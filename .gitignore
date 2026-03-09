@@ -1,0 +1,70 @@
+# ─── Secrets & Env ────────────────────────────────────────────────
+.env
+.env.local
+.env.production
+.env.*.local
+apps/api/.env
+apps/web/.env.local
+*.env
+
+# ─── Python ───────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+.venv/
+venv/
+env/
+*.egg-info/
+dist/
+build/
+*.so
+.pytest_cache/
+.mypy_cache/
+htmlcov/
+.coverage
+*.db
+*.sqlite3
+
+# ─── Node.js ──────────────────────────────────────────────────────
+node_modules/
+apps/web/.next/
+apps/web/out/
+apps/web/.turbo/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# ─── Docker ───────────────────────────────────────────────────────
+# (docker-compose.production.yml est commité intentionnellement)
+
+# ─── Logs ─────────────────────────────────────────────────────────
+*.log
+logs/
+*.log.*
+
+# ─── IDE ──────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# ─── Tests & Temp ─────────────────────────────────────────────────
+test-dce-files/
+test_dce_pdfs/
+*.pdf
+test_results.json
+create_test_pdfs*.py
+test_*.py
+test_pipeline.py
+
+# ─── Alembic versions générées (garder le dossier, ignorer .pyc) ──
+apps/api/alembic/versions/__pycache__/
+
+# ─── Certificats SSL ──────────────────────────────────────────────
+nginx/ssl/
+certbot/

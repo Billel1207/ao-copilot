@@ -1,0 +1,85 @@
+import os
+from pathlib import Path
+
+from pydantic_settings import BaseSettings, SettingsConfigDict
+from typing import Literal
+
+# Force-load .env BEFORE Pydantic reads os.environ
+# (Claude Code sets ANTHROPIC_API_KEY="" in shell env which overrides .env)
+from dotenv import load_dotenv
+
+_env_path = Path(__file__).resolve().parent.parent / ".env"
+if _env_path.exists():
+    load_dotenv(_env_path, override=True)
+
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=".env", env_file_encoding="utf-8", extra="ignore"
+    )
+
+    # App
+    APP_ENV: Literal["development", "staging", "production"] = "development"
+    SECRET_KEY: str = "change-me-in-production-min-32-chars"
+    ALLOWED_ORIGINS: str = "http://localhost:3000"
+
+    # Database
+    DATABASE_URL: str = "postgresql+asyncpg://aocopilot:aocopilot_secret@localhost:5432/aocopilot"
+    DATABASE_URL_SYNC: str = "postgresql://aocopilot:aocopilot_secret@localhost:5432/aocopilot"
+
+    # Redis / Celery
+    REDIS_URL: str = "redis://localhost:6379/0"
+    CELERY_BROKER_URL: str = "redis://localhost:6379/1"
+    CELERY_RESULT_BACKEND: str = "redis://localhost:6379/2"
+
+    # S3 / MinIO
+    S3_ENDPOINT_URL: str = "http://localhost:9000"
+    S3_ACCESS_KEY: str = "aocopilot_minio"
+    S3_SECRET_KEY: str = "aocopilot_minio_secret"
+    S3_BUCKET_NAME: str = "aocopilot-documents"
+    S3_REGION: str = "fr-par"
+    S3_SIGNED_URL_EXPIRY: int = 900
+
+    # LLM (Anthropic Claude — moteur principal)
+    ANTHROPIC_API_KEY: str = ""
+    LLM_MODEL: str = "claude-sonnet-4-6"
+    LLM_TEMPERATURE: float = 0.1
+    LLM_MAX_TOKENS: int = 4096
+
+    # Embeddings (OpenAI — meilleur rapport qualité/prix pour les vecteurs)
+    OPENAI_API_KEY: str = ""
+    EMBEDDING_MODEL: str = "text-embedding-3-small"
+    EMBEDDING_DIMS: int = 1536
+
+    # JWT
+    JWT_ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+
+    # Sentry
+    SENTRY_DSN: str = ""
+
+    # Stripe Billing
+    STRIPE_SECRET_KEY: str = ""
+    STRIPE_WEBHOOK_SECRET: str = ""
+    STRIPE_PRICE_STARTER: str = ""   # price_xxx du plan Starter (79€/mois)
+    STRIPE_PRICE_PRO: str = ""       # price_xxx du plan Pro (199€/mois)
+    STRIPE_PRICE_EUROPE: str = ""    # price_xxx du plan Europe (299€/mois)
+    STRIPE_PUBLISHABLE_KEY: str = "" # pk_xxx pour le frontend
+
+    # Email (Resend)
+    RESEND_API_KEY: str = ""
+    EMAIL_FROM: str = "AO Copilot <noreply@ao-copilot.fr>"
+    FRONTEND_URL: str = "http://localhost:3000"
+
+    # ─── e-Attestations.com ───────────────────────────────
+    EATTESTATION_API_KEY: str = ""
+    EATTESTATION_BASE_URL: str = "https://api.e-attestations.com/v2"
+
+    @property
+    def allowed_origins_list(self) -> list[str]:
+        return [o.strip() for o in self.ALLOWED_ORIGINS.split(",")]
+
+
+settings = Settings()
+

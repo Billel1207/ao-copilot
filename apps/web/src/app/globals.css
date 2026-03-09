@@ -1,0 +1,175 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,400;0,14..32,500;0,14..32,600;0,14..32,700;1,14..32,400&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Couleurs CSS custom ─────────────────────────────────────────── */
+:root {
+  --background: #FAFAF9;
+  --foreground: #1C1917;
+  --primary: #1E40AF;
+  --success: #059669;
+  --warning: #D97706;
+  --danger: #DC2626;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: 'Inter', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ── Transitions universelles ─────────────────────────────────────── */
+* {
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ── Shimmer animation (skeleton loaders) ─────────────────────────── */
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    #F5F5F4 25%,
+    #E7E5E4 50%,
+    #F5F5F4 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.8s linear infinite;
+  border-radius: 0.375rem;
+}
+
+/* ── Composants ────────────────────────────────────────────────────── */
+@layer components {
+
+  /* Boutons */
+  .btn-primary {
+    @apply bg-primary-800 hover:bg-primary-700 active:bg-primary-900
+           text-white font-semibold px-4 py-2.5 rounded-xl
+           transition-all duration-150 shadow-sm hover:shadow-md
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-primary-gradient {
+    @apply bg-gradient-to-r from-primary-800 to-primary-700
+           hover:from-primary-900 hover:to-primary-800
+           text-white font-semibold px-5 py-2.5 rounded-xl
+           transition-all duration-150 shadow-md hover:shadow-lg
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-secondary {
+    @apply bg-white border border-slate-200 hover:bg-slate-50 hover:border-slate-300
+           text-slate-700 font-medium px-4 py-2.5 rounded-xl
+           transition-all duration-150 shadow-sm
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-danger {
+    @apply bg-danger-600 hover:bg-danger-700 text-white font-semibold px-4 py-2.5 rounded-xl
+           transition-all duration-150 shadow-sm
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  /* Cards */
+  .card {
+    @apply bg-white rounded-2xl border border-slate-100 shadow-card;
+  }
+
+  .card-hover {
+    @apply card hover:shadow-card-hover transition-shadow duration-150 cursor-pointer;
+  }
+
+  /* Left-accent card — bordure colorée à gauche (signature visuelle) */
+  .card-accent {
+    @apply card border-l-4 pl-5 pr-5 py-4;
+  }
+
+  .card-accent-success { @apply card-accent border-l-success-600; }
+  .card-accent-warning { @apply card-accent border-l-warning-600; }
+  .card-accent-danger  { @apply card-accent border-l-danger-600; }
+  .card-accent-primary { @apply card-accent border-l-primary-800; }
+
+  /* Stat card avec gradient */
+  .stat-card {
+    @apply bg-gradient-to-br from-primary-50 to-primary-100
+           rounded-2xl border border-primary-100 p-5 shadow-card;
+  }
+
+  /* Badges filled (pas outline) */
+  .badge {
+    @apply inline-flex items-center gap-1.5 px-2.5 py-1
+           rounded-full text-xs font-semibold;
+  }
+
+  .badge-ok        { @apply badge bg-success-100 text-success-700; }
+  .badge-manquant  { @apply badge bg-danger-100 text-danger-700; }
+  .badge-clarifier { @apply badge bg-warning-100 text-warning-700; }
+  .badge-info      { @apply badge bg-slate-100 text-slate-600; }
+  .badge-primary   { @apply badge bg-primary-100 text-primary-800; }
+
+  /* Badges criticité */
+  .badge-critique  { @apply badge bg-danger-600 text-white; }
+  .badge-important { @apply badge bg-warning-600 text-white; }
+
+  /* Input */
+  .input-field {
+    @apply w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm
+           placeholder:text-slate-400
+           focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent
+           transition-shadow duration-150;
+  }
+
+  /* Tab indicator (pour les onglets analysés) */
+  .tab-item {
+    @apply relative pb-3 px-1 text-sm font-medium text-slate-500
+           hover:text-slate-700 transition-colors duration-150 cursor-pointer;
+  }
+
+  .tab-item-active {
+    @apply tab-item text-primary-800;
+  }
+
+  .tab-item-active::after {
+    content: '';
+    @apply absolute bottom-0 left-0 right-0 h-0.5 bg-primary-700 rounded-full;
+  }
+
+  /* Risk row (tableau des risques) */
+  .risk-row-high   { @apply border-l-4 border-l-danger-500 bg-danger-50/50; }
+  .risk-row-medium { @apply border-l-4 border-l-warning-500 bg-warning-50/50; }
+  .risk-row-low    { @apply border-l-4 border-l-success-500 bg-success-50/50; }
+
+  /* Checklist row hover */
+  .checklist-row {
+    @apply transition-all duration-100 hover:bg-slate-50/70;
+  }
+
+  /* Empty state */
+  .empty-state {
+    @apply flex flex-col items-center justify-center py-16 text-center text-slate-400;
+  }
+}
+
+/* ── Scrollbar fine (webkit) ───────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: #CBD5E1;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover { background: #94A3B8; }
+
+/* ── Focus ring accessible ─────────────────────────────────────────── */
+:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}

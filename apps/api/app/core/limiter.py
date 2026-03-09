@@ -1,0 +1,6 @@
+"""Rate limiter global — importé par main.py ET les routers sans import circulaire."""
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+from app.config import settings
+
+limiter = Limiter(key_func=get_remote_address, storage_uri=settings.REDIS_URL)
