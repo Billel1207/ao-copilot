@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { useScoringSimulation } from "@/hooks/useAnalysis";
 import { cn } from "@/lib/utils";
+import AIDisclaimer from "@/components/ui/AIDisclaimer";
 
 interface Props {
   projectId: string;
@@ -108,8 +109,16 @@ function ScoreCircle20({ score, label }: { score: number; label?: string }) {
 
   return (
     <div className="flex flex-col items-center gap-1">
-      <div className="relative" style={{ width: size, height: size }}>
-        <svg width={size} height={size} className="rotate-[-90deg]">
+      <div
+        className="relative"
+        style={{ width: size, height: size }}
+        role="meter"
+        aria-valuenow={score}
+        aria-valuemin={0}
+        aria-valuemax={20}
+        aria-label={`${label ?? "Score"} : ${score.toFixed(1)} sur 20`}
+      >
+        <svg width={size} height={size} className="rotate-[-90deg]" aria-hidden="true">
           <circle
             cx={size / 2}
             cy={size / 2}
@@ -217,7 +226,14 @@ function DimensionCard({ dim, index }: { dim: ScoringDimension; index: number })
             {(ratio * 100).toFixed(0)}%
           </span>
         </div>
-        <div className={cn("h-2 rounded-full w-full", colors.barBg)}>
+        <div
+          className={cn("h-2 rounded-full w-full", colors.barBg)}
+          role="meter"
+          aria-valuenow={dim.estimated_score}
+          aria-valuemin={0}
+          aria-valuemax={dim.max_score}
+          aria-label={`${dim.criterion} : ${dim.estimated_score} sur ${dim.max_score}`}
+        >
           <div
             className={cn("h-2 rounded-full transition-all duration-500", colors.barFill)}
             style={{ width: `${pctWidth}%` }}
@@ -237,7 +253,7 @@ function DimensionCard({ dim, index }: { dim: ScoringDimension; index: number })
         <div className="rounded-lg px-3 py-2 bg-blue-50 border border-blue-100">
           <p className="text-xs font-semibold text-blue-800 mb-1 inline-flex items-center gap-1">
             <Lightbulb className="w-3.5 h-3.5" />
-            Pistes d&apos;amelioration
+            Pistes d&apos;amélioration
           </p>
           <ul className="space-y-0.5">
             {dim.tips_to_improve.map((tip, i) => (
@@ -298,7 +314,7 @@ export function ScoringSimulatorTab({ projectId }: Props) {
           Impossible de charger la simulation de notation.
         </p>
         <p className="text-slate-400 text-sm">
-          Verifiez que l&apos;analyse du projet a bien ete lancee.
+          Vérifiez que l&apos;analyse du projet a bien été lancée.
         </p>
       </div>
     );
@@ -308,7 +324,7 @@ export function ScoringSimulatorTab({ projectId }: Props) {
     return (
       <div className="card p-8 flex flex-col items-center gap-3 text-center animate-fade-in">
         <FileX className="w-10 h-10 text-slate-300" />
-        <p className="text-slate-500">Aucune donnee disponible.</p>
+        <p className="text-slate-500">Aucune donnée disponible.</p>
       </div>
     );
   }
@@ -343,7 +359,7 @@ export function ScoringSimulatorTab({ projectId }: Props) {
         <div className="card p-3 flex items-center gap-3 bg-blue-50 border border-blue-100">
           <Info className="w-5 h-5 text-blue-500 shrink-0" />
           <p className="text-xs text-blue-700 leading-relaxed">
-            Configurez votre profil entreprise pour une simulation plus precise.
+            Configurez votre profil entreprise pour une simulation plus précise.
           </p>
         </div>
       )}
@@ -369,7 +385,7 @@ export function ScoringSimulatorTab({ projectId }: Props) {
                 icon={<TrendingUp className="w-5 h-5" style={{ color: noteColor(scoring.note_technique_estimee) }} />}
               />
               <StatCard
-                label="Note financiere"
+                label="Note financière"
                 value={scoring.note_financiere_estimee}
                 color={noteColor(scoring.note_financiere_estimee)}
                 icon={<Star className="w-5 h-5" style={{ color: noteColor(scoring.note_financiere_estimee) }} />}
@@ -386,6 +402,7 @@ export function ScoringSimulatorTab({ projectId }: Props) {
                   "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold",
                   classementCfg.badgeCls,
                 )}
+                aria-label={`Classement probable : ${scoring.classement_probable}`}
               >
                 {classementCfg.icon}
                 {scoring.classement_probable}
@@ -398,7 +415,7 @@ export function ScoringSimulatorTab({ projectId }: Props) {
         {scoring.resume && (
           <div className="mt-4 pt-4 border-t border-slate-100">
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">
-              Synthese
+              Synthèse
             </p>
             <p className="text-sm text-slate-700 leading-relaxed">
               {scoring.resume}
@@ -410,7 +427,7 @@ export function ScoringSimulatorTab({ projectId }: Props) {
       {/* -- Dimensions section -- */}
       <div>
         <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3 px-1">
-          Detail des criteres ({scoring.dimensions.length})
+          Détail des critères ({scoring.dimensions.length})
         </p>
         <div className="space-y-3">
           {scoring.dimensions.map((dim, i) => (
@@ -424,7 +441,7 @@ export function ScoringSimulatorTab({ projectId }: Props) {
         <div className="card p-5 bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100">
           <p className="text-xs font-semibold text-blue-800 uppercase tracking-wide mb-3 inline-flex items-center gap-1.5">
             <Target className="w-4 h-4" />
-            Axes d&apos;amelioration prioritaires
+            Axes d&apos;amélioration prioritaires
           </p>
           <ol className="space-y-2">
             {scoring.axes_amelioration.map((axe, i) => (
@@ -442,10 +459,8 @@ export function ScoringSimulatorTab({ projectId }: Props) {
         </div>
       )}
 
-      {/* -- Footer -- */}
-      <p className="text-[11px] text-slate-400 text-center pb-2">
-        Simulation indicative basee sur l&apos;IA — les notes reelles dependent de l&apos;offre finale soumise.
-      </p>
+      {/* -- Footer disclaimer -- */}
+      <AIDisclaimer text="Simulation indicative basée sur l'IA — les notes réelles dépendent de l'offre finale soumise. Ne se substitue pas à un conseil professionnel." />
     </div>
   );
 }

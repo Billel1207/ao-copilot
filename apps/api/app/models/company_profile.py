@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy import String, ForeignKey, DateTime, Integer, JSON, text, UniqueConstraint
+from sqlalchemy import Boolean, String, ForeignKey, DateTime, Integer, JSON, text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database import Base
 
@@ -29,6 +29,27 @@ class CompanyProfile(Base):
     max_market_size_eur: Mapped[int | None] = mapped_column(
         Integer, nullable=True
     )  # taille max marché capable de gérer
+
+    # ── Champs étendus (Go/No-Go 9 dimensions) ───────────────────────────
+    assurance_rc_montant: Mapped[int | None] = mapped_column(
+        Integer, nullable=True
+    )  # Montant couverture RC Pro en €
+    assurance_decennale: Mapped[bool | None] = mapped_column(
+        Boolean, nullable=True
+    )  # Assurance décennale souscrite ?
+    partenaires_specialites: Mapped[list] = mapped_column(
+        JSON, nullable=False, default=list, server_default="[]"
+    )  # Spécialités couvertes par sous-traitants / partenaires
+    marge_minimale_pct: Mapped[int | None] = mapped_column(
+        Integer, nullable=True
+    )  # Marge brute minimale acceptée (%)
+    max_projets_simultanes: Mapped[int | None] = mapped_column(
+        Integer, nullable=True
+    )  # Nombre max de projets en parallèle
+    projets_actifs_count: Mapped[int | None] = mapped_column(
+        Integer, nullable=True
+    )  # Nombre de projets actifs actuellement
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=text("NOW()")
     )

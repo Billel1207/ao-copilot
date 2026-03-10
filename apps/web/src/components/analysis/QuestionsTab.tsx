@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { useQuestions } from "@/hooks/useAnalysis";
 import { cn } from "@/lib/utils";
+import AIDisclaimer from "@/components/ui/AIDisclaimer";
 
 interface Props {
   projectId: string;
@@ -85,6 +86,7 @@ function PriorityBadge({ priority }: { priority: Priority }) {
         "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold",
         cfg.badgeCls
       )}
+      aria-label={`Priorite : ${cfg.label}`}
     >
       {cfg.icon}
       {cfg.label}
@@ -328,9 +330,7 @@ export function QuestionsTab({ projectId }: Props) {
             </p>
           </div>
         </div>
-        <p className="text-[11px] text-slate-400 text-center pb-2">
-          Analyse générée automatiquement par IA — vérifiez avec les documents originaux.
-        </p>
+        <AIDisclaimer compact />
       </div>
     );
   }
@@ -426,10 +426,8 @@ export function QuestionsTab({ projectId }: Props) {
         </p>
       </div>
 
-      {/* ── Footer note ── */}
-      <p className="text-[11px] text-slate-400 text-center pb-2">
-        Analyse générée automatiquement par IA — vérifiez avec les documents originaux.
-      </p>
+      {/* ── Footer disclaimer ── */}
+      <AIDisclaimer />
     </div>
   );
 }

@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { useRcAnalysis } from "@/hooks/useAnalysis";
 import { cn } from "@/lib/utils";
+import AIDisclaimer from "@/components/ui/AIDisclaimer";
 
 interface Props {
   projectId: string;
@@ -115,7 +116,10 @@ function ConditionCard({ condition, index }: { condition: ConditionAcces; index:
           </div>
         </div>
         <div className="shrink-0">
-          <span className={cn("inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold", cfg.badgeCls)}>
+          <span
+            className={cn("inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold", cfg.badgeCls)}
+            aria-label={`Type de condition : ${cfg.label}`}
+          >
             {cfg.icon}
             {cfg.label}
           </span>
@@ -350,12 +354,18 @@ export function RcAnalysisTab({ projectId }: Props) {
           <div className="space-y-2">
             <div className="flex items-center gap-2">
               {rcData.groupement.autorise ? (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-800 border border-green-200">
+                <span
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-800 border border-green-200"
+                  aria-label="Groupement : Autorise"
+                >
                   <ShieldCheck className="w-3.5 h-3.5" />
                   Autoris&eacute;
                 </span>
               ) : (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-800 border border-red-200">
+                <span
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-800 border border-red-200"
+                  aria-label="Groupement : Non autorise"
+                >
                   <ShieldAlert className="w-3.5 h-3.5" />
                   Non autoris&eacute;
                 </span>
@@ -389,12 +399,18 @@ export function RcAnalysisTab({ projectId }: Props) {
           <div className="space-y-2">
             <div className="flex items-center gap-2">
               {rcData.sous_traitance.autorisee ? (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-800 border border-green-200">
+                <span
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-800 border border-green-200"
+                  aria-label="Sous-traitance : Autorisee"
+                >
                   <ShieldCheck className="w-3.5 h-3.5" />
                   Autoris&eacute;e
                 </span>
               ) : (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-800 border border-red-200">
+                <span
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-800 border border-red-200"
+                  aria-label="Sous-traitance : Non autorisee"
+                >
                   <ShieldAlert className="w-3.5 h-3.5" />
                   Non autoris&eacute;e
                 </span>
@@ -421,12 +437,18 @@ export function RcAnalysisTab({ projectId }: Props) {
           <div className="space-y-2">
             <div className="flex items-center gap-2">
               {rcData.variantes.autorisees ? (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-800 border border-green-200">
+                <span
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-800 border border-green-200"
+                  aria-label="Variantes : Autorisees"
+                >
                   <ShieldCheck className="w-3.5 h-3.5" />
                   Autoris&eacute;es
                 </span>
               ) : (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-800 border border-red-200">
+                <span
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-800 border border-red-200"
+                  aria-label="Variantes : Non autorisees"
+                >
                   <ShieldAlert className="w-3.5 h-3.5" />
                   Non autoris&eacute;es
                 </span>
@@ -439,10 +461,8 @@ export function RcAnalysisTab({ projectId }: Props) {
         </InfoCard>
       )}
 
-      {/* ── Footer note ── */}
-      <p className="text-[11px] text-slate-400 text-center pb-2">
-        Analyse g&eacute;n&eacute;r&eacute;e automatiquement par IA — v&eacute;rifiez avec les documents originaux.
-      </p>
+      {/* ── Footer disclaimer ── */}
+      <AIDisclaimer />
     </div>
   );
 }

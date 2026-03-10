@@ -54,23 +54,23 @@ class PlanConfig:
 PLANS: dict[PlanId, PlanConfig] = {
     "free": PlanConfig(
         name="Gratuit",
-        docs_per_month=3,
-        max_users=1,
-        monthly_eur=0.0,
-        stripe_price_id="",
-        retention_days=7,
-        word_export=False,
-        features=["3 documents/mois", "1 utilisateur", "Analyse IA basique"],
-    ),
-    "trial": PlanConfig(
-        name="Essai 14 jours",
         docs_per_month=5,
         max_users=1,
         monthly_eur=0.0,
         stripe_price_id="",
         retention_days=14,
         word_export=False,
-        features=["5 documents/mois", "1 utilisateur", "Analyse IA complète", "14 jours gratuits"],
+        features=["5 documents/mois", "1 utilisateur", "Analyse IA basique", "14 jours de rétention"],
+    ),
+    "trial": PlanConfig(
+        name="Essai 14 jours",
+        docs_per_month=15,
+        max_users=1,
+        monthly_eur=0.0,
+        stripe_price_id="",
+        retention_days=30,
+        word_export=True,
+        features=["15 documents/mois", "1 utilisateur", "Analyse IA complète", "Export Word", "14 jours gratuits"],
     ),
     "starter": PlanConfig(
         name="Starter",
@@ -79,8 +79,8 @@ PLANS: dict[PlanId, PlanConfig] = {
         monthly_eur=79.0,
         stripe_price_id=settings.STRIPE_PRICE_STARTER,
         retention_days=30,
-        word_export=False,
-        features=["15 documents/mois", "1 utilisateur", "Analyse IA complète", "Export PDF", "Support email"],
+        word_export=True,
+        features=["15 documents/mois", "1 utilisateur", "Analyse IA complète", "Export PDF + Word", "Support email"],
     ),
     "pro": PlanConfig(
         name="Pro",
@@ -94,7 +94,7 @@ PLANS: dict[PlanId, PlanConfig] = {
             "60 documents/mois",
             "5 utilisateurs",
             "Analyse IA complète",
-            "Export PDF + Word",
+            "Export PDF + Word + Excel",
             "Gestion équipe",
             "Support prioritaire",
         ],
@@ -102,14 +102,14 @@ PLANS: dict[PlanId, PlanConfig] = {
     "europe": PlanConfig(
         name="Europe",
         docs_per_month=100,
-        max_users=10,
+        max_users=20,
         monthly_eur=299.0,
         stripe_price_id=settings.STRIPE_PRICE_EUROPE,
         retention_days=180,
         word_export=True,
         features=[
             "100 documents/mois",
-            "10 utilisateurs",
+            "20 utilisateurs",
             "Export Word inclus",
             "Monitoring TED (UE)",
             "Wallonie & Luxembourg",
@@ -121,11 +121,20 @@ PLANS: dict[PlanId, PlanConfig] = {
         name="Business",
         docs_per_month=999,
         max_users=999,
-        monthly_eur=0.0,  # Sur devis
-        stripe_price_id="",
+        monthly_eur=499.0,
+        stripe_price_id=settings.STRIPE_PRICE_BUSINESS,
         retention_days=365,
         word_export=True,
-        features=["Illimité", "SSO", "SLA 99.9%", "Onboarding dédié", "API accès"],
+        features=[
+            "Documents illimités",
+            "Utilisateurs illimités",
+            "SSO SAML",
+            "SLA 99.9%",
+            "Onboarding dédié",
+            "API webhooks",
+            "Export PDF + Word + Excel",
+            "Support dédié",
+        ],
     ),
 }
 
@@ -293,9 +302,22 @@ class BillingService:
             raise HTTPException(status_code=400, detail="Signature webhook invalide")
 
         event_type = event["type"]
+        event_id = event.get("id", "")
         data = event["data"]["object"]
 
-        logger.info("stripe_webhook_received", event_type=event_type)
+        logger.info("stripe_webhook_received", event_type=event_type, event_id=event_id)
+
+        # Idempotency — skip already-processed events (Redis SET NX with 48h TTL)
+        if event_id:
+            try:
+                import redis as redis_lib
+                r = redis_lib.from_url(settings.CELERY_BROKER_URL, socket_timeout=2)
+                cache_key = f"stripe_event:{event_id}"
+                if not r.set(cache_key, "1", nx=True, ex=172800):  # 48h TTL
+                    logger.info("stripe_webhook_duplicate_skipped", event_id=event_id)
+                    return {"status": "duplicate", "event": event_type}
+            except Exception:
+                pass  # Redis down — process anyway (at-least-once is better than skipping)
 
         if event_type == "checkout.session.completed":
             await self._handle_checkout_completed(data, db)

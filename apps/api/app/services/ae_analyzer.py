@@ -4,17 +4,22 @@ L'AE définit les ENGAGEMENTS du titulaire envers l'acheteur public :
 prix, délais, pénalités, garanties, reconduction, et toutes les clauses
 financières et contractuelles du marché.
 """
-import logging
+import structlog
 from typing import Any
 
+from app.services.ccag_travaux_2021 import get_ccag_context_for_analyzer
+from app.services.jurisprudence_btp import get_jurisprudence_context_for_analyzer
 from app.services.llm import llm_service
 from app.services.llm_validators import ValidatedAeAnalysis
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 # ── Prompt système spécialisé AE ──────────────────────────────────────────
 
-AE_SYSTEM_PROMPT = """Tu es un juriste expert en droit des marchés publics français et en droit de la construction BTP.
+_CCAG_CONTEXT_AE = get_ccag_context_for_analyzer("ae")
+_JURIS_CONTEXT_AE = get_jurisprudence_context_for_analyzer("ae")
+
+AE_SYSTEM_PROMPT = f"""Tu es un juriste expert en droit des marchés publics français et en droit de la construction BTP.
 Tu analyses des Actes d'Engagement (AE) pour identifier les engagements contractuels du titulaire et évaluer les risques financiers et juridiques.
 
 Tu dois identifier avec précision les éléments suivants :
@@ -77,12 +82,19 @@ Tu dois identifier avec précision les éléments suivants :
     - citation : extrait textuel (50-150 caractères)
     - conseil : recommandation concrète pour négocier ou se protéger
 
+{_CCAG_CONTEXT_AE}
+
+{_JURIS_CONTEXT_AE}
+
 11. SCORE DE RISQUE GLOBAL (0-100) :
     - 0-30 : risque faible (vert) — conditions équilibrées
     - 31-70 : risque modéré (amber) — certaines clauses à surveiller
     - 71-100 : risque élevé (rouge) — clauses potentiellement abusives
 
 12. RÉSUMÉ : synthèse de 3-5 phrases des engagements clés et des points de vigilance.
+
+13. DÉROGATIONS CCAG : Pour chaque engagement de l'AE, COMPARE au standard CCAG-Travaux 2021.
+    Si l'AE déroge au CCAG de manière DÉFAVORABLE au titulaire, ajoute-la dans la liste ccag_derogations.
 
 Réponds UNIQUEMENT en JSON valide sans commentaires."""
 
@@ -112,6 +124,15 @@ Réponds avec ce JSON exact :
       "risk_level": "CRITIQUE|HAUT|MOYEN|BAS",
       "citation": "string (extrait du texte)",
       "conseil": "string (recommandation)"
+    }}
+  ],
+  "ccag_derogations": [
+    {{
+      "article_ccag": "string (ex: '19.1')",
+      "valeur_ccag": "string (valeur standard CCAG)",
+      "valeur_ae": "string (valeur trouvée dans l'AE)",
+      "impact": "DEFAVORABLE|FAVORABLE|NEUTRE",
+      "description": "string (explication courte de la dérogation)"
     }}
   ],
   "score_risque_global": 0,
@@ -219,10 +240,33 @@ def analyze_ae(text: str, project_id: str | None = None) -> dict[str, Any]:
     confidence = result.get("confidence_overall", 0.5)
     confidence = max(0.0, min(1.0, float(confidence)))
 
+    # Extraire et valider les dérogations CCAG
+    raw_derogations = result.get("ccag_derogations", [])
+    validated_derogations = []
+    for derog in raw_derogations:
+        if not isinstance(derog, dict):
+            continue
+        impact = derog.get("impact", "NEUTRE")
+        if impact not in ("DEFAVORABLE", "FAVORABLE", "NEUTRE"):
+            impact = "NEUTRE"
+        validated_derogations.append({
+            "article_ccag": derog.get("article_ccag", ""),
+            "valeur_ccag": derog.get("valeur_ccag", ""),
+            "valeur_ae": derog.get("valeur_ae", derog.get("valeur_ccap", "")),
+            "impact": impact,
+            "description": derog.get("description", ""),
+        })
+
+    nb_derogations_defavorables = sum(
+        1 for d in validated_derogations if d["impact"] == "DEFAVORABLE"
+    )
+
     logger.info(
         f"{log_prefix}AE analysé — score={score}, "
         f"clauses={len(validated_clauses)} (critiques={nb_critiques}, hautes={nb_hautes}), "
-        f"prix={result.get('prix_forme', '?')}, durée={result.get('duree_marche', '?')}"
+        f"prix={result.get('prix_forme', '?')}, durée={result.get('duree_marche', '?')}, "
+        f"dérogations CCAG={len(validated_derogations)} "
+        f"(défavorables={nb_derogations_defavorables})"
     )
 
     return {
@@ -238,6 +282,8 @@ def analyze_ae(text: str, project_id: str | None = None) -> dict[str, Any]:
         "avance_pct": avance,
         "delai_paiement_jours": delai_paiement,
         "clauses_risquees": validated_clauses,
+        "ccag_derogations": validated_derogations,
+        "nb_derogations_defavorables": nb_derogations_defavorables,
         "score_risque_global": score,
         "nb_clauses_critiques": nb_critiques,
         "nb_clauses_hautes": nb_hautes,

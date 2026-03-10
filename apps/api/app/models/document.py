@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from sqlalchemy import String, ForeignKey, DateTime, Boolean, Integer, Text, text
+from sqlalchemy import String, ForeignKey, DateTime, Boolean, Integer, Float, Text, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database import Base
 
@@ -21,6 +21,9 @@ class AoDocument(Base):
     status: Mapped[str] = mapped_column(String(20), default="pending")  # pending|processing|done|error
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     uploaded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("NOW()"))
+    # OCR quality scoring (ajouté GAP 1)
+    ocr_quality_score: Mapped[float | None] = mapped_column(Float, nullable=True)  # Score moyen OCR 0-100
+    ocr_warning: Mapped[str | None] = mapped_column(Text, nullable=True)  # Message d'alerte qualité OCR
 
     project: Mapped["AoProject"] = relationship("AoProject", back_populates="documents")
     pages: Mapped[list["DocumentPage"]] = relationship("DocumentPage", back_populates="document", cascade="all, delete-orphan")
@@ -38,5 +41,7 @@ class DocumentPage(Base):
     raw_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     char_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
     section: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # OCR confidence per page (ajouté GAP 1)
+    ocr_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)  # Score OCR 0-100 pour cette page
 
     document: Mapped["AoDocument"] = relationship("AoDocument", back_populates="pages")

@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from sqlalchemy import String, Integer, DateTime, Boolean, text
+from sqlalchemy import String, Integer, DateTime, Boolean, Text, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database import Base
 
@@ -19,6 +19,12 @@ class Organization(Base):
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     trial_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     onboarding_completed: Mapped[bool] = mapped_column(Boolean, default=False, server_default=text("false"))
+
+    # SSO SAML (plan Business uniquement)
+    sso_idp_entity_id: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    sso_idp_sso_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    sso_idp_certificate: Mapped[str | None] = mapped_column(Text, nullable=True)
+    sso_idp_slo_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
     users: Mapped[list["User"]] = relationship("User", back_populates="organization")
     projects: Mapped[list["AoProject"]] = relationship("AoProject", back_populates="organization")

@@ -7,12 +7,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 import redis as redis_lib
 
+from sqlalchemy import func as sa_func
+
 from app.database import get_db
 from app.models.project import AoProject
+from app.models.document import AoDocument
 from app.models.analysis import ExtractionResult, ChecklistItem, CriteriaItem
 from app.models.deadline import ProjectDeadline
 from app.models.user import User
 from app.models.organization import Organization
+from app.services.billing import billing_service
 from app.schemas.analysis import (
     SummaryOut, ChecklistOut, ChecklistItemOut, ChecklistItemUpdate,
     CriteriaOut, AnalysisStatusOut
@@ -59,6 +63,39 @@ async def trigger_analysis(
     if project.status == "analyzing":
         return {"message": "Analyse déjà en cours", "project_id": str(project_id)}
 
+    # Quota check — empêche le Denial-of-Wallet
+    await billing_service.enforce_quota(org, db)
+
+    # Pré-validation : au moins 1 document traité
+    doc_count_result = await db.execute(
+        select(sa_func.count(AoDocument.id)).where(
+            AoDocument.project_id == project_id,
+            AoDocument.status == "done",
+        )
+    )
+    if (doc_count_result.scalar_one() or 0) == 0:
+        raise HTTPException(
+            status_code=400,
+            detail="Aucun document traité dans ce projet. Uploadez au moins un document avant de lancer l'analyse.",
+        )
+
+    # OCR quality gating — avertir si qualité moyenne < 40%
+    ocr_warning = None
+    ocr_avg_result = await db.execute(
+        select(sa_func.avg(AoDocument.ocr_quality_score)).where(
+            AoDocument.project_id == project_id,
+            AoDocument.status == "done",
+            AoDocument.ocr_quality_score.isnot(None),
+        )
+    )
+    ocr_avg = ocr_avg_result.scalar_one()
+    if ocr_avg is not None and ocr_avg < 40:
+        ocr_warning = (
+            f"Qualité OCR moyenne faible ({ocr_avg:.0f}%). "
+            "Les résultats d'analyse peuvent être imprécis. "
+            "Privilégiez des PDFs textuels ou des scans de meilleure qualité."
+        )
+
     from app.worker.tasks import analyze_project
     task = analyze_project.delay(str(project_id))
 
@@ -71,7 +108,10 @@ async def trigger_analysis(
     project.status = "analyzing"
     await db.flush()
 
-    return {"message": "Analyse lancée", "project_id": str(project_id), "task_id": task.id}
+    response = {"message": "Analyse lancée", "project_id": str(project_id), "task_id": task.id}
+    if ocr_warning:
+        response["ocr_warning"] = ocr_warning
+    return response
 
 
 @router.get("/{project_id}/analyze/status", response_model=AnalysisStatusOut)
@@ -111,6 +151,14 @@ async def get_analysis_status(
             logger.warning(f"Lecture progression Redis échouée: {e}")
             progress_pct = 50
             current_step = "Analyse en cours..."
+
+    elif project.status == "error":
+        progress_pct = 0
+        try:
+            error_msg = get_redis().get(f"project_error:{project_id}")
+        except Exception:
+            error_msg = None
+        current_step = error_msg or "L'analyse a échoué. Veuillez réessayer."
 
     elif project.status == "draft":
         progress_pct = 0
@@ -271,7 +319,7 @@ async def chat_with_dce(
 
     # RAG : récupérer les chunks pertinents (sync dans thread)
     from app.worker.tasks import SyncSession
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     def _retrieve():
         sync_db = SyncSession()
         try:
@@ -339,7 +387,7 @@ async def generate_checklist_response(
     await _get_project_or_404(project_id, org.id, db)
 
     # Vérifier le plan (Pro+ uniquement)
-    if org.plan not in ("pro", "business"):
+    if org.plan not in ("pro", "europe", "business"):
         raise HTTPException(
             status_code=403,
             detail="L'assistant rédaction est disponible à partir du plan Pro"
@@ -361,7 +409,7 @@ async def generate_checklist_response(
     import asyncio
 
     from app.worker.tasks import SyncSession
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     query = f"{item.requirement} {item.what_to_provide or ''}"
     def _retrieve_writing():
         sync_db = SyncSession()
@@ -508,7 +556,9 @@ async def get_deadlines(
 # ── Analyse des risques CCAP ─────────────────────────────────────────────────
 
 @router.get("/{project_id}/ccap-risks")
+@limiter.limit("10/hour")
 async def get_ccap_risks(
+    request: Request,
     project_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -584,7 +634,7 @@ async def get_ccap_risks(
         }
 
     # ── 4. Lancer l'analyse LLM (dans un thread — appel synchrone) ─────────
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     try:
         analysis = await loop.run_in_executor(
             None,
@@ -667,7 +717,9 @@ async def _get_doc_text_by_type(
 # ── V1 : Analyse RC (Règlement de Consultation) ─────────────────────────────
 
 @router.get("/{project_id}/rc-analysis")
+@limiter.limit("10/hour")
 async def get_rc_analysis(
+    request: Request,
     project_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -692,7 +744,7 @@ async def get_rc_analysis(
         return {"message": "Aucun document RC trouvé. Uploadez un Règlement de Consultation.", "no_rc_document": True}
 
     import asyncio
-    analysis = await asyncio.get_event_loop().run_in_executor(
+    analysis = await asyncio.get_running_loop().run_in_executor(
         None, lambda: analyze_rc(full_text, project_id=str(project_id))
     )
 
@@ -708,7 +760,9 @@ async def get_rc_analysis(
 # ── V2 : Analyse AE (Acte d'Engagement) ─────────────────────────────────────
 
 @router.get("/{project_id}/ae-analysis")
+@limiter.limit("10/hour")
 async def get_ae_analysis(
+    request: Request,
     project_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -733,7 +787,7 @@ async def get_ae_analysis(
         return {"message": "Aucun document AE trouvé. Uploadez un Acte d'Engagement.", "no_ae_document": True}
 
     import asyncio
-    analysis = await asyncio.get_event_loop().run_in_executor(
+    analysis = await asyncio.get_running_loop().run_in_executor(
         None, lambda: analyze_ae(full_text, project_id=str(project_id))
     )
 
@@ -746,10 +800,154 @@ async def get_ae_analysis(
     return analysis
 
 
+# ── V2b : Analyse CCTP (Cahier des Clauses Techniques Particulières) ─────────
+
+@router.get("/{project_id}/cctp-analysis")
+@limiter.limit("10/hour")
+async def get_cctp_analysis(
+    request: Request,
+    project_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    org: Organization = Depends(get_current_org),
+):
+    """Analyse le CCTP : exigences techniques, normes DTU, matériaux, essais, risques."""
+    await _get_project_or_404(project_id, org.id, db)
+    from app.services.cctp_analyzer import analyze_cctp
+
+    cached = await db.execute(
+        select(ExtractionResult).where(
+            ExtractionResult.project_id == project_id,
+            ExtractionResult.result_type == "cctp_analysis",
+        ).order_by(ExtractionResult.version.desc()).limit(1)
+    )
+    cr = cached.scalars().first()
+    if cr:
+        return cr.payload
+
+    full_text, doc_names = await _get_doc_text_by_type(db, project_id, "CCTP")
+    if not full_text.strip():
+        return {"message": "Aucun document CCTP trouvé. Uploadez un Cahier des Clauses Techniques.", "no_cctp_document": True}
+
+    import asyncio
+    analysis = await asyncio.get_running_loop().run_in_executor(
+        None, lambda: analyze_cctp(full_text, project_id=str(project_id))
+    )
+
+    new_er = ExtractionResult(
+        project_id=project_id, result_type="cctp_analysis",
+        payload=analysis, model_used=analysis.get("model_used", ""),
+    )
+    db.add(new_er)
+    await db.flush()
+    return analysis
+
+
+# ── V2c : Simulation trésorerie / Cash-flow ────────────────────────────────
+
+@router.get("/{project_id}/cashflow-simulation")
+async def get_cashflow_simulation(
+    project_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    org: Organization = Depends(get_current_org),
+):
+    """Simule la trésorerie du marché à partir des données AE (avance, retenue, délai paiement)."""
+    await _get_project_or_404(project_id, org.id, db)
+    from app.services.cashflow_simulator import simulate_cashflow
+    import asyncio
+
+    # Vérifier le cache
+    cached = await db.execute(
+        select(ExtractionResult).where(
+            ExtractionResult.project_id == project_id,
+            ExtractionResult.result_type == "cashflow_simulation",
+        ).order_by(ExtractionResult.version.desc()).limit(1)
+    )
+    cr = cached.scalars().first()
+    if cr:
+        return cr.payload
+
+    # Récupérer les données AE pour alimenter le simulateur
+    ae_result = await db.execute(
+        select(ExtractionResult).where(
+            ExtractionResult.project_id == project_id,
+            ExtractionResult.result_type == "ae_analysis",
+        ).order_by(ExtractionResult.version.desc()).limit(1)
+    )
+    ae = ae_result.scalars().first()
+
+    # Valeurs par défaut si pas d'AE analysé
+    montant_total_ht = 500_000.0
+    duree_mois = 12
+    avance_pct = 5.0
+    retenue_pct = 5.0
+    delai_paiement_jours = 30
+    marge_brute_pct = 15.0
+
+    if ae and ae.payload:
+        p = ae.payload
+        # Extraire le montant total HT
+        montant = p.get("montant_total_ht") or p.get("montant_marche_ht")
+        if montant and isinstance(montant, (int, float)) and montant > 0:
+            montant_total_ht = float(montant)
+
+        # Extraire la durée en mois
+        duree = p.get("duree_mois") or p.get("duree_marche_mois")
+        if duree and isinstance(duree, (int, float)) and duree > 0:
+            duree_mois = int(duree)
+
+        # Extraire le pourcentage d'avance
+        avance = p.get("avance_pct") or p.get("avance_forfaitaire_pct")
+        if avance is not None and isinstance(avance, (int, float)):
+            avance_pct = float(avance)
+
+        # Extraire le pourcentage de retenue de garantie
+        retenue = p.get("retenue_garantie_pct")
+        if retenue is not None and isinstance(retenue, (int, float)):
+            retenue_pct = float(retenue)
+
+        # Extraire le délai de paiement
+        delai = p.get("delai_paiement_jours")
+        if delai and isinstance(delai, (int, float)) and delai > 0:
+            delai_paiement_jours = int(delai)
+
+    simulation = await asyncio.get_running_loop().run_in_executor(
+        None,
+        lambda: simulate_cashflow(
+            montant_total_ht=montant_total_ht,
+            duree_mois=duree_mois,
+            avance_pct=avance_pct,
+            retenue_pct=retenue_pct,
+            delai_paiement_jours=delai_paiement_jours,
+            marge_brute_pct=marge_brute_pct,
+        ),
+    )
+
+    # Ajouter la source des données
+    simulation["source_ae"] = ae is not None
+    simulation["message"] = (
+        "Simulation basée sur les données de l'Acte d'Engagement."
+        if ae else
+        "Simulation avec valeurs par défaut — uploadez un Acte d'Engagement pour des données réelles."
+    )
+
+    # Cache le résultat
+    new_er = ExtractionResult(
+        project_id=project_id, result_type="cashflow_simulation",
+        payload=simulation, model_used="deterministic",
+    )
+    db.add(new_er)
+    await db.flush()
+    return simulation
+
+
 # ── V3 : Vérificateur DC1/DC2 + attestations ────────────────────────────────
 
 @router.get("/{project_id}/dc-check")
+@limiter.limit("10/hour")
 async def get_dc_check(
+    request: Request,
     project_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -772,7 +970,7 @@ async def get_dc_check(
         return cr.payload
 
     from app.worker.tasks import SyncSession
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     dc_query = "DC1 DC2 Kbis attestation URSSAF fiscale assurance certification Qualibat pièces administratives candidature"
     def _retrieve():
         sync_db = SyncSession()
@@ -802,7 +1000,9 @@ async def get_dc_check(
 # ── V4 : Détecteur de conflits intra-DCE ─────────────────────────────────────
 
 @router.get("/{project_id}/conflicts")
+@limiter.limit("10/hour")
 async def get_conflicts(
+    request: Request,
     project_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -836,7 +1036,7 @@ async def get_conflicts(
             "docs_found": list(texts.keys()),
         }
 
-    analysis = await asyncio.get_event_loop().run_in_executor(
+    analysis = await asyncio.get_running_loop().run_in_executor(
         None, lambda: detect_conflicts(texts, project_id=str(project_id))
     )
 
@@ -877,7 +1077,7 @@ async def get_questions(
         return cr.payload
 
     from app.worker.tasks import SyncSession
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     def _retrieve():
         sync_db = SyncSession()
         try:
@@ -947,7 +1147,7 @@ async def get_scoring_simulation(
             "regions": cp.regions or [],
         }
 
-    analysis = await asyncio.get_event_loop().run_in_executor(
+    analysis = await asyncio.get_running_loop().run_in_executor(
         None, lambda: simulate_scoring(criteria.payload, company_profile=company_profile, project_id=str(project_id))
     )
     return analysis
@@ -967,8 +1167,14 @@ async def get_dpgf_pricing(
     from app.services.btp_pricing import check_dpgf_pricing
     from app.services.dpgf_extractor import extract_tables_from_pdf
     from app.models.document import AoDocument
+    from app.models.company_profile import CompanyProfile
     from app.services.storage import storage_service
     import asyncio
+
+    # Fetch company profile region for geo-adjusted pricing
+    cp_result = await db.execute(select(CompanyProfile).where(CompanyProfile.org_id == org.id))
+    cp = cp_result.scalars().first()
+    region = cp.regions[0] if cp and cp.regions else None
 
     docs_result = await db.execute(
         select(AoDocument).where(
@@ -982,7 +1188,7 @@ async def get_dpgf_pricing(
         return {"message": "Aucun document DPGF/BPU trouvé.", "pricing_analysis": []}
 
     all_pricing: list[dict] = []
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     for doc in dpgf_docs[:2]:
         try:
             pdf_bytes = await loop.run_in_executor(None, lambda d=doc: storage_service.download_bytes(d.s3_key))
@@ -992,7 +1198,7 @@ async def get_dpgf_pricing(
                     {"designation": getattr(r, "designation", ""), "prix_unitaire": getattr(r, "prix_unitaire", "")}
                     for r in table.rows
                 ]
-                pricing_results = check_dpgf_pricing(rows_dicts)
+                pricing_results = check_dpgf_pricing(rows_dicts, region=region or "france")
                 all_pricing.extend(pricing_results)
         except Exception as exc:
             logger.warning(f"[{project_id}] DPGF pricing error for {doc.original_name}: {exc}")
@@ -1002,3 +1208,41 @@ async def get_dpgf_pricing(
         "total_lines": len(all_pricing),
         "alerts": [p for p in all_pricing if p.get("status") in ("SOUS_EVALUE", "SUR_EVALUE")],
     }
+
+
+# ── Sous-traitance ───────────────────────────────────────────────────────
+@router.get("/{project_id}/subcontracting")
+@limiter.limit("10/hour")
+async def get_subcontracting(
+    request: Request,
+    project_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    org: Organization = Depends(get_current_org),
+):
+    """Analyse de la stratégie de sous-traitance optimale."""
+    await _get_project_or_404(project_id, org.id, db)
+
+    cache_key = f"subcontracting:{project_id}"
+    try:
+        cached = get_redis().get(cache_key)
+        if cached:
+            return json.loads(cached)
+    except Exception:
+        pass
+
+    from app.services.subcontracting_analyzer import analyze_subcontracting
+    from app.worker.tasks import SyncSession
+
+    sync_db = SyncSession()
+    try:
+        result = await analyze_subcontracting(str(project_id), sync_db)
+    finally:
+        sync_db.close()
+
+    try:
+        get_redis().set(cache_key, json.dumps(result, default=str), ex=3600)
+    except Exception:
+        pass
+
+    return result

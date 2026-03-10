@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { useAeAnalysis } from "@/hooks/useAnalysis";
 import { cn } from "@/lib/utils";
+import AIDisclaimer from "@/components/ui/AIDisclaimer";
 
 interface Props {
   projectId: string;
@@ -158,8 +159,16 @@ function ScoreCircle({ score }: { score: number }) {
 
   return (
     <div className="flex flex-col items-center gap-1">
-      <div className="relative" style={{ width: size, height: size }}>
-        <svg width={size} height={size} className="rotate-[-90deg]">
+      <div
+        className="relative"
+        style={{ width: size, height: size }}
+        role="meter"
+        aria-valuenow={score}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-label={`Score de risque : ${score} sur 100 (${scoreLabel})`}
+      >
+        <svg width={size} height={size} className="rotate-[-90deg]" aria-hidden="true">
           <circle
             cx={size / 2}
             cy={size / 2}
@@ -238,7 +247,10 @@ function AeClauseCard({ clause, index }: { clause: ClauseRisquee; index: number 
           </div>
         </div>
         <div className="shrink-0">
-          <span className={cn("inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold", cfg.badgeCls)}>
+          <span
+            className={cn("inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold", cfg.badgeCls)}
+            aria-label={`Niveau de risque : ${cfg.label}`}
+          >
             {cfg.icon}
             {cfg.label}
           </span>
@@ -432,7 +444,10 @@ export function AeAnalysisTab({ projectId }: Props) {
                     <p className="text-xs text-slate-500 mt-0.5">{pen.montant_ou_taux}</p>
                   </div>
                   <div className="shrink-0">
-                    <span className={cn("inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold", evalCfg.badgeCls)}>
+                    <span
+                      className={cn("inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold", evalCfg.badgeCls)}
+                      aria-label={`Evaluation de la penalite : ${evalCfg.label}`}
+                    >
                       {evalCfg.icon}
                       {evalCfg.label}
                     </span>
@@ -513,11 +528,17 @@ export function AeAnalysisTab({ projectId }: Props) {
           <div className="space-y-2 text-sm text-slate-600">
             <div className="flex items-center gap-2">
               {aeData.revision_prix.applicable ? (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-800 border border-green-200">
+                <span
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-800 border border-green-200"
+                  aria-label="Revision des prix : Applicable"
+                >
                   Applicable
                 </span>
               ) : (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-800 border border-red-200">
+                <span
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-800 border border-red-200"
+                  aria-label="Revision des prix : Non applicable"
+                >
                   Non applicable
                 </span>
               )}
@@ -536,10 +557,8 @@ export function AeAnalysisTab({ projectId }: Props) {
         </div>
       )}
 
-      {/* ── Footer note ── */}
-      <p className="text-[11px] text-slate-400 text-center pb-2">
-        Analyse g&eacute;n&eacute;r&eacute;e automatiquement par IA — v&eacute;rifiez avec les documents originaux.
-      </p>
+      {/* ── Footer disclaimer ── */}
+      <AIDisclaimer />
     </div>
   );
 }

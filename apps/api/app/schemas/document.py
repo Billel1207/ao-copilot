@@ -12,6 +12,7 @@ class DocumentOut(BaseModel):
     file_size_kb: int | None
     has_text: bool
     status: str
+    ocr_quality_score: float | None = None
     uploaded_at: datetime
 
     model_config = {"from_attributes": True}

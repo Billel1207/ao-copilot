@@ -19,7 +19,7 @@ logger = structlog.get_logger(__name__)
 # ── Schémas request/response ───────────────────────────────────────────────
 
 class CheckoutRequest(BaseModel):
-    plan: Literal["starter", "pro"]
+    plan: Literal["starter", "pro", "europe", "business"]
     success_url: str
     cancel_url: str
 
@@ -140,9 +140,10 @@ async def get_usage(
             "max_users": p.max_users,
             "word_export": p.word_export,
             "features": p.features,
+            "stripe_price_id": p.stripe_price_id or "",
         }
         for pid, p in PLANS.items()
-        if pid != "business"  # Business est sur devis
+        if pid not in ("free", "trial")  # Masquer free/trial de la liste des plans achetables
     ]
 
     return UsageResponse(

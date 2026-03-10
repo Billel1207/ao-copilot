@@ -36,6 +36,26 @@ class CompanyProfileIn(BaseModel):
     max_market_size_eur: int | None = Field(
         None, ge=0, description="Taille maximale du marché gérable en euros"
     )
+    # ── Champs Go/No-Go enrichi (Phase 6) ──
+    assurance_rc_montant: int | None = Field(
+        None, ge=0, description="Montant RC Pro en euros"
+    )
+    assurance_decennale: bool | None = Field(
+        None, description="Possède une assurance décennale"
+    )
+    partenaires_specialites: list[str] = Field(
+        default_factory=list,
+        description="Spécialités des partenaires sous-traitants"
+    )
+    marge_minimale_pct: float | None = Field(
+        None, ge=0, le=100, description="Marge minimale acceptable en %"
+    )
+    max_projets_simultanes: int | None = Field(
+        None, ge=0, description="Capacité max de projets simultanés"
+    )
+    projets_actifs_count: int | None = Field(
+        None, ge=0, description="Nombre de projets actifs actuellement"
+    )
 
 
 class CompanyProfileOut(BaseModel):
@@ -47,6 +67,12 @@ class CompanyProfileOut(BaseModel):
     specialties: list[str]
     regions: list[str]
     max_market_size_eur: int | None
+    assurance_rc_montant: int | None = None
+    assurance_decennale: bool | None = None
+    partenaires_specialites: list[str] = []
+    marge_minimale_pct: float | None = None
+    max_projets_simultanes: int | None = None
+    projets_actifs_count: int | None = None
     created_at: str
     updated_at: str
 
@@ -82,6 +108,12 @@ async def get_company_profile(
         specialties=profile.specialties or [],
         regions=profile.regions or [],
         max_market_size_eur=profile.max_market_size_eur,
+        assurance_rc_montant=profile.assurance_rc_montant,
+        assurance_decennale=profile.assurance_decennale,
+        partenaires_specialites=profile.partenaires_specialites or [],
+        marge_minimale_pct=profile.marge_minimale_pct,
+        max_projets_simultanes=profile.max_projets_simultanes,
+        projets_actifs_count=profile.projets_actifs_count,
         created_at=profile.created_at.isoformat(),
         updated_at=profile.updated_at.isoformat(),
     )
@@ -110,6 +142,12 @@ async def upsert_company_profile(
         profile.specialties = body.specialties
         profile.regions = body.regions
         profile.max_market_size_eur = body.max_market_size_eur
+        profile.assurance_rc_montant = body.assurance_rc_montant
+        profile.assurance_decennale = body.assurance_decennale
+        profile.partenaires_specialites = body.partenaires_specialites
+        profile.marge_minimale_pct = body.marge_minimale_pct
+        profile.max_projets_simultanes = body.max_projets_simultanes
+        profile.projets_actifs_count = body.projets_actifs_count
         profile.updated_at = now
         logger.info(f"Profil entreprise mis à jour pour org={org.id}")
     else:
@@ -121,6 +159,12 @@ async def upsert_company_profile(
             specialties=body.specialties,
             regions=body.regions,
             max_market_size_eur=body.max_market_size_eur,
+            assurance_rc_montant=body.assurance_rc_montant,
+            assurance_decennale=body.assurance_decennale,
+            partenaires_specialites=body.partenaires_specialites,
+            marge_minimale_pct=body.marge_minimale_pct,
+            max_projets_simultanes=body.max_projets_simultanes,
+            projets_actifs_count=body.projets_actifs_count,
         )
         db.add(profile)
         logger.info(f"Profil entreprise créé pour org={org.id}")
@@ -137,6 +181,12 @@ async def upsert_company_profile(
         specialties=profile.specialties or [],
         regions=profile.regions or [],
         max_market_size_eur=profile.max_market_size_eur,
+        assurance_rc_montant=profile.assurance_rc_montant,
+        assurance_decennale=profile.assurance_decennale,
+        partenaires_specialites=profile.partenaires_specialites or [],
+        marge_minimale_pct=profile.marge_minimale_pct,
+        max_projets_simultanes=profile.max_projets_simultanes,
+        projets_actifs_count=profile.projets_actifs_count,
         created_at=profile.created_at.isoformat(),
         updated_at=profile.updated_at.isoformat(),
     )

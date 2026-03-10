@@ -1,25 +1,22 @@
-"""RAG retrieval — numpy cosine similarity over JSONB embeddings.
+"""RAG retrieval — pgvector cosine distance for fast similarity search.
 
+Utilise l'opérateur pgvector <=> (cosine distance) pour une recherche
+vectorielle performante côté SQL, au lieu du calcul numpy côté Python.
 Inclut un seuil de similarité minimum (SIMILARITY_THRESHOLD) pour éviter
 les hallucinations quand le contexte RAG est pauvre.
 """
-import logging
-import numpy as np
+import json
+import structlog
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.services.embedder import embed_query
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 # Seuil minimum de similarité — en dessous, le chunk est considéré non pertinent
-SIMILARITY_THRESHOLD = 0.35
-
-
-def _cosine_similarity(a: list[float], b: list[float]) -> float:
-    va, vb = np.array(a, dtype=np.float32), np.array(b, dtype=np.float32)
-    denom = np.linalg.norm(va) * np.linalg.norm(vb)
-    return float(np.dot(va, vb) / denom) if denom > 0 else 0.0
+# 0.50 = plus strict que 0.35, réduit les hallucinations sur DCE mal structurés/OCR
+SIMILARITY_THRESHOLD = 0.50
 
 
 def retrieve_relevant_chunks(
@@ -29,12 +26,16 @@ def retrieve_relevant_chunks(
     top_k: int = 15,
     min_similarity: float = SIMILARITY_THRESHOLD,
 ) -> list[dict]:
-    """Cosine similarity search with minimum threshold.
+    """pgvector cosine similarity search with minimum threshold.
+
+    Uses the <=> operator (cosine distance) for server-side vector search.
+    cosine_distance = 1 - cosine_similarity, so we filter where distance < (1 - min_similarity).
 
     Returns chunks sorted by similarity DESC, filtered by min_similarity.
     Each chunk includes a 'similarity' field for downstream confidence scoring.
     """
     query_embedding = embed_query(query)
+    max_distance = 1.0 - min_similarity  # cosine distance threshold
 
     sql = text("""
         SELECT
@@ -43,47 +44,40 @@ def retrieve_relevant_chunks(
             c.page_start,
             c.page_end,
             c.chunk_index,
-            c.embedding,
             d.original_name AS doc_name,
-            d.doc_type
+            d.doc_type,
+            (c.embedding_vec <=> :query_vec::vector) AS distance
         FROM chunks c
         JOIN ao_documents d ON d.id = c.document_id
         WHERE c.project_id = :project_id
-          AND c.embedding IS NOT NULL
+          AND c.embedding_vec IS NOT NULL
+          AND (c.embedding_vec <=> :query_vec::vector) < :max_distance
+        ORDER BY distance ASC
+        LIMIT :top_k
     """)
 
-    rows = db.execute(sql, {"project_id": project_id}).fetchall()
+    rows = db.execute(
+        sql,
+        {
+            "project_id": project_id,
+            "query_vec": json.dumps(query_embedding),
+            "max_distance": max_distance,
+            "top_k": top_k,
+        },
+    ).fetchall()
 
     if not rows:
-        logger.debug(f"RAG: 0 chunks with embeddings for project_id={project_id!r}")
-        return []
-
-    # Compute cosine similarity in Python
-    scored = []
-    for row in rows:
-        emb = row.embedding
-        if not emb:
-            continue
-        sim = _cosine_similarity(query_embedding, emb)
-        # Filtrer par seuil minimum de similarité
-        if sim >= min_similarity:
-            scored.append((sim, row))
-
-    scored.sort(key=lambda x: x[0], reverse=True)
-    top = scored[:top_k]
-
-    total_above_threshold = len(scored)
-    logger.debug(
-        f"RAG: {len(top)}/{total_above_threshold} chunks selected "
-        f"(threshold={min_similarity}, total_embeddings={len(rows)}) "
-        f"for project_id={project_id!r}"
-    )
-
-    if not top:
         logger.warning(
             f"RAG: Aucun chunk au-dessus du seuil {min_similarity} "
             f"pour project_id={project_id!r} (query={query[:60]!r})"
         )
+        return []
+
+    logger.debug(
+        f"RAG: {len(rows)} chunks selected via pgvector "
+        f"(threshold={min_similarity}, max_distance={max_distance:.3f}) "
+        f"for project_id={project_id!r}"
+    )
 
     return [
         {
@@ -93,9 +87,9 @@ def retrieve_relevant_chunks(
             "page_end": row.page_end,
             "doc_name": row.doc_name,
             "doc_type": row.doc_type,
-            "similarity": float(sim),
+            "similarity": round(1.0 - float(row.distance), 4),
         }
-        for sim, row in top
+        for row in rows
     ]
 
 

@@ -7,6 +7,7 @@ export function useSummary(projectId: string, enabled = true) {
     queryFn: () => analysisApi.summary(projectId).then((r) => r.data),
     enabled: !!projectId && enabled,
     retry: false,
+    staleTime: 5 * 60 * 1000,
   });
 }
 
@@ -19,6 +20,7 @@ export function useChecklist(
     queryFn: () => analysisApi.checklist(projectId, filters).then((r) => r.data),
     enabled: !!projectId,
     retry: false,
+    staleTime: 5 * 60 * 1000,
   });
 }
 
@@ -28,6 +30,7 @@ export function useCriteria(projectId: string) {
     queryFn: () => analysisApi.criteria(projectId).then((r) => r.data),
     enabled: !!projectId,
     retry: false,
+    staleTime: 5 * 60 * 1000,
   });
 }
 
@@ -47,6 +50,7 @@ export function useGoNoGo(projectId: string, enabled = true) {
     queryFn: () => analysisApi.gonogo(projectId).then((r) => r.data),
     enabled: !!projectId && enabled,
     retry: false,
+    staleTime: 5 * 60 * 1000,
   });
 }
 
@@ -56,6 +60,7 @@ export function useTimeline(projectId: string, enabled = true) {
     queryFn: () => analysisApi.timeline(projectId).then((r) => r.data),
     enabled: !!projectId && enabled,
     retry: false,
+    staleTime: 5 * 60 * 1000,
   });
 }
 
@@ -101,6 +106,7 @@ export function useCcapRisks(projectId: string, enabled = true) {
     queryFn: () => analysisApi.ccapRisks(projectId).then((r) => r.data),
     enabled: !!projectId && enabled,
     retry: false,
+    staleTime: 5 * 60 * 1000,
   });
 }
 
@@ -110,6 +116,7 @@ export function useDeadlines(projectId: string, enabled = true) {
     queryFn: () => analysisApi.deadlines(projectId).then((r) => r.data),
     enabled: !!projectId && enabled,
     retry: false,
+    staleTime: 5 * 60 * 1000,
   });
 }
 
@@ -121,6 +128,7 @@ export function useRcAnalysis(projectId: string, enabled = true) {
     queryFn: () => analysisApi.rcAnalysis(projectId).then((r) => r.data),
     enabled: !!projectId && enabled,
     retry: false,
+    staleTime: 5 * 60 * 1000,
   });
 }
 
@@ -130,6 +138,17 @@ export function useAeAnalysis(projectId: string, enabled = true) {
     queryFn: () => analysisApi.aeAnalysis(projectId).then((r) => r.data),
     enabled: !!projectId && enabled,
     retry: false,
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+export function useCctpAnalysis(projectId: string, enabled = true) {
+  return useQuery({
+    queryKey: ["cctp-analysis", projectId],
+    queryFn: () => analysisApi.cctpAnalysis(projectId).then((r) => r.data),
+    enabled: !!projectId && enabled,
+    retry: false,
+    staleTime: 5 * 60 * 1000,
   });
 }
 
@@ -139,6 +158,7 @@ export function useDcCheck(projectId: string, enabled = true) {
     queryFn: () => analysisApi.dcCheck(projectId).then((r) => r.data),
     enabled: !!projectId && enabled,
     retry: false,
+    staleTime: 5 * 60 * 1000,
   });
 }
 
@@ -148,6 +168,7 @@ export function useConflicts(projectId: string, enabled = true) {
     queryFn: () => analysisApi.conflicts(projectId).then((r) => r.data),
     enabled: !!projectId && enabled,
     retry: false,
+    staleTime: 5 * 60 * 1000,
   });
 }
 
@@ -157,6 +178,7 @@ export function useQuestions(projectId: string, enabled = true) {
     queryFn: () => analysisApi.questions(projectId).then((r) => r.data),
     enabled: !!projectId && enabled,
     retry: false,
+    staleTime: 5 * 60 * 1000,
   });
 }
 
@@ -166,6 +188,17 @@ export function useScoringSimulation(projectId: string, enabled = true) {
     queryFn: () => analysisApi.scoringSimulation(projectId).then((r) => r.data),
     enabled: !!projectId && enabled,
     retry: false,
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+export function useCashflowSimulation(projectId: string, enabled = true) {
+  return useQuery({
+    queryKey: ["cashflow-simulation", projectId],
+    queryFn: () => analysisApi.cashflowSimulation(projectId).then((r) => r.data),
+    enabled: !!projectId && enabled,
+    retry: false,
+    staleTime: 5 * 60 * 1000,
   });
 }
 
@@ -175,6 +208,17 @@ export function useDpgfPricing(projectId: string, enabled = true) {
     queryFn: () => analysisApi.dpgfPricing(projectId).then((r) => r.data),
     enabled: !!projectId && enabled,
     retry: false,
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+export function useSubcontracting(projectId: string, enabled = true) {
+  return useQuery({
+    queryKey: ["subcontracting", projectId],
+    queryFn: () => analysisApi.subcontracting(projectId).then((r) => r.data),
+    enabled: !!projectId && enabled,
+    retry: false,
+    staleTime: 5 * 60 * 1000,
   });
 }
 
@@ -183,6 +227,7 @@ export function useCompanyProfile() {
     queryKey: ["company-profile"],
     queryFn: () => companyApi.getProfile().then((r) => r.data),
     retry: false,
+    staleTime: 5 * 60 * 1000,
   });
 }
 

@@ -13,6 +13,8 @@ import {
 } from "lucide-react";
 import { useConflicts } from "@/hooks/useAnalysis";
 import { cn } from "@/lib/utils";
+import AIDisclaimer from "@/components/ui/AIDisclaimer";
+import ConfidenceWarning from "@/components/ui/ConfidenceWarning";
 
 interface Props {
   projectId: string;
@@ -27,7 +29,19 @@ type Categorie =
   | "Montants"
   | "Exigences"
   | "Clauses illégales"
-  | "Références";
+  | "Références"
+  | "Dérogation CCAG"
+  | "CCTP ↔ DPGF";
+
+const CONFLICT_TYPE_LABELS: Record<string, Categorie> = {
+  delai: "Délais",
+  montant: "Montants",
+  exigence: "Exigences",
+  clause_illegale: "Clauses illégales",
+  reference: "Références",
+  deviation_ccag: "Dérogation CCAG",
+  cctp_dpgf: "CCTP ↔ DPGF",
+};
 
 interface Conflit {
   description: string;
@@ -77,7 +91,7 @@ function normalizeConflicts(data: ConflictsData): Conflit[] {
       article_1: c.citation_a ?? "",
       article_2: c.citation_b ?? "",
       severite: (c.severity?.toUpperCase() as Severite) ?? "MOYEN",
-      categorie: (c.conflict_type as Categorie) ?? "Exigences",
+      categorie: CONFLICT_TYPE_LABELS[c.conflict_type ?? ""] ?? "Exigences",
       recommandation: c.recommendation ?? "",
     }));
   }
@@ -149,6 +163,7 @@ function SeverityBadge({ level }: { level: Severite }) {
         "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold",
         cfg.badgeCls
       )}
+      aria-label={`Niveau de severite : ${cfg.label}`}
     >
       {cfg.icon}
       {cfg.label}
@@ -166,6 +181,7 @@ function CategoryBadge({ categorie }: { categorie: Categorie }) {
         "inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold",
         cls
       )}
+      aria-label={`Categorie du conflit : ${categorie}`}
     >
       {categorie}
     </span>
@@ -414,9 +430,7 @@ export function ConflictsTab({ projectId }: Props) {
             </p>
           </div>
         </div>
-        <p className="text-[11px] text-slate-400 text-center pb-2">
-          Analyse générée automatiquement par IA — vérifiez avec les documents originaux.
-        </p>
+        <AIDisclaimer compact />
       </div>
     );
   }
@@ -522,10 +536,9 @@ export function ConflictsTab({ projectId }: Props) {
         ))}
       </div>
 
-      {/* ── Footer note ── */}
-      <p className="text-[11px] text-slate-400 text-center pb-2">
-        Analyse générée automatiquement par IA — vérifiez avec les documents originaux.
-      </p>
+      {/* ── Confidence + Disclaimer ── */}
+      <ConfidenceWarning confidence={conflictsData.confidence_overall} />
+      <AIDisclaimer />
     </div>
   );
 }

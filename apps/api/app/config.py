@@ -62,9 +62,11 @@ class Settings(BaseSettings):
     # Stripe Billing
     STRIPE_SECRET_KEY: str = ""
     STRIPE_WEBHOOK_SECRET: str = ""
-    STRIPE_PRICE_STARTER: str = ""   # price_xxx du plan Starter (79€/mois)
-    STRIPE_PRICE_PRO: str = ""       # price_xxx du plan Pro (199€/mois)
-    STRIPE_PRICE_EUROPE: str = ""    # price_xxx du plan Europe (299€/mois)
+    STRIPE_PRICE_STARTER: str = "price_1T9JtH01CSvduw4lzqagkbQQ"  # 79€/mois
+    STRIPE_PRICE_PRO: str = "price_1T9Jv901CSvduw4lh0rVDHiQ"  # 199€/mois
+    STRIPE_PRICE_EUROPE: str = "price_1T91vb01CSvduw4lFd3RvNL6"  # 299€/mois
+    STRIPE_PRICE_BUSINESS: str = "price_1T9Fum01CSvduw4lo5gFEIbE"  # 499€/mois
+    STRIPE_PRICE_DOC_UNIT: str = "price_1T9FwV01CSvduw4l4597ixbb"  # 3€/doc
     STRIPE_PUBLISHABLE_KEY: str = "" # pk_xxx pour le frontend
 
     # Email (Resend)
@@ -83,3 +85,19 @@ class Settings(BaseSettings):
 
 settings = Settings()
 
+# ── Production safety guards ─────────────────────────────────────────────
+if settings.APP_ENV == "production":
+    if settings.SECRET_KEY == "change-me-in-production-min-32-chars":
+        raise RuntimeError(
+            "CRITICAL: SECRET_KEY has the default value. "
+            "Set a strong random secret (min 32 chars) in .env before running in production."
+        )
+    if not settings.ANTHROPIC_API_KEY:
+        raise RuntimeError(
+            "CRITICAL: ANTHROPIC_API_KEY is empty. AI analysis requires a valid API key."
+        )
+    if not settings.STRIPE_SECRET_KEY:
+        import logging as _log
+        _log.getLogger(__name__).warning(
+            "STRIPE_SECRET_KEY is empty — billing features will be unavailable"
+        )

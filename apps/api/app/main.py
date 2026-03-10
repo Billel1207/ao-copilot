@@ -1,7 +1,9 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
 import sentry_sdk
+from sqlalchemy import text
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
@@ -23,11 +25,42 @@ from app.api.v1.analytics import router as analytics_router
 from app.api.v1.onboarding import router as onboarding_router
 from app.api.v1.attestations import router as attestations_router
 from app.api.v1.developer import router as developer_router
+from app.api.v1.api_keys import router as api_keys_router
+from app.api.v1.webhooks import router as webhooks_router
+from app.api.v1.sso import router as sso_router
+from app.api.v1.gdpr import router as gdpr_router
+
+import structlog
+
+
+def _configure_structlog():
+    """Configure structlog : JSON en production, console colorée en dev."""
+    processors = [
+        structlog.contextvars.merge_contextvars,
+        structlog.stdlib.add_log_level,
+        structlog.stdlib.add_logger_name,
+        structlog.processors.TimeStamper(fmt="iso"),
+        structlog.processors.StackInfoRenderer(),
+        structlog.processors.format_exc_info,
+    ]
+    if settings.APP_ENV == "production":
+        processors.append(structlog.processors.JSONRenderer())
+    else:
+        processors.append(structlog.dev.ConsoleRenderer())
+
+    structlog.configure(
+        processors=processors,
+        wrapper_class=structlog.stdlib.BoundLogger,
+        context_class=dict,
+        logger_factory=structlog.stdlib.LoggerFactory(),
+        cache_logger_on_first_use=True,
+    )
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
+    _configure_structlog()
     if settings.SENTRY_DSN:
         sentry_sdk.init(dsn=settings.SENTRY_DSN, environment=settings.APP_ENV)
     yield
@@ -73,8 +106,45 @@ app.include_router(analytics_router, prefix="/api/v1/analytics", tags=["analytic
 app.include_router(onboarding_router, prefix="/api/v1/onboarding", tags=["onboarding"])
 app.include_router(attestations_router, prefix="/api/v1/attestations", tags=["attestations"])
 app.include_router(developer_router, prefix="/api/v1/developer", tags=["developer"])
+app.include_router(api_keys_router, prefix="/api/v1/api-keys", tags=["api-keys"])
+app.include_router(webhooks_router, prefix="/api/v1/webhooks", tags=["webhooks"])
+app.include_router(sso_router, prefix="/api/v1/sso", tags=["sso"])
+app.include_router(gdpr_router, prefix="/api/v1/account", tags=["gdpr"])
 
 
 @app.get("/api/health")
 async def health():
     return {"status": "ok", "version": "0.1.0"}
+
+
+@app.get("/api/health/ready")
+async def health_ready():
+    """Deep healthcheck — vérifie DB + Redis. Utilisé par monitoring / load balancer."""
+    import time
+    from app.core.database import SessionLocal
+    checks: dict = {"api": "ok", "version": "0.1.0"}
+    start = time.monotonic()
+
+    # Check PostgreSQL
+    try:
+        db = SessionLocal()
+        db.execute(text("SELECT 1"))
+        db.close()
+        checks["database"] = "ok"
+    except Exception as exc:
+        checks["database"] = f"error: {str(exc)[:100]}"
+
+    # Check Redis / Celery broker
+    try:
+        import redis
+        r = redis.from_url(settings.CELERY_BROKER_URL, socket_timeout=2)
+        r.ping()
+        checks["redis"] = "ok"
+    except Exception as exc:
+        checks["redis"] = f"error: {str(exc)[:100]}"
+
+    checks["latency_ms"] = round((time.monotonic() - start) * 1000, 1)
+    all_ok = checks.get("database") == "ok" and checks.get("redis") == "ok"
+    checks["status"] = "ok" if all_ok else "degraded"
+
+    return JSONResponse(content=checks, status_code=200 if all_ok else 503)

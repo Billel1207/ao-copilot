@@ -1,14 +1,23 @@
 """Abstraction LLM — Anthropic Claude (principal) avec fallback OpenAI optionnel."""
 import json
-import logging
+import structlog
 from typing import Any
 
 import anthropic as anthropic_sdk
 from pydantic import BaseModel, ValidationError
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
 from app.config import settings
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
+
+# Exceptions Anthropic qui méritent un retry (transitoires)
+_RETRYABLE_EXCEPTIONS = (
+    anthropic_sdk.RateLimitError,
+    anthropic_sdk.InternalServerError,
+    anthropic_sdk.APIConnectionError,
+    anthropic_sdk.APITimeoutError,
+)
 
 
 class LLMService:
@@ -64,6 +73,14 @@ class LLMService:
 
         return result
 
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=1, max=30),
+        retry=retry_if_exception_type(_RETRYABLE_EXCEPTIONS),
+        before_sleep=lambda rs: logger.warning(
+            "LLM retry attempt %d after %s", rs.attempt_number, rs.outcome.exception()
+        ),
+    )
     def _anthropic_json(self, system: str, user: str) -> dict:
         import re
         response = self._anthropic.messages.create(
@@ -149,6 +166,14 @@ class LLMService:
 
         return raw
 
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=1, max=30),
+        retry=retry_if_exception_type(_RETRYABLE_EXCEPTIONS),
+        before_sleep=lambda rs: logger.warning(
+            "LLM chat_text retry attempt %d after %s", rs.attempt_number, rs.outcome.exception()
+        ),
+    )
     def chat_text(self, system: str, user: str, max_tokens: int = 1024) -> str:
         """Appel Claude en mode texte libre (pas JSON)."""
         response = self._anthropic.messages.create(

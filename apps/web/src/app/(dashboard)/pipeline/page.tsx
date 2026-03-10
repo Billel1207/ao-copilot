@@ -1,4 +1,6 @@
 "use client";
+
+export const dynamic = "force-dynamic";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -264,7 +266,7 @@ function PipelineEmptyState() {
 // ── Vue liste mobile ───────────────────────────────────────────────────
 function MobileListView({ data }: { data: PipelineStats }) {
   const allProjects = COLUMNS.flatMap((col) =>
-    (data.columns[col.key] ?? []).map((p) => ({ ...p, colKey: col.key, colLabel: col.label }))
+    (data?.columns?.[col.key] ?? []).map((p) => ({ ...p, colKey: col.key, colLabel: col.label }))
   );
 
   if (allProjects.length === 0) return <PipelineEmptyState />;
@@ -327,7 +329,7 @@ export default function PipelinePage() {
   const totalProjects = data?.stats.total_projects ?? 0;
   const winRate = data?.stats.win_rate_pct ?? 0;
   const inProgress =
-    (data?.columns.processing?.length ?? 0) + (data?.columns.analyzing?.length ?? 0);
+    (data?.columns?.processing?.length ?? 0) + (data?.columns?.analyzing?.length ?? 0);
 
   return (
     <div className="p-6 md:p-8 max-w-screen-xl mx-auto space-y-8">
@@ -406,8 +408,10 @@ export default function PipelinePage() {
               <div key={i} className="h-16 bg-slate-100 rounded-2xl animate-pulse" />
             ))}
           </div>
+        ) : data ? (
+          <MobileListView data={data} />
         ) : (
-          <MobileListView data={data!} />
+          <PipelineEmptyState />
         )}
       </div>
     </div>

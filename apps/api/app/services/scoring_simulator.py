@@ -4,13 +4,13 @@ Prend en entrée les critères d'attribution détectés (criteria_payload) et
 le profil entreprise, puis simule note technique, note financière, note
 globale, avec justifications et axes d'amélioration concrets.
 """
-import logging
+import structlog
 from typing import Any
 
 from app.services.llm import llm_service
 from app.services.llm_validators import ValidatedScoringSimulation
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 # ── Prompt système spécialisé Scoring ────────────────────────────────────────
 

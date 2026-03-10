@@ -4,13 +4,13 @@ Analyse le DCE pour identifier les zones d'ombre, ambiguïtés et informations
 manquantes, puis génère 5-10 questions prioritaires au format officiel
 compatible PLACE / AWS / eMarchés.
 """
-import logging
+import structlog
 from typing import Any
 
 from app.services.llm import llm_service
 from app.services.llm_validators import ValidatedQuestions
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 # ── Prompt système spécialisé Questions ──────────────────────────────────────
 

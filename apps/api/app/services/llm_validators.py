@@ -6,13 +6,13 @@ scores hors-range, citations vides, etc.).
 """
 from __future__ import annotations
 
-import logging
+import structlog
 from datetime import datetime
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -384,6 +384,28 @@ class LLMAeClause(BaseModel):
             return "MOYEN"
         return v.upper()
 
+class LLMCcagDerogation(BaseModel):
+    """Dérogation au CCAG-Travaux 2021 détectée dans un document du DCE."""
+    article_ccag: str = ""
+    valeur_ccag: str = ""
+    valeur_ccap: str = ""  # Peut aussi contenir la valeur AE
+    impact: str = "NEUTRE"
+    description: str = ""
+
+    @field_validator("impact")
+    @classmethod
+    def validate_impact(cls, v: str) -> str:
+        allowed = {"DEFAVORABLE", "FAVORABLE", "NEUTRE"}
+        v_upper = v.upper().strip()
+        if v_upper in allowed:
+            return v_upper
+        # Mapping fuzzy
+        if "defav" in v.lower() or "négatif" in v.lower():
+            return "DEFAVORABLE"
+        if "favor" in v.lower() or "positif" in v.lower():
+            return "FAVORABLE"
+        return "NEUTRE"
+
 class ValidatedAeAnalysis(BaseModel):
     """Analyse complète de l'Acte d'Engagement."""
     prix_forme: str = ""  # forfait, unitaire, mixte
@@ -398,6 +420,7 @@ class ValidatedAeAnalysis(BaseModel):
     avance_pct: float | None = None
     delai_paiement_jours: int | None = None
     clauses_risquees: list[LLMAeClause] = []
+    ccag_derogations: list[LLMCcagDerogation] = []
     score_risque_global: int = 0
     resume: str = ""
     confidence_overall: float = 0.5
@@ -440,7 +463,7 @@ class ValidatedDcCheck(BaseModel):
 # ═══════════════════════════════════════════════════════════════════════════════
 
 class LLMConflict(BaseModel):
-    conflict_type: str  # "délai", "montant", "exigence", "clause_illegale"
+    conflict_type: str  # "delai", "montant", "exigence", "clause_illegale", "reference", "deviation_ccag", "cctp_dpgf"
     severity: str = "MOYEN"
     doc_a: str = ""
     doc_b: str = ""
@@ -448,6 +471,32 @@ class LLMConflict(BaseModel):
     citation_a: str = ""
     citation_b: str = ""
     recommendation: str = ""
+
+    @field_validator("conflict_type")
+    @classmethod
+    def validate_conflict_type(cls, v: str) -> str:
+        allowed = {"delai", "montant", "exigence", "clause_illegale", "reference", "deviation_ccag", "cctp_dpgf"}
+        v_lower = v.lower().strip().replace("é", "e").replace(" ", "_")
+        if v_lower in allowed:
+            return v_lower
+        # Mapping fuzzy
+        mapping = {
+            "délai": "delai", "delais": "delai", "deadline": "delai",
+            "montants": "montant", "prix": "montant", "financial": "montant",
+            "exigences": "exigence", "requirement": "exigence",
+            "clause_illegale": "clause_illegale", "illegale": "clause_illegale",
+            "illegal": "clause_illegale", "clause illegale": "clause_illegale",
+            "references": "reference", "ref": "reference",
+            "ccag": "deviation_ccag", "derog": "deviation_ccag",
+            "derogation": "deviation_ccag", "deviation": "deviation_ccag",
+            "derogation_ccag": "deviation_ccag",
+            "cctp": "cctp_dpgf", "dpgf": "cctp_dpgf",
+            "materiau": "cctp_dpgf", "quantite": "cctp_dpgf",
+        }
+        for key, val in mapping.items():
+            if key in v_lower:
+                return val
+        return "exigence"  # Default fallback
 
     @field_validator("severity")
     @classmethod
@@ -513,6 +562,222 @@ class ValidatedScoringSimulation(BaseModel):
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# CCAP (Cahier des Clauses Administratives Particulières)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class LLMCcapClause(BaseModel):
+    clause: str = ""
+    risk_type: str = ""
+    severity: str = "MOYEN"
+    article_ccag: str = ""
+    explication: str = ""
+    recommendation: str = ""
+    citation: str = ""
+
+    @field_validator("severity", mode="before")
+    @classmethod
+    def normalize_severity(cls, v):
+        mapping = {"critique": "CRITIQUE", "haut": "HAUT", "moyen": "MOYEN", "faible": "FAIBLE"}
+        return mapping.get(str(v).lower().strip(), "MOYEN")
+
+class ValidatedCcapAnalysis(BaseModel):
+    clauses_risquees: list[LLMCcapClause] = []
+    ccag_derogations: list[LLMCcagDerogation] = []
+    score_risque_global: int = 50
+    nb_clauses_critiques: int = 0
+    resume: str = ""
+    confidence_overall: float = 0.5
+
+    @field_validator("score_risque_global", mode="before")
+    @classmethod
+    def clamp_score(cls, v):
+        return max(0, min(100, int(v or 50)))
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# CCTP (Cahier des Clauses Techniques Particulières)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+_CCTP_CATEGORIES = {
+    "materiaux", "normes", "execution", "essais",
+    "garanties", "risques", "documents", "restrictives",
+}
+
+_CCTP_RISK_LEVELS = {"CRITIQUE", "HAUT", "MOYEN", "BAS", "INFO"}
+
+_CCTP_RISK_TYPES = {
+    "geotechnique", "amiante", "plomb", "pollution",
+    "reseaux", "demolition", "environnement", "autre",
+}
+
+_CCTP_DOC_TYPES = {
+    "DOE", "DIUO", "notes_calcul", "plans_exe",
+    "PAQ", "fiches_techniques", "PV_essais", "autre",
+}
+
+_CCTP_RESPONSABLES = {"titulaire", "moa", "moe", "labo_externe"}
+
+
+class LLMCctpExigence(BaseModel):
+    category: str = "autre"
+    description: str = ""
+    norme_ref: str | None = None
+    risk_level: str = "INFO"
+    citation: str = ""
+    conseil: str = ""
+
+    @field_validator("category")
+    @classmethod
+    def validate_category(cls, v: str) -> str:
+        v_lower = v.lower().strip()
+        if v_lower in _CCTP_CATEGORIES:
+            return v_lower
+        # Fuzzy mapping
+        mapping = {
+            "matériau": "materiaux", "materiau": "materiaux", "fourniture": "materiaux",
+            "norme": "normes", "dtu": "normes", "eurocode": "normes", "re2020": "normes",
+            "exécution": "execution", "chantier": "execution", "phasage": "execution",
+            "essai": "essais", "contrôle": "essais", "controle": "essais", "test": "essais",
+            "garantie": "garanties", "décennale": "garanties", "gpa": "garanties",
+            "risque": "risques", "danger": "risques", "amiante": "risques",
+            "document": "documents", "doe": "documents", "diuo": "documents",
+            "restrictif": "restrictives", "restriction": "restrictives", "marque": "restrictives",
+        }
+        for key, val in mapping.items():
+            if key in v_lower:
+                return val
+        return "autre"
+
+    @field_validator("risk_level")
+    @classmethod
+    def validate_risk_level(cls, v: str) -> str:
+        v_upper = v.upper().strip()
+        if v_upper in _CCTP_RISK_LEVELS:
+            return v_upper
+        mapping = {"CRITICAL": "CRITIQUE", "HIGH": "HAUT", "MEDIUM": "MOYEN",
+                    "LOW": "BAS", "INFORMATION": "INFO"}
+        return mapping.get(v_upper, "INFO")
+
+
+class LLMCctpNorme(BaseModel):
+    code: str = ""
+    titre: str = ""
+    applicabilite: str = ""
+
+
+class LLMCctpMateriau(BaseModel):
+    designation: str = ""
+    marque_imposee: bool = False
+    anticoncurrentiel: bool = False
+    alternative: str | None = None
+
+
+class LLMCctpEssai(BaseModel):
+    type: str = ""
+    frequence: str = ""
+    responsable: str = "titulaire"
+
+    @field_validator("responsable")
+    @classmethod
+    def validate_responsable(cls, v: str) -> str:
+        v_lower = v.lower().strip()
+        if v_lower in _CCTP_RESPONSABLES:
+            return v_lower
+        mapping = {"maître d'ouvrage": "moa", "maitre ouvrage": "moa",
+                    "maître d'œuvre": "moe", "maitre oeuvre": "moe",
+                    "laboratoire": "labo_externe", "externe": "labo_externe",
+                    "entreprise": "titulaire"}
+        for key, val in mapping.items():
+            if key in v_lower:
+                return val
+        return "titulaire"
+
+
+class LLMCctpDocument(BaseModel):
+    type: str = "autre"
+    obligatoire: bool = True
+    delai: str = ""
+
+
+class LLMCctpRisqueTechnique(BaseModel):
+    type: str = "autre"
+    severity: str = "MOYEN"
+    description: str = ""
+    mitigation: str = ""
+
+    @field_validator("type")
+    @classmethod
+    def validate_type(cls, v: str) -> str:
+        v_lower = v.lower().strip()
+        if v_lower in _CCTP_RISK_TYPES:
+            return v_lower
+        mapping = {
+            "géotechnique": "geotechnique", "sol": "geotechnique", "nappe": "geotechnique",
+            "amiante": "amiante", "désamiantage": "amiante",
+            "plomb": "plomb", "saturnisme": "plomb",
+            "pollution": "pollution", "dépollution": "pollution", "sol pollué": "pollution",
+            "réseau": "reseaux", "dict": "reseaux", "canalisation": "reseaux",
+            "démolition": "demolition", "déconstruction": "demolition",
+            "environnement": "environnement", "abf": "environnement", "faune": "environnement",
+        }
+        for key, val in mapping.items():
+            if key in v_lower:
+                return val
+        return "autre"
+
+    @field_validator("severity")
+    @classmethod
+    def validate_severity(cls, v: str) -> str:
+        v_upper = v.upper().strip()
+        if v_upper in _CCTP_RISK_LEVELS:
+            return v_upper
+        return "MOYEN"
+
+
+class LLMCctpContradiction(BaseModel):
+    """Contradiction interne détectée au sein du CCTP."""
+    article_a: str = ""
+    article_b: str = ""
+    description: str = ""
+    severity: str = "medium"
+
+    @field_validator("severity")
+    @classmethod
+    def validate_severity(cls, v: str) -> str:
+        allowed = {"high", "medium", "low"}
+        v_lower = v.lower().strip()
+        if v_lower in allowed:
+            return v_lower
+        mapping = {"haut": "high", "haute": "high", "critique": "high",
+                   "moyen": "medium", "moyenne": "medium",
+                   "bas": "low", "basse": "low", "faible": "low"}
+        return mapping.get(v_lower, "medium")
+
+
+class ValidatedCctpAnalysis(BaseModel):
+    exigences_techniques: list[LLMCctpExigence] = []
+    normes_dtu_applicables: list[LLMCctpNorme] = []
+    materiaux_imposes: list[LLMCctpMateriau] = []
+    essais_controles: list[LLMCctpEssai] = []
+    documents_execution: list[LLMCctpDocument] = []
+    risques_techniques: list[LLMCctpRisqueTechnique] = []
+    contradictions_techniques: list[LLMCctpContradiction] = []
+    score_complexite_technique: int = 50
+    resume: str = ""
+    confidence_overall: float = 0.5
+
+    @field_validator("score_complexite_technique")
+    @classmethod
+    def clamp_score(cls, v: int) -> int:
+        return max(0, min(100, int(v)))
+
+    @field_validator("confidence_overall")
+    @classmethod
+    def clamp_confidence(cls, v: float) -> float:
+        return max(0.0, min(1.0, float(v)))
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # HELPERS
 # ═══════════════════════════════════════════════════════════════════════════════
 
@@ -560,6 +825,7 @@ def compute_overall_confidence(
     payload: dict,
     chunks: list[dict],
     min_similarity: float = 0.0,
+    ocr_quality: float | None = None,
 ) -> float:
     """Calcule un score de confiance global (0.0-1.0) pour une analyse.
 
@@ -567,6 +833,7 @@ def compute_overall_confidence(
     - Nombre de chunks avec similarité > 0.5 (qualité contexte RAG)
     - Présence des champs critiques dans le payload
     - Score de confiance moyen des items (si applicable)
+    - Qualité OCR des documents sources (si disponible)
     """
     scores: list[float] = []
 
@@ -596,5 +863,17 @@ def compute_overall_confidence(
     # 4. Similarité minimale des chunks
     if min_similarity > 0:
         scores.append(min(1.0, min_similarity / 0.7))  # Normalisé: 0.7 = confiance max
+
+    # 5. Pénalité OCR — si la qualité OCR est faible, la confiance est réduite
+    if ocr_quality is not None:
+        # Score OCR 0-100. Si < 90, pénalité linéaire.
+        # 90+ → 1.0, 70 → 0.7, 50 → 0.5, 30 → 0.3
+        ocr_factor = min(1.0, ocr_quality / 90.0)
+        scores.append(ocr_factor)
+        if ocr_quality < 70:
+            logger.warning(
+                f"Qualité OCR faible ({ocr_quality:.0f}/100) — "
+                f"confiance pénalisée"
+            )
 
     return round(sum(scores) / max(len(scores), 1), 2) if scores else 0.5

@@ -18,6 +18,7 @@ const BASE_URL =
 const api = axios.create({
   baseURL: BASE_URL,
   withCredentials: true,
+  timeout: 30_000, // 30s par défaut
   headers: { "Content-Type": "application/json" },
 });
 
@@ -30,14 +31,36 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Auto-refresh on 401
+// Auto-refresh on 401 with queued retry for concurrent requests
 let isRefreshing = false;
+let failedQueue: Array<{ resolve: (token: string) => void; reject: (err: unknown) => void }> = [];
+
+function processQueue(error: unknown, token: string | null) {
+  failedQueue.forEach((prom) => {
+    if (token) {
+      prom.resolve(token);
+    } else {
+      prom.reject(error);
+    }
+  });
+  failedQueue = [];
+}
+
 api.interceptors.response.use(
   (res) => res,
   async (error: AxiosError) => {
     const original = error.config as typeof error.config & { _retry?: boolean };
     if (error.response?.status === 401 && !original?._retry) {
-      if (isRefreshing) return Promise.reject(error);
+      if (isRefreshing) {
+        // Queue this request — it will be retried after refresh completes
+        return new Promise<string>((resolve, reject) => {
+          failedQueue.push({ resolve, reject });
+        }).then((token) => {
+          original!.headers!["Authorization"] = `Bearer ${token}`;
+          return api(original!);
+        });
+      }
+
       isRefreshing = true;
       original._retry = true;
       try {
@@ -52,10 +75,13 @@ api.interceptors.response.use(
           secure: process.env.NODE_ENV === "production",
         });
         original!.headers!["Authorization"] = `Bearer ${data.access_token}`;
+        processQueue(null, data.access_token);
         return api(original!);
-      } catch {
+      } catch (refreshError) {
+        processQueue(refreshError, null);
         Cookies.remove("access_token");
         window.location.href = "/login";
+        return Promise.reject(refreshError);
       } finally {
         isRefreshing = false;
       }
@@ -117,7 +143,7 @@ export const documentsApi = {
 
 // ── Analysis ──────────────────────────────────────────────────
 export const analysisApi = {
-  trigger: (projectId: string) => api.post(`/projects/${projectId}/analyze`),
+  trigger: (projectId: string) => api.post(`/projects/${projectId}/analyze`, {}, { timeout: 120_000 }),
   status: (projectId: string) => api.get(`/projects/${projectId}/analyze/status`),
   summary: (projectId: string) => api.get(`/projects/${projectId}/summary`),
   checklist: (projectId: string, params?: { criticality?: string; status?: string; category?: string }) =>
@@ -129,10 +155,10 @@ export const analysisApi = {
   gonogo: (projectId: string) => api.get(`/projects/${projectId}/gonogo`),
   // Chat DCE
   chat: (projectId: string, question: string) =>
-    api.post(`/projects/${projectId}/chat`, { question }),
+    api.post(`/projects/${projectId}/chat`, { question }, { timeout: 120_000 }),
   // Writing assistant
   generateText: (projectId: string, itemId: string) =>
-    api.post(`/projects/${projectId}/checklist/${itemId}/generate`),
+    api.post(`/projects/${projectId}/checklist/${itemId}/generate`, {}, { timeout: 120_000 }),
   // Timeline
   timeline: (projectId: string) => api.get(`/projects/${projectId}/timeline`),
   updateTimelineTask: (projectId: string, taskIndex: number, done: boolean) =>
@@ -144,11 +170,14 @@ export const analysisApi = {
   // Sprint V+W — Nouvelles analyses
   rcAnalysis: (projectId: string) => api.get(`/projects/${projectId}/rc-analysis`),
   aeAnalysis: (projectId: string) => api.get(`/projects/${projectId}/ae-analysis`),
+  cctpAnalysis: (projectId: string) => api.get(`/projects/${projectId}/cctp-analysis`),
   dcCheck: (projectId: string) => api.get(`/projects/${projectId}/dc-check`),
   conflicts: (projectId: string) => api.get(`/projects/${projectId}/conflicts`),
   questions: (projectId: string) => api.get(`/projects/${projectId}/questions`),
   scoringSimulation: (projectId: string) => api.get(`/projects/${projectId}/scoring-simulation`),
   dpgfPricing: (projectId: string) => api.get(`/projects/${projectId}/dpgf-pricing`),
+  cashflowSimulation: (projectId: string) => api.get(`/projects/${projectId}/cashflow-simulation`),
+  subcontracting: (projectId: string) => api.get(`/projects/${projectId}/subcontracting`),
 };
 
 // ── Company profile ────────────────────────────────────────────
@@ -309,7 +338,7 @@ export const attestationsApi = {
 export const billingApi = {
   getUsage: () => api.get("/billing/usage"),
   getSubscription: () => api.get("/billing/subscription"),
-  createCheckout: (plan: "starter" | "pro", successUrl: string, cancelUrl: string) =>
+  createCheckout: (plan: "starter" | "pro" | "europe" | "business", successUrl: string, cancelUrl: string) =>
     api.post("/billing/checkout", {
       plan,
       success_url: successUrl,

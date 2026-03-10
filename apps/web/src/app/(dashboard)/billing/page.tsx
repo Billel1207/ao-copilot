@@ -1,52 +1,23 @@
 "use client";
 
-import { useEffect } from "react";
+export const dynamic = "force-dynamic";
+
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useBillingStore } from "@/stores/billing";
 import PlanCards from "@/components/billing/PlanCards";
 import UsageBar from "@/components/billing/UsageBar";
 
-export default function BillingPage() {
+// Composant séparé pour useSearchParams — obligatoire dans Next.js 14 (Suspense requis)
+function CheckoutNotifications() {
   const searchParams = useSearchParams();
-  const { usage, subscription, isLoading, checkoutPlan, error, fetchBilling, createCheckout, openPortal } =
-    useBillingStore();
-
   const success = searchParams.get("success");
   const canceled = searchParams.get("canceled");
 
-  useEffect(() => {
-    fetchBilling();
-  }, [fetchBilling]);
-
-  const handleUpgrade = async (planId: string) => {
-    await createCheckout(planId as "starter" | "pro");
-  };
-
-  if (isLoading && !usage) {
-    return (
-      <div className="max-w-4xl mx-auto px-4 py-8">
-        <div className="animate-pulse space-y-4">
-          <div className="h-8 bg-gray-100 rounded w-48" />
-          <div className="h-28 bg-gray-100 rounded-xl" />
-          <div className="grid grid-cols-3 gap-4">
-            {[1, 2, 3].map((i) => <div key={i} className="h-64 bg-gray-100 rounded-2xl" />)}
-          </div>
-        </div>
-      </div>
-    );
-  }
+  if (!success && !canceled) return null;
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8 space-y-8">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Abonnement & Facturation</h1>
-        <p className="text-gray-500 mt-1">
-          Gérez votre plan, consultez votre utilisation et vos factures.
-        </p>
-      </div>
-
-      {/* Notifications post-checkout */}
+    <>
       {success && (
         <div className="flex items-center gap-3 bg-green-50 border border-green-200 rounded-xl px-4 py-3">
           <svg className="w-5 h-5 text-green-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -68,6 +39,107 @@ export default function BillingPage() {
           </p>
         </div>
       )}
+    </>
+  );
+}
+
+function BillingPlansSection({
+  plans,
+  currentPlan,
+  onUpgrade,
+  isLoading,
+  checkoutPlan,
+}: {
+  plans: any[];
+  currentPlan: string;
+  onUpgrade: (planId: string) => void;
+  isLoading: boolean;
+  checkoutPlan: string | null;
+}) {
+  const [annual, setAnnual] = useState(false);
+
+  const displayPlans = plans.map((p: any) => ({
+    ...p,
+    monthly_eur:
+      annual && p.monthly_eur > 0
+        ? Math.round(p.monthly_eur * 0.8)
+        : p.monthly_eur,
+  }));
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-semibold text-gray-900">Plans disponibles</h2>
+        <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+          <button
+            onClick={() => setAnnual(false)}
+            className={`text-sm font-medium px-3 py-1.5 rounded-md transition-colors ${
+              !annual ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
+            }`}
+          >
+            Mensuel
+          </button>
+          <button
+            onClick={() => setAnnual(true)}
+            className={`text-sm font-medium px-3 py-1.5 rounded-md transition-colors ${
+              annual ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
+            }`}
+          >
+            Annuel <span className="text-green-600 font-semibold">-20%</span>
+          </button>
+        </div>
+      </div>
+      <PlanCards
+        plans={displayPlans}
+        currentPlan={currentPlan}
+        onUpgrade={onUpgrade}
+        isLoading={isLoading}
+        checkoutPlan={checkoutPlan}
+      />
+    </div>
+  );
+}
+
+export default function BillingPage() {
+  const { usage, subscription, isLoading, checkoutPlan, error, fetchBilling, createCheckout, openPortal } =
+    useBillingStore();
+
+  useEffect(() => {
+    fetchBilling();
+  }, [fetchBilling]);
+
+  const handleUpgrade = async (planId: string) => {
+    await createCheckout(planId as "starter" | "pro" | "europe" | "business");
+  };
+
+  if (isLoading && !usage) {
+    return (
+      <div className="max-w-4xl mx-auto px-4 py-8">
+        <div className="animate-pulse space-y-4">
+          <div className="h-8 bg-gray-100 rounded w-48" />
+          <div className="h-28 bg-gray-100 rounded-xl" />
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            {[1, 2, 3, 4].map((i) => <div key={i} className="h-64 bg-gray-100 rounded-2xl" />)}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-4xl mx-auto px-4 py-8 space-y-8">
+      {/* Header */}
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900">Abonnement & Facturation</h1>
+        <p className="text-gray-500 mt-1">
+          Gérez votre plan, consultez votre utilisation et vos factures.
+        </p>
+      </div>
+
+      {/* Notifications post-checkout — enveloppées dans Suspense (requis par Next.js 14) */}
+      <Suspense fallback={null}>
+        <CheckoutNotifications />
+      </Suspense>
 
       {error && (
         <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700">
@@ -88,8 +160,10 @@ export default function BillingPage() {
             <div className="flex items-baseline gap-2 mb-4">
               <span className="text-2xl font-bold text-gray-900">{usage.plan_name}</span>
               <span className={`text-xs font-semibold px-2 py-0.5 rounded-full
-                ${usage.plan === "pro" ? "bg-blue-100 text-blue-700" :
+                ${usage.plan === "business" ? "bg-amber-100 text-amber-700" :
+                  usage.plan === "pro" ? "bg-blue-100 text-blue-700" :
                   usage.plan === "starter" ? "bg-indigo-100 text-indigo-700" :
+                  usage.plan === "europe" ? "bg-purple-100 text-purple-700" :
                   "bg-gray-100 text-gray-600"}`}>
                 {usage.plan.toUpperCase()}
               </span>
@@ -119,16 +193,13 @@ export default function BillingPage() {
 
       {/* Plans disponibles */}
       {usage && (
-        <div>
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Choisir un plan</h2>
-          <PlanCards
-            plans={usage.plans_available}
-            currentPlan={usage.plan}
-            onUpgrade={handleUpgrade}
-            isLoading={isLoading}
-            checkoutPlan={checkoutPlan}
-          />
-        </div>
+        <BillingPlansSection
+          plans={usage.plans_available}
+          currentPlan={usage.plan}
+          onUpgrade={handleUpgrade}
+          isLoading={isLoading}
+          checkoutPlan={checkoutPlan}
+        />
       )}
 
       {/* Section FAQ rapide */}

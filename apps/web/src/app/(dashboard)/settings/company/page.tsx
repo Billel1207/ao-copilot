@@ -1,8 +1,10 @@
 "use client";
+
+export const dynamic = "force-dynamic";
 import { useState, useEffect } from "react";
 import {
   Building2, Save, Loader2, CheckCircle2, AlertCircle,
-  Euro, Users, Award, MapPin, BarChart3
+  Euro, Users, Award, MapPin, BarChart3, Shield, Briefcase, TrendingUp
 } from "lucide-react";
 import { toast } from "sonner";
 import { useCompanyProfile, useUpdateCompanyProfile } from "@/hooks/useAnalysis";
@@ -76,6 +78,12 @@ interface FormState {
   certifications: string[];
   specialties: string[];
   regions: string[];
+  assurance_rc_montant: string;
+  assurance_decennale: boolean;
+  partenaires_specialites: string[];
+  marge_minimale_pct: string;
+  max_projets_simultanes: string;
+  projets_actifs_count: string;
 }
 
 // ── Checkbox group ─────────────────────────────────────────────────────────
@@ -215,6 +223,12 @@ export default function CompanyProfilePage() {
     certifications: [],
     specialties: [],
     regions: [],
+    assurance_rc_montant: "",
+    assurance_decennale: false,
+    partenaires_specialites: [],
+    marge_minimale_pct: "",
+    max_projets_simultanes: "",
+    projets_actifs_count: "",
   });
 
   // Sync form when profile loads
@@ -228,6 +242,12 @@ export default function CompanyProfilePage() {
         certifications: profile.certifications ?? [],
         specialties: profile.specialties ?? [],
         regions: profile.regions ?? [],
+        assurance_rc_montant: profile.assurance_rc_montant != null ? String(profile.assurance_rc_montant) : "",
+        assurance_decennale: profile.assurance_decennale ?? false,
+        partenaires_specialites: profile.partenaires_specialites ?? [],
+        marge_minimale_pct: profile.marge_minimale_pct != null ? String(profile.marge_minimale_pct) : "",
+        max_projets_simultanes: profile.max_projets_simultanes != null ? String(profile.max_projets_simultanes) : "",
+        projets_actifs_count: profile.projets_actifs_count != null ? String(profile.projets_actifs_count) : "",
       });
     }
   }, [profile]);
@@ -244,6 +264,12 @@ export default function CompanyProfilePage() {
       certifications: form.certifications,
       specialties: form.specialties,
       regions: form.regions,
+      assurance_rc_montant: form.assurance_rc_montant ? parseInt(form.assurance_rc_montant, 10) : null,
+      assurance_decennale: form.assurance_decennale,
+      partenaires_specialites: form.partenaires_specialites,
+      marge_minimale_pct: form.marge_minimale_pct ? parseInt(form.marge_minimale_pct, 10) : null,
+      max_projets_simultanes: form.max_projets_simultanes ? parseInt(form.max_projets_simultanes, 10) : null,
+      projets_actifs_count: form.projets_actifs_count ? parseInt(form.projets_actifs_count, 10) : null,
     };
 
     updateProfile.mutate(payload, {
@@ -384,6 +410,86 @@ export default function CompanyProfilePage() {
             selected={form.regions}
             onChange={(v) => setForm((f) => ({ ...f, regions: v }))}
             cols={2}
+          />
+        </Section>
+
+        {/* ── Assurances ── */}
+        <Section
+          icon={<Shield className="w-4 h-4 text-primary-600" />}
+          title="Assurances"
+          description="RC Pro et décennale — critères courants des marchés publics BTP"
+        >
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <NumberInput
+              label="Montant couverture RC Pro (EUR)"
+              value={form.assurance_rc_montant}
+              onChange={(v) => setForm((f) => ({ ...f, assurance_rc_montant: v }))}
+              placeholder="ex. 5000000"
+              suffix="EUR"
+              hint="Plafond de garantie responsabilité civile professionnelle"
+            />
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1.5">
+                Assurance décennale
+              </label>
+              <label className={`flex items-center gap-2.5 p-3 rounded-xl border cursor-pointer transition-all ${form.assurance_decennale ? "bg-primary-50 border-primary-300" : "bg-white border-slate-100"}`}>
+                <input
+                  type="checkbox"
+                  checked={form.assurance_decennale}
+                  onChange={(e) => setForm((f) => ({ ...f, assurance_decennale: e.target.checked }))}
+                  className="w-4 h-4 accent-primary-600"
+                />
+                <span className="text-sm font-medium text-slate-700">Assurance décennale souscrite</span>
+              </label>
+              <p className="text-[10px] text-slate-400 mt-1">Obligatoire pour les travaux de construction</p>
+            </div>
+          </div>
+        </Section>
+
+        {/* ── Capacite & charge ── */}
+        <Section
+          icon={<Briefcase className="w-4 h-4 text-primary-600" />}
+          title="Capacité de charge"
+          description="Nombre de projets simultanés et marge minimale acceptée"
+        >
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <NumberInput
+              label="Max projets simultanés"
+              value={form.max_projets_simultanes}
+              onChange={(v) => setForm((f) => ({ ...f, max_projets_simultanes: v }))}
+              placeholder="ex. 8"
+              suffix="projets"
+              hint="Capacité maximale en parallèle"
+            />
+            <NumberInput
+              label="Projets actifs actuels"
+              value={form.projets_actifs_count}
+              onChange={(v) => setForm((f) => ({ ...f, projets_actifs_count: v }))}
+              placeholder="ex. 5"
+              suffix="projets"
+              hint="Nombre de chantiers en cours"
+            />
+            <NumberInput
+              label="Marge brute minimale (%)"
+              value={form.marge_minimale_pct}
+              onChange={(v) => setForm((f) => ({ ...f, marge_minimale_pct: v }))}
+              placeholder="ex. 12"
+              suffix="%"
+              hint="Seuil minimum pour décider de répondre"
+            />
+          </div>
+        </Section>
+
+        {/* ── Partenaires sous-traitance ── */}
+        <Section
+          icon={<TrendingUp className="w-4 h-4 text-primary-600" />}
+          title="Partenaires & sous-traitance"
+          description="Spécialités couvertes par vos partenaires habituels"
+        >
+          <CheckboxGroup
+            items={SPECIALTIES}
+            selected={form.partenaires_specialites}
+            onChange={(v) => setForm((f) => ({ ...f, partenaires_specialites: v }))}
           />
         </Section>
 

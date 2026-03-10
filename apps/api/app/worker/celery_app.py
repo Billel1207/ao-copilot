@@ -18,7 +18,7 @@ celery_app.conf.update(
     task_track_started=True,
     task_acks_late=True,
     worker_prefetch_multiplier=1,
-    result_expires=3600,  # 1h
+    result_expires=86400,  # 24h
     beat_schedule={
         # Veille BOAMP — toutes les heures
         "sync_boamp_all_orgs": {
@@ -29,6 +29,11 @@ celery_app.conf.update(
         "send_daily_deadline_reminders": {
             "task": "send_daily_deadline_reminders",
             "schedule": crontab(hour=8, minute=0),
+        },
+        # Purge rétention — tous les jours à 3h du matin
+        "purge_expired_data": {
+            "task": "purge_expired_data",
+            "schedule": crontab(hour=3, minute=0),
         },
     },
 )

@@ -1,16 +1,23 @@
 """Enrichissement du score Go/No-Go par comparaison avec le profil entreprise.
 
-Appelé après la génération du score LLM de base pour produire :
-  - profile_match_score (0-100) : adéquation globale profil vs exigences
-  - profile_gaps : liste des points manquants ou inadéquats
+9 dimensions d'évaluation :
+  1. Capacité financière (CA vs exigences)
+  2. Taille marché (montant vs capacité max)
+  3. Certifications (couverture vs requises)
+  4. Zone géographique (régions d'intervention)
+  5. Adéquation assurance (RC Pro + décennale vs requis)
+  6. Viabilité marge (marge estimée vs seuil minimum)
+  7. Capacité charge (projets actifs vs max simultanés)
+  8. Couverture sous-traitance (spécialités partenaires)
+  9. Taux de succès historique (win rate estimé — bonus)
 
 Ce module est purement synchrone (pas d'appel LLM) et peut être utilisé
 depuis le worker Celery ou depuis un endpoint FastAPI via run_in_executor.
 """
-import logging
+import structlog
 from dataclasses import dataclass, field
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 # ── Types ─────────────────────────────────────────────────────────────────────
@@ -185,13 +192,128 @@ def compute_profile_match(
     else:
         dimension_scores["geographic_coverage"] = 80  # Pas d'info
 
+    # ── Dimension 5 : Adéquation assurance ────────────────────────────────
+    assurance_rc = _parse_int(company_profile.get("assurance_rc_montant"))
+    assurance_decennale = company_profile.get("assurance_decennale")
+
+    assurance_score = 100
+    if market_amount and assurance_rc is not None:
+        if assurance_rc < market_amount:
+            ratio = assurance_rc / market_amount
+            assurance_score = int(min(90, 100 * ratio))
+            gaps.append(
+                f"RC Pro insuffisante : {assurance_rc:,} € vs montant marché {market_amount:,} €"
+            )
+        else:
+            strengths.append(f"RC Pro ({assurance_rc:,} €) couvre le montant du marché")
+    elif assurance_rc is None:
+        assurance_score = 60  # Non renseigné
+
+    if assurance_decennale is False:
+        assurance_score = max(0, assurance_score - 30)
+        gaps.append("Assurance décennale non souscrite")
+    elif assurance_decennale is True:
+        strengths.append("Assurance décennale active")
+
+    dimension_scores["insurance_adequacy"] = assurance_score
+
+    # ── Dimension 6 : Viabilité marge ────────────────────────────────────
+    marge_min_pct = _parse_int(company_profile.get("marge_minimale_pct"))
+    estimated_margin = gonogo_payload.get("estimated_margin_pct")
+
+    margin_score = 80  # Par défaut neutre
+    if marge_min_pct is not None and estimated_margin is not None:
+        try:
+            est_m = float(estimated_margin)
+            if est_m < marge_min_pct:
+                margin_score = int(max(0, 100 * est_m / marge_min_pct))
+                gaps.append(
+                    f"Marge estimée ({est_m:.0f}%) inférieure au seuil ({marge_min_pct}%)"
+                )
+            else:
+                margin_score = 100
+                strengths.append(
+                    f"Marge estimée ({est_m:.0f}%) au-dessus du seuil ({marge_min_pct}%)"
+                )
+        except (ValueError, TypeError):
+            pass
+    elif marge_min_pct is None:
+        margin_score = 70  # Non renseigné
+    dimension_scores["margin_viability"] = margin_score
+
+    # ── Dimension 7 : Capacité de charge (projets simultanés) ─────────────
+    max_simultaneous = _parse_int(company_profile.get("max_projets_simultanes"))
+    active_count = _parse_int(company_profile.get("projets_actifs_count"))
+
+    capacity_score = 80
+    if max_simultaneous is not None and active_count is not None:
+        if active_count >= max_simultaneous:
+            capacity_score = 10
+            gaps.append(
+                f"Capacité saturée : {active_count} projets actifs / {max_simultaneous} max"
+            )
+        elif active_count >= max_simultaneous * 0.8:
+            capacity_score = 50
+            gaps.append(
+                f"Capacité presque saturée : {active_count}/{max_simultaneous} projets"
+            )
+        else:
+            capacity_score = 100
+            strengths.append(
+                f"Capacité disponible : {active_count}/{max_simultaneous} projets"
+            )
+    elif max_simultaneous is None:
+        capacity_score = 70  # Non renseigné
+    dimension_scores["workload_capacity"] = capacity_score
+
+    # ── Dimension 8 : Couverture sous-traitance ───────────────────────────
+    partenaires: list[str] = company_profile.get("partenaires_specialites") or []
+    all_specialties = set(s.lower() for s in company_specialties + partenaires)
+
+    # Vérifier si les spécialités détectées dans le marché sont couvertes
+    market_specialties: list[str] = gonogo_payload.get("required_specialties") or []
+    partner_score = 100
+    if market_specialties:
+        market_specs_normalized = [s.lower().strip() for s in market_specialties]
+        covered = sum(1 for s in market_specs_normalized if any(sp in s or s in sp for sp in all_specialties))
+        partner_score = int(100 * covered / len(market_specs_normalized)) if market_specs_normalized else 100
+        uncovered = [s for s in market_specialties if not any(sp in s.lower() or s.lower() in sp for sp in all_specialties)]
+        if uncovered:
+            gaps.append(f"Spécialités non couvertes : {', '.join(uncovered[:3])}")
+        else:
+            strengths.append("Toutes les spécialités requises couvertes (direct ou sous-traitance)")
+    elif partenaires:
+        strengths.append(f"{len(partenaires)} spécialité(s) partenaire(s) disponibles")
+    dimension_scores["subcontracting_coverage"] = partner_score
+
+    # ── Dimension 9 : Taux de succès historique (bonus) ───────────────────
+    # Utilise les données de projets gagnés/perdus si disponibles dans le payload
+    win_rate = gonogo_payload.get("historical_win_rate")
+    history_score = 70  # Neutre par défaut
+    if win_rate is not None:
+        try:
+            wr = float(win_rate)
+            history_score = int(min(100, max(0, wr * 100)))
+            if wr >= 0.3:
+                strengths.append(f"Taux de succès historique : {wr:.0%}")
+            elif wr < 0.15:
+                gaps.append(f"Taux de succès faible : {wr:.0%}")
+        except (ValueError, TypeError):
+            pass
+    dimension_scores["historical_success"] = history_score
+
     # ── Score global ────────────────────────────────────────────────────────
-    # Pondérations : finances 30%, taille marché 25%, certifs 30%, région 15%
+    # Pondérations sur 9 dimensions (somme = 1.00)
     weights = {
-        "financial_capacity": 0.30,
-        "market_size_fit": 0.25,
-        "certifications": 0.30,
-        "geographic_coverage": 0.15,
+        "financial_capacity": 0.18,
+        "market_size_fit": 0.14,
+        "certifications": 0.16,
+        "geographic_coverage": 0.08,
+        "insurance_adequacy": 0.10,
+        "margin_viability": 0.10,
+        "workload_capacity": 0.10,
+        "subcontracting_coverage": 0.08,
+        "historical_success": 0.06,
     }
     profile_match_score = int(sum(
         dimension_scores.get(dim, 100) * w

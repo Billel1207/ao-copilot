@@ -1,12 +1,12 @@
 """Génération PDF d'export avec xhtml2pdf + Word avec python-docx."""
 import uuid
-import logging
+import structlog
 from datetime import datetime
 from io import BytesIO
 from jinja2 import Environment, BaseLoader
 from sqlalchemy.orm import Session
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 from app.models.project import AoProject
 from app.models.analysis import ExtractionResult, ChecklistItem, CriteriaItem

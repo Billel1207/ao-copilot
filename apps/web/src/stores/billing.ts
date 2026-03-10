@@ -9,6 +9,7 @@ export interface PlanInfo {
   max_users: number;
   word_export: boolean;
   features: string[];
+  stripe_price_id?: string;
 }
 
 export interface BillingUsage {
@@ -38,11 +39,11 @@ interface BillingState {
   subscription: BillingSubscription | null;
   isLoading: boolean;
   /** Plan en cours de checkout (null = aucun) — évite que les deux boutons se grisent */
-  checkoutPlan: "starter" | "pro" | null;
+  checkoutPlan: "starter" | "pro" | "europe" | "business" | null;
   error: string | null;
 
   fetchBilling: () => Promise<void>;
-  createCheckout: (plan: "starter" | "pro") => Promise<void>;
+  createCheckout: (plan: "starter" | "pro" | "europe" | "business") => Promise<void>;
   openPortal: () => Promise<void>;
 }
 

@@ -1,20 +1,26 @@
 """Analyse spécialisée des clauses risquées dans les CCAP (Cahier des Clauses Administratives Particulières)."""
-import logging
+import structlog
 from typing import Any
 
+from app.services.ccag_travaux_2021 import get_ccag_context_for_analyzer
+from app.services.jurisprudence_btp import get_jurisprudence_context_for_analyzer
 from app.services.llm import llm_service
+from app.services.llm_validators import ValidatedCcapAnalysis
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 # ── Prompt système spécialisé CCAP ──────────────────────────────────────────
 
-CCAP_SYSTEM_PROMPT = """Tu es un juriste expert en droit des marchés publics français et en droit de la construction BTP.
+_CCAG_CONTEXT = get_ccag_context_for_analyzer("ccap")
+_JURIS_CONTEXT = get_jurisprudence_context_for_analyzer("ccap")
+
+CCAP_SYSTEM_PROMPT = f"""Tu es un juriste expert en droit des marchés publics français et en droit de la construction BTP.
 Tu analyses des CCAP (Cahiers des Clauses Administratives Particulières) pour identifier les clauses potentiellement risquées
 pour l'entreprise titulaire du marché.
 
 Tu dois repérer et évaluer les clauses suivantes selon la réglementation française (Code de la commande publique, loi MOP, etc.) :
 
-1. PÉNALITÉS DE RETARD : risque CRITIQUE si > 1/1000 du montant du marché par jour calendaire
+1. PÉNALITÉS DE RETARD : risque CRITIQUE si > 1/1000 du montant du marché par jour calendaire (standard CCAG : 1/3000)
 2. RETENUE DE GARANTIE : risque HAUT si > 5% du montant des travaux (seuil légal selon loi du 16 juillet 1971)
 3. DÉLAIS D'EXÉCUTION TRÈS SERRÉS : risque HAUT si < 30 jours pour des prestations complexes
 4. CLAUSES DE RÉSILIATION FACILITÉE : risque CRITIQUE si l'acheteur peut résilier sans motif légitime ou avec préavis très court
@@ -22,6 +28,10 @@ Tu dois repérer et évaluer les clauses suivantes selon la réglementation fran
 6. CONDITIONS DE SOUS-TRAITANCE RESTRICTIVES : risque MOYEN à HAUT si contraires à la loi du 31 décembre 1975 relative à la sous-traitance
 7. RÉVISION DE PRIX ABSENTE OU PLAFONNÉE : risque HAUT si durée > 3 mois sans clause de révision ou avec plafond < variation IRL/BTP
 8. PAIEMENTS DIFFÉRÉS : risque HAUT si délai de paiement > 30 jours (hors délais légaux fixés par l'ordonnance 2019-359)
+
+{_CCAG_CONTEXT}
+
+{_JURIS_CONTEXT}
 
 Pour chaque clause risquée détectée, fournis :
 - article_reference : numéro ou titre de l'article concerné (ex: "Article 7.3", "Chapitre IV §2")
@@ -31,6 +41,8 @@ Pour chaque clause risquée détectée, fournis :
 - conseil : recommandation concrète pour négocier ou se protéger (1-2 phrases)
 - citation : passage exact de la clause (citation courte)
 
+Pour chaque clause, COMPARE au standard CCAG-Travaux 2021. Si le CCAP déroge au CCAG de manière DÉFAVORABLE au titulaire, ajoute-la dans la liste ccag_derogations.
+
 Le score_risque_global (0-100) reflète l'exposition globale :
 - 0-30 : risque faible (vert)
 - 31-70 : risque modéré (amber)
@@ -39,6 +51,7 @@ Le score_risque_global (0-100) reflète l'exposition globale :
 Réponds UNIQUEMENT en JSON valide sans commentaires."""
 
 CCAP_USER_PROMPT_TEMPLATE = """Analyse ce CCAP et identifie toutes les clauses risquées pour l'entreprise titulaire.
+Compare chaque clause au standard CCAG-Travaux 2021 et signale les dérogations.
 
 --- TEXTE DU CCAP ---
 {text}
@@ -56,12 +69,22 @@ Réponds avec ce JSON exact :
       "citation": "string"
     }}
   ],
+  "ccag_derogations": [
+    {{
+      "article_ccag": "string (ex: '19.1')",
+      "valeur_ccag": "string (valeur standard CCAG)",
+      "valeur_ccap": "string (valeur trouvée dans le CCAP)",
+      "impact": "DEFAVORABLE|FAVORABLE|NEUTRE",
+      "description": "string (explication courte de la dérogation)"
+    }}
+  ],
   "score_risque_global": 0,
   "nb_clauses_critiques": 0,
   "resume_risques": "string (2-3 phrases résumant l'exposition)"
 }}
 
-Si aucune clause risquée n'est détectée, retourne une liste vide et score 0."""
+Si aucune clause risquée n'est détectée, retourne des listes vides et score 0.
+Si aucune dérogation CCAG n'est détectée, retourne ccag_derogations comme liste vide."""
 
 
 def analyze_ccap_risks(text: str, project_id: str | None = None) -> dict[str, Any]:
@@ -97,6 +120,7 @@ def analyze_ccap_risks(text: str, project_id: str | None = None) -> dict[str, An
             system_prompt=CCAP_SYSTEM_PROMPT,
             user_prompt=user_prompt,
             required_keys=["clauses_risquees", "score_risque_global"],
+            validator=ValidatedCcapAnalysis,
         )
     except ValueError as exc:
         logger.error(f"{log_prefix}Erreur LLM CCAP (ValueError): {exc}")
@@ -135,13 +159,38 @@ def analyze_ccap_risks(text: str, project_id: str | None = None) -> dict[str, An
             validated_clause["risk_level"] = "MOYEN"
         validated_clauses.append(validated_clause)
 
+    # Extraire et valider les dérogations CCAG
+    raw_derogations = result.get("ccag_derogations", [])
+    validated_derogations = []
+    for derog in raw_derogations:
+        if not isinstance(derog, dict):
+            continue
+        impact = derog.get("impact", "NEUTRE")
+        if impact not in ("DEFAVORABLE", "FAVORABLE", "NEUTRE"):
+            impact = "NEUTRE"
+        validated_derogations.append({
+            "article_ccag": derog.get("article_ccag", ""),
+            "valeur_ccag": derog.get("valeur_ccag", ""),
+            "valeur_ccap": derog.get("valeur_ccap", ""),
+            "impact": impact,
+            "description": derog.get("description", ""),
+        })
+
+    nb_derogations_defavorables = sum(
+        1 for d in validated_derogations if d["impact"] == "DEFAVORABLE"
+    )
+
     logger.info(
         f"{log_prefix}CCAP analysé — score={score}, "
-        f"clauses={len(validated_clauses)}, critiques={nb_critiques}"
+        f"clauses={len(validated_clauses)}, critiques={nb_critiques}, "
+        f"dérogations CCAG={len(validated_derogations)} "
+        f"(défavorables={nb_derogations_defavorables})"
     )
 
     return {
         "clauses_risquees": validated_clauses,
+        "ccag_derogations": validated_derogations,
+        "nb_derogations_defavorables": nb_derogations_defavorables,
         "score_risque_global": score,
         "nb_clauses_critiques": nb_critiques,
         "resume_risques": result.get("resume_risques", ""),

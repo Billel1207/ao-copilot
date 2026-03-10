@@ -52,7 +52,7 @@ def process_document(self, doc_id: str):
         doc.page_count = len(pages)
         doc.has_text = any(p.char_count > 50 for p in pages)
 
-        # Sauvegarder les pages
+        # Sauvegarder les pages (avec confiance OCR)
         for page in pages:
             dp = DocumentPage(
                 document_id=doc.id,
@@ -60,8 +60,28 @@ def process_document(self, doc_id: str):
                 raw_text=page.raw_text,
                 char_count=page.char_count,
                 section=page.section,
+                ocr_confidence=page.ocr_confidence,
             )
             db.add(dp)
+
+        # Qualité OCR globale du document
+        from app.services.pdf_extractor import compute_document_ocr_quality, detect_doc_type_from_content
+        ocr_quality = compute_document_ocr_quality(pages)
+        doc.ocr_quality_score = ocr_quality.get("ocr_score")
+        doc.ocr_warning = ocr_quality.get("warning")
+
+        # Détection type document par contenu si non identifié
+        if doc.doc_type in (None, "AUTRES", ""):
+            full_text = " ".join(p.raw_text for p in pages if p.raw_text)
+            detected_type = detect_doc_type_from_content(full_text)
+            if detected_type:
+                import logging
+                logging.getLogger(__name__).info(
+                    "[%s] Type document détecté par contenu : %s → %s",
+                    doc_id, doc.doc_type, detected_type,
+                )
+                doc.doc_type = detected_type
+
         db.flush()
 
         _set_progress(self.request.id, 40, "Découpage en chunks")
@@ -171,14 +191,33 @@ def analyze_project(self, project_id: str):
             import logging
             logging.getLogger(__name__).warning("Email notification failed: %s", email_exc)
 
+        # Dispatch webhook analysis.completed via Celery (async, fail-safe)
+        try:
+            dispatch_webhook_event.delay(
+                str(project.org_id),
+                "analysis.completed",
+                {"project_id": project_id, "title": project.title, "status": "ready"},
+            )
+        except Exception as wh_exc:
+            import logging
+            logging.getLogger(__name__).warning("Webhook dispatch trigger failed: %s", wh_exc)
+
         return {"project_id": project_id, "status": "ready"}
 
     except Exception as exc:
         db.rollback()
         project = db.query(AoProject).filter_by(id=uuid.UUID(project_id)).first()
         if project:
-            project.status = "draft"
+            project.status = "error"
             db.commit()
+        # Stocker le message d'erreur dans Redis pour le frontend
+        try:
+            import redis as redis_lib
+            r = redis_lib.from_url(settings.REDIS_URL)
+            error_msg = str(exc)[:500] if exc else "Erreur interne"
+            r.set(f"project_error:{project_id}", error_msg, ex=86400)
+        except Exception:
+            pass
         # Guard : ne relancer que si le quota de retries n'est pas épuisé
         if self.request.retries < self.max_retries:
             raise self.retry(exc=exc, countdown=60)
@@ -409,3 +448,124 @@ def export_project_docx(project_id: str) -> str:
         return s3_key
     finally:
         db.close()
+
+
+@celery_app.task(name="purge_expired_data", time_limit=300, soft_time_limit=280)
+def purge_expired_data():
+    """Purge les données expirées selon la rétention du plan de chaque organisation.
+
+    Tâche Celery beat — exécutée chaque nuit à 3h Europe/Paris.
+    Pour chaque organisation, supprime :
+    - Les projets (et leurs documents/analyses) dépassant la durée de rétention
+    - Les exports S3 correspondants
+
+    Rétentions par plan :
+    - free/trial : 7-14 jours
+    - starter : 30 jours
+    - pro : 90 jours
+    - europe : 180 jours
+    - business : 365 jours
+    """
+    import logging
+    from datetime import datetime, timezone, timedelta
+    from app.models.organization import Organization
+    from app.models.project import AoProject
+    from app.models.document import AoDocument
+    from app.services.billing import PLANS
+
+    _log = logging.getLogger(__name__)
+    db = SyncSession()
+
+    try:
+        now = datetime.now(timezone.utc)
+        orgs = db.query(Organization).filter(Organization.deleted_at.is_(None)).all()
+
+        total_purged = 0
+
+        for org in orgs:
+            plan_config = PLANS.get(org.plan, PLANS.get("free"))
+            if not plan_config:
+                continue
+
+            retention_days = plan_config.retention_days
+            cutoff_date = now - timedelta(days=retention_days)
+
+            # Trouver les projets expirés
+            expired_projects = (
+                db.query(AoProject)
+                .filter(
+                    AoProject.org_id == org.id,
+                    AoProject.created_at < cutoff_date,
+                )
+                .all()
+            )
+
+            if not expired_projects:
+                continue
+
+            for project in expired_projects:
+                try:
+                    docs = db.query(AoDocument).filter_by(project_id=project.id).all()
+                    for doc in docs:
+                        if doc.s3_key:
+                            try:
+                                from app.services.storage import storage_service
+                                storage_service.delete_object(doc.s3_key)
+                            except Exception:
+                                pass  # S3 cleanup best-effort
+                    db.delete(project)
+                    total_purged += 1
+                except Exception as exc:
+                    _log.warning("purge_project_failed project=%s: %s", project.id, exc)
+
+            db.commit()
+            if expired_projects:
+                _log.info(
+                    "purge_completed org=%s plan=%s retention=%dd purged=%d",
+                    org.id, org.plan, retention_days, len(expired_projects),
+                )
+
+        return {"organizations_checked": len(orgs), "projects_purged": total_purged}
+
+    except Exception as exc:
+        _log.error("purge_expired_data_failed: %s", exc)
+        db.rollback()
+        raise
+    finally:
+        db.close()
+
+
+@celery_app.task(name="dispatch_webhook_event", time_limit=60, soft_time_limit=50, max_retries=2)
+def dispatch_webhook_event(org_id: str, event_type: str, data: dict):
+    """Dispatch un événement webhook à tous les endpoints actifs de l'organisation.
+
+    Exécuté de manière asynchrone via Celery pour ne pas bloquer le pipeline IA.
+    """
+    import asyncio
+    import logging as _logging
+    from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession as _AsyncSession
+    from sqlalchemy.orm import sessionmaker as _sessionmaker
+    from app.services.webhook_dispatch import dispatch_event
+
+    _log = _logging.getLogger(__name__)
+
+    async def _dispatch():
+        engine = create_async_engine(settings.DATABASE_URL, pool_pre_ping=True)
+        async_session = _sessionmaker(engine, class_=_AsyncSession, expire_on_commit=False)
+        async with async_session() as session:
+            success_count = await dispatch_event(session, org_id, event_type, data)
+            await session.commit()
+            return success_count
+
+    try:
+        loop = asyncio.new_event_loop()
+        success_count = loop.run_until_complete(_dispatch())
+        loop.close()
+        _log.info(
+            "webhook_dispatched event=%s org=%s success=%d",
+            event_type, org_id, success_count,
+        )
+        return {"event": event_type, "org_id": org_id, "success_count": success_count}
+    except Exception as exc:
+        _log.error("webhook_dispatch_failed event=%s org=%s: %s", event_type, org_id, exc)
+        raise

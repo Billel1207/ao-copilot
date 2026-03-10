@@ -91,6 +91,15 @@ jobs:
       - name: Run pytest
         run: pytest apps/api/tests -v --tb=short
 
+      - name: Install security scanning tools
+        run: pip install bandit pip-audit
+
+      - name: Run Bandit security linter
+        run: bandit -r apps/api/app -s B101 -q
+
+      - name: Run pip-audit dependency check
+        run: pip-audit --strict
+
   # ──────────────────────────────────────────────
   # Frontend — Tests Vitest (Next.js)
   # ──────────────────────────────────────────────
@@ -118,6 +127,9 @@ jobs:
 
       - name: Run Vitest
         run: npm run test
+
+      - name: Run npm audit
+        run: npm audit --audit-level=high || true
 
   # ──────────────────────────────────────────────
   # Docker — Build images (validation)

@@ -2,6 +2,7 @@
 
 import { AlertTriangle, AlertOctagon, Info, ShieldAlert, FileX, CheckCircle } from "lucide-react";
 import { useCcapRisks } from "@/hooks/useAnalysis";
+import AIDisclaimer from "@/components/ui/AIDisclaimer";
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -104,9 +105,17 @@ function ScoreCircle({ score }: { score: number }) {
 
   return (
     <div className="flex flex-col items-center gap-1">
-      <div className="relative" style={{ width: size, height: size }}>
+      <div
+        className="relative"
+        style={{ width: size, height: size }}
+        role="meter"
+        aria-valuenow={score}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-label={`Score de risque : ${score} sur 100 (${scoreLabel})`}
+      >
         {/* Track */}
-        <svg width={size} height={size} className="rotate-[-90deg]">
+        <svg width={size} height={size} className="rotate-[-90deg]" aria-hidden="true">
           <circle
             cx={size / 2}
             cy={size / 2}
@@ -148,7 +157,10 @@ function ScoreCircle({ score }: { score: number }) {
 function RiskBadge({ level }: { level: RiskLevel }) {
   const cfg = RISK_CONFIG[level] ?? RISK_CONFIG.MOYEN;
   return (
-    <span className={cn("inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold", cfg.badgeCls)}>
+    <span
+      className={cn("inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold", cfg.badgeCls)}
+      aria-label={`Niveau de risque : ${cfg.label}`}
+    >
       {cfg.icon}
       {cfg.label}
     </span>
@@ -394,10 +406,8 @@ export function CcapRiskTab({ projectId }: Props) {
         ))}
       </div>
 
-      {/* ── Footer note ── */}
-      <p className="text-[11px] text-slate-400 text-center pb-2">
-        Analyse générée automatiquement par IA — vérifiez les clauses avec votre service juridique avant de signer.
-      </p>
+      {/* ── Footer disclaimer ── */}
+      <AIDisclaimer />
     </div>
   );
 }

@@ -1,6 +1,6 @@
 """Service de veille BOAMP — interroge l'API officielle BOAMP et synchronise les résultats."""
 import uuid
-import logging
+import structlog
 from datetime import datetime, timezone
 from typing import Any
 
@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session  # utilisé par les workers Celery synchrones
 
 from app.models.ao_alert import AoWatchConfig, AoWatchResult
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 BOAMP_API_URL = "https://www.boamp.fr/api/explore/v2.1/catalog/datasets/boamp/records"
 BOAMP_TIMEOUT_S = 30

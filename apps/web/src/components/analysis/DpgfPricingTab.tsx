@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { useDpgfPricing } from "@/hooks/useAnalysis";
 import { cn } from "@/lib/utils";
+import AIDisclaimer from "@/components/ui/AIDisclaimer";
 
 interface Props {
   projectId: string;
@@ -52,14 +53,14 @@ const STATUS_CONFIG: Record<PricingStatus, {
   icon: React.ReactNode;
 }> = {
   SOUS_EVALUE: {
-    label: "Sous-evalue",
+    label: "Sous-évalué",
     badgeCls: "bg-orange-100 text-orange-800 border border-orange-200",
     rowCls: "bg-orange-50/60",
     borderCls: "border-l-orange-400",
     icon: <TrendingDown className="w-4 h-4 text-orange-500" />,
   },
   SUR_EVALUE: {
-    label: "Surevalue",
+    label: "Surévalué",
     badgeCls: "bg-red-100 text-red-800 border border-red-200",
     rowCls: "bg-red-50/60",
     borderCls: "border-l-red-500",
@@ -86,7 +87,10 @@ const STATUS_CONFIG: Record<PricingStatus, {
 function StatusBadge({ status }: { status: PricingStatus }) {
   const cfg = STATUS_CONFIG[status] ?? STATUS_CONFIG.INCONNU;
   return (
-    <span className={cn("inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold", cfg.badgeCls)}>
+    <span
+      className={cn("inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold", cfg.badgeCls)}
+      aria-label={`Statut tarifaire : ${cfg.label}`}
+    >
       {cfg.icon}
       {cfg.label}
     </span>
@@ -218,7 +222,7 @@ export function DpgfPricingTab({ projectId }: Props) {
           Impossible de charger l&apos;analyse tarifaire DPGF.
         </p>
         <p className="text-slate-400 text-sm">
-          Verifiez que l&apos;analyse du projet a bien ete lancee.
+          Vérifiez que l&apos;analyse du projet a bien été lancée.
         </p>
       </div>
     );
@@ -228,7 +232,7 @@ export function DpgfPricingTab({ projectId }: Props) {
     return (
       <div className="card p-8 flex flex-col items-center gap-3 text-center animate-fade-in">
         <FileX className="w-10 h-10 text-slate-300" />
-        <p className="text-slate-500">Aucune donnee disponible.</p>
+        <p className="text-slate-500">Aucune donnée disponible.</p>
       </div>
     );
   }
@@ -297,7 +301,7 @@ export function DpgfPricingTab({ projectId }: Props) {
               {pricing.total_lines ?? lines.length}
             </p>
             <p className="text-[11px] text-slate-500 font-medium">
-              postes analyses
+              postes analysés
             </p>
           </div>
 
@@ -305,13 +309,13 @@ export function DpgfPricingTab({ projectId }: Props) {
           <div className="flex-1 space-y-3">
             <div className="flex flex-wrap gap-x-5 gap-y-2">
               <StatCounter
-                label="Sous-evalues"
+                label="Sous-évalués"
                 count={nbSousEvalue}
                 badgeCls="bg-orange-100 text-orange-800 border border-orange-200"
                 icon={<TrendingDown className="w-3.5 h-3.5 text-orange-500" />}
               />
               <StatCounter
-                label="Surevalues"
+                label="Surévalués"
                 count={nbSurEvalue}
                 badgeCls="bg-red-100 text-red-800 border border-red-200"
                 icon={<TrendingUp className="w-3.5 h-3.5 text-red-600" />}
@@ -337,7 +341,7 @@ export function DpgfPricingTab({ projectId }: Props) {
               <div className="flex items-center gap-2">
                 <Info className="w-4 h-4 text-amber-500" />
                 <p className="text-xs text-amber-700 font-medium">
-                  {alerts.length} alerte{alerts.length > 1 ? "s" : ""} tarifaire{alerts.length > 1 ? "s" : ""} detectee{alerts.length > 1 ? "s" : ""}
+                  {alerts.length} alerte{alerts.length > 1 ? "s" : ""} tarifaire{alerts.length > 1 ? "s" : ""} détectée{alerts.length > 1 ? "s" : ""}
                 </p>
               </div>
             )}
@@ -367,7 +371,7 @@ export function DpgfPricingTab({ projectId }: Props) {
       {/* -- Full pricing table -- */}
       <div>
         <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3 px-1">
-          Detail des postes ({lines.length})
+          Détail des postes ({lines.length})
         </p>
         <div className="card overflow-hidden">
           <div className="overflow-x-auto">
@@ -375,13 +379,13 @@ export function DpgfPricingTab({ projectId }: Props) {
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-200">
                   <th className="text-left px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wide">
-                    Designation
+                    Désignation
                   </th>
                   <th className="text-right px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">
                     Prix unitaire
                   </th>
                   <th className="text-right px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">
-                    Ref. marche (bas - haut)
+                    Réf. marché (bas - haut)
                   </th>
                   <th className="text-right px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wide">
                     Ratio
@@ -437,10 +441,8 @@ export function DpgfPricingTab({ projectId }: Props) {
         </div>
       </div>
 
-      {/* -- Footer -- */}
-      <p className="text-[11px] text-slate-400 text-center pb-2">
-        Referentiel indicatif 2024 — les prix reels varient selon localisation, quantites et conjoncture.
-      </p>
+      {/* -- Footer disclaimer -- */}
+      <AIDisclaimer text="Référentiel indicatif 2024 (ajusté 2026) — les prix réels varient selon localisation, quantités et conjoncture. Ne se substitue pas à une estimation professionnelle." />
     </div>
   );
 }

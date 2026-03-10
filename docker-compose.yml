@@ -103,6 +103,27 @@ services:
       --concurrency=2
       -P prefork
 
+  # ── Celery Beat (scheduler — purge, veille) ─────────────────────────────────
+  beat:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+    container_name: aocopilot_beat
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://aocopilot:aocopilot_secret@postgres:5432/aocopilot
+      DATABASE_URL_SYNC: postgresql://aocopilot:aocopilot_secret@postgres:5432/aocopilot
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/2
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    command: >
+      python -m celery -A app.worker.celery_app beat
+      --loglevel=info
+
 volumes:
   postgres_data:
   redis_data:

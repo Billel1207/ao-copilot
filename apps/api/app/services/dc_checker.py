@@ -4,14 +4,96 @@ Analyse le texte extrait du dossier de consultation pour identifier
 TOUS les documents administratifs obligatoires (formulaires DC1/DC2,
 attestations fiscales, URSSAF, assurances, Kbis, certifications, etc.)
 et génère des alertes en cas de version périmée ou de délai de validité.
+
+Inclut un pré-traitement OCR fuzzy pour normaliser les références
+garbled par des scans de mauvaise qualité (ex: "D C1" → "DC1").
 """
-import logging
+import structlog
+import re
 from typing import Any
 
 from app.services.llm import llm_service
 from app.services.llm_validators import ValidatedDcCheck
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
+
+
+# ── Normalisation OCR pour références administratives ────────────────────
+
+# Patterns regex pour corriger les erreurs OCR courantes sur les références
+# administratives BTP. L'OCR sur PDFs scannés produit souvent des espaces
+# parasites, des confusions de caractères (l/1, I/1, O/0), etc.
+DC_FUZZY_PATTERNS: list[tuple[str, str]] = [
+    # DC1 : espaces, confusions I/1/l
+    (r"\bD\s*C\s*[1lI]\b", "DC1"),
+    (r"\bDC[lI]\b", "DC1"),
+    (r"\bD\s*C\s*1\b", "DC1"),
+    # DC2
+    (r"\bD\s*C\s*2\b", "DC2"),
+    # DC3
+    (r"\bD\s*C\s*3\b", "DC3"),
+    # DC4
+    (r"\bD\s*C\s*4\b", "DC4"),
+    # ATTRI1
+    (r"\bA\s*T\s*T\s*R\s*I\s*[1lI]\b", "ATTRI1"),
+    (r"\bATTR[lI][1lI]?\b", "ATTRI1"),
+    # NOTI1 / NOTI2
+    (r"\bN\s*O\s*T\s*I\s*[1lI]\b", "NOTI1"),
+    (r"\bN\s*O\s*T\s*I\s*2\b", "NOTI2"),
+    # Kbis
+    (r"\bK\s*[bB]\s*[iI1l]\s*[sS]\b", "Kbis"),
+    (r"\bK\s*B\s*I\s*S\b", "Kbis"),
+    # URSSAF
+    (r"\bU\s*R\s*S\s*S\s*A\s*F\b", "URSSAF"),
+    (r"\bURSSAE\b", "URSSAF"),  # F→E confusion OCR
+    # Qualibat
+    (r"\bQ\s*u\s*a\s*l\s*i\s*b\s*a\s*t\b", "Qualibat"),
+    (r"\bQua[lI1]ibat\b", "Qualibat"),
+    # Qualifelec
+    (r"\bQ\s*u\s*a\s*l\s*i\s*f\s*e\s*l\s*e\s*c\b", "Qualifelec"),
+    # ISO
+    (r"\bI\s*S\s*O\s+(\d{4,5})\b", r"ISO \1"),
+    # DUME
+    (r"\bD\s*U\s*M\s*E\b", "DUME"),
+    # MPS
+    (r"\bM\s*P\s*S\b", "MPS"),
+    # AGEFIPH
+    (r"\bA\s*G\s*E\s*F\s*I\s*P\s*H\b", "AGEFIPH"),
+    # RGE
+    (r"\bR\s*G\s*E\b", "RGE"),
+    # MASE
+    (r"\bM\s*A\s*S\s*E\b", "MASE"),
+]
+
+
+def normalize_ocr_references(text: str) -> str:
+    """Normalise les références administratives garblées par l'OCR.
+
+    Corrige les erreurs OCR courantes (espaces parasites, confusions
+    de caractères) pour les acronymes BTP/marchés publics.
+
+    Args:
+        text: Texte brut potentiellement garblé par OCR.
+
+    Returns:
+        Texte avec les références normalisées.
+    """
+    normalized = text
+    corrections_count = 0
+
+    for pattern, replacement in DC_FUZZY_PATTERNS:
+        new_text = re.sub(pattern, replacement, normalized, flags=re.IGNORECASE)
+        if new_text != normalized:
+            corrections_count += 1
+            normalized = new_text
+
+    if corrections_count > 0:
+        logger.info(
+            f"OCR normalization: {corrections_count} corrections appliquées "
+            f"sur les références administratives"
+        )
+
+    return normalized
 
 # ── Prompt système expert marchés publics ────────────────────────────────────
 
@@ -149,6 +231,9 @@ def analyze_dc_requirements(text: str, project_id: str | None = None) -> dict[st
         - model_used: str
     """
     log_prefix = f"[{project_id}] " if project_id else ""
+
+    # Pré-traitement : normaliser les références OCR garblées
+    text = normalize_ocr_references(text)
 
     # Tronquer le texte si trop long (~12 000 tokens = ~48 000 chars)
     max_chars = 48_000

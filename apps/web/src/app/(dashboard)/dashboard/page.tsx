@@ -1,4 +1,6 @@
 "use client";
+
+export const dynamic = "force-dynamic";
 import Link from "next/link";
 import {
   Plus, FolderOpen, Clock, CheckCircle, AlertCircle,
@@ -152,6 +154,36 @@ export default function DashboardPage() {
         </div>
       )}
 
+      {/* ── Getting started guide (shown when projects exist but none analyzed) ── */}
+      {!isLoading && projects.length > 0 && readyCount === 0 && (
+        <div className="rounded-xl border border-primary-200 bg-gradient-to-r from-primary-50 to-blue-50 p-5 animate-fade-in">
+          <h3 className="font-semibold text-primary-800 text-sm mb-3">Premiers pas avec AO Copilot</h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="flex items-start gap-3">
+              <div className="w-7 h-7 rounded-full bg-primary-600 text-white flex items-center justify-center text-xs font-bold flex-shrink-0">1</div>
+              <div>
+                <p className="text-sm font-medium text-slate-700">Uploadez vos documents</p>
+                <p className="text-xs text-slate-500">RC, CCAP, CCTP, AE, DPGF...</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <div className="w-7 h-7 rounded-full bg-primary-600 text-white flex items-center justify-center text-xs font-bold flex-shrink-0">2</div>
+              <div>
+                <p className="text-sm font-medium text-slate-700">Lancez l&apos;analyse IA</p>
+                <p className="text-xs text-slate-500">17 analyses automatiques en 5 min</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <div className="w-7 h-7 rounded-full bg-primary-600 text-white flex items-center justify-center text-xs font-bold flex-shrink-0">3</div>
+              <div>
+                <p className="text-sm font-medium text-slate-700">Consultez les résultats</p>
+                <p className="text-xs text-slate-500">Checklist, risques, scoring, export</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── Liste de projets ── */}
       <div>
         <div className="flex items-center justify-between mb-4">
@@ -169,8 +201,11 @@ export default function DashboardPage() {
           <div className="space-y-2">
             {projects.map((project, idx) => {
               const statusConf = STATUS_CONFIG[project.status] ?? STATUS_CONFIG.draft;
+              const diff = project.submission_deadline
+                ? new Date(project.submission_deadline).getTime() - Date.now()
+                : 0;
               const isUrgent = project.submission_deadline
-                ? (new Date(project.submission_deadline).getTime() - Date.now()) < 7 * 86400000
+                ? diff > 0 && diff < 7 * 86400000
                 : false;
 
               return (

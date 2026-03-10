@@ -1,4 +1,6 @@
 "use client";
+
+export const dynamic = "force-dynamic";
 import { useState, useEffect, useCallback } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
@@ -8,6 +10,7 @@ import {
   AlertCircle, Zap, RefreshCw, MessageSquare, Calendar,
   TrendingUp, Eye, X, ShieldAlert, Trophy, ThumbsDown, Ban, Pencil,
   ScrollText, FileCheck, GitCompareArrows, HelpCircle, BarChart3, DollarSign,
+  Wrench, Wallet, Users,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -30,28 +33,58 @@ import { ConflictsTab }    from "@/components/analysis/ConflictsTab";
 import { QuestionsTab }    from "@/components/analysis/QuestionsTab";
 import { ScoringSimulatorTab } from "@/components/analysis/ScoringSimulatorTab";
 import { DpgfPricingTab }  from "@/components/analysis/DpgfPricingTab";
+import CctpAnalysisTab from "@/components/analysis/CctpAnalysisTab";
+import CashFlowTab from "@/components/analysis/CashFlowTab";
+import SubcontractingTab from "@/components/analysis/SubcontractingTab";
+import OcrQualityBanner from "@/components/ui/OcrQualityBanner";
 import { ProgressAnalysis } from "@/components/ui/ProgressAnalysis";
 import { ProjectDetailSkeleton } from "@/components/common/Skeleton";
 import { cn, formatDate } from "@/lib/utils";
 
-// ── Tab config ───────────────────────────────────────────────────────────
-const TABS = [
-  { key: "documents",  label: "Documents",    icon: FileText          },
-  { key: "summary",    label: "Résumé",       icon: FileText          },
-  { key: "checklist",  label: "Checklist",    icon: CheckSquare       },
-  { key: "criteria",   label: "Critères",     icon: Target            },
-  { key: "ccap",       label: "Risques CCAP", icon: ShieldAlert       },
-  { key: "rc",         label: "RC",           icon: ScrollText        },
-  { key: "ae",         label: "Acte Eng.",    icon: FileCheck         },
-  { key: "dc",         label: "Admin.",       icon: FileCheck         },
-  { key: "conflicts",  label: "Conflits",     icon: GitCompareArrows  },
-  { key: "questions",  label: "Questions",    icon: HelpCircle        },
-  { key: "scoring",    label: "Scoring",      icon: BarChart3         },
-  { key: "pricing",    label: "Pricing",      icon: DollarSign        },
-  { key: "timeline",   label: "Calendrier",   icon: Calendar          },
-  { key: "chat",       label: "Chat DCE",     icon: MessageSquare     },
-  { key: "export",     label: "Export",       icon: Download          },
+// ── Tab config (grouped into 4 categories) ──────────────────────────────
+const TAB_GROUPS = [
+  {
+    label: "Synthèse",
+    tabs: [
+      { key: "documents",  label: "Documents",    icon: FileText          },
+      { key: "summary",    label: "Résumé",       icon: FileText          },
+      { key: "checklist",  label: "Checklist",    icon: CheckSquare       },
+      { key: "criteria",   label: "Critères",     icon: Target            },
+    ],
+  },
+  {
+    label: "Analyse pièces",
+    tabs: [
+      { key: "ccap",       label: "CCAP",         icon: ShieldAlert       },
+      { key: "rc",         label: "RC",           icon: ScrollText        },
+      { key: "ae",         label: "Acte Eng.",    icon: FileCheck         },
+      { key: "cctp",       label: "CCTP",         icon: Wrench            },
+      { key: "dc",         label: "Admin.",       icon: FileCheck         },
+      { key: "conflicts",  label: "Conflits",     icon: GitCompareArrows  },
+    ],
+  },
+  {
+    label: "Stratégie",
+    tabs: [
+      { key: "questions",       label: "Questions",       icon: HelpCircle        },
+      { key: "scoring",         label: "Scoring",         icon: BarChart3         },
+      { key: "pricing",         label: "Pricing",         icon: DollarSign        },
+      { key: "cashflow",        label: "Trésorerie",      icon: Wallet            },
+      { key: "subcontracting",  label: "Sous-traitance",  icon: Users             },
+    ],
+  },
+  {
+    label: "Outils",
+    tabs: [
+      { key: "timeline",   label: "Calendrier",   icon: Calendar          },
+      { key: "chat",       label: "Chat DCE",     icon: MessageSquare     },
+      { key: "export",     label: "Export",       icon: Download          },
+    ],
+  },
 ];
+
+// Flat list for filtering/rendering
+const TABS = TAB_GROUPS.flatMap(g => g.tabs);
 
 // ── Status badge ─────────────────────────────────────────────────────────
 const STATUS_CONFIG: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
@@ -452,7 +485,7 @@ export default function ProjectPage() {
   // Tabs visibles selon statut
   const visibleTabs = TABS.filter(t => {
     if (["timeline", "chat", "checklist", "criteria", "summary", "export", "ccap",
-         "rc", "ae", "dc", "conflicts", "questions", "scoring", "pricing"].includes(t.key)) {
+         "rc", "ae", "dc", "conflicts", "questions", "scoring", "pricing", "cctp", "cashflow"].includes(t.key)) {
       return isReady;
     }
     return true;
@@ -557,50 +590,68 @@ export default function ProjectPage() {
       {/* ── Win/Loss section (toujours visible) ── */}
       <WinLossSection project={project} />
 
-      {/* ── Tabs (scroll horizontal sur mobile) ── */}
-      <div className={cn(
-        "border-b border-slate-200 bg-white px-4 md:px-8 overflow-x-auto scrollbar-none sticky top-[73px] z-10 mt-5",
-      )}>
-        <div className="flex gap-0 min-w-max">
-          {visibleTabs.map(({ key, label, icon: Icon }) => (
-            <button
-              key={key}
-              onClick={() => setActiveTab(key)}
-              className={cn(
-                "relative flex items-center gap-1.5 px-4 py-3.5 text-sm font-medium whitespace-nowrap transition-colors duration-150",
-                activeTab === key
-                  ? "text-primary-700"
-                  : "text-slate-500 hover:text-slate-700"
-              )}
-            >
-              <Icon className="w-4 h-4" />
-              {label}
-
-              {/* Indicator animé */}
-              {activeTab === key && (
-                <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary-600 rounded-t-full animate-scale-in" />
-              )}
-
-              {/* Badge alerte checklist */}
-              {key === "checklist" && isReady && (
-                <span className="ml-0.5 bg-danger-500 text-white text-[9px] font-bold rounded-full w-4 h-4 flex items-center justify-center flex-shrink-0">
-                  !
-                </span>
-              )}
-
-              {/* Badge IA pour les onglets IA */}
-              {(["chat", "ccap", "rc", "ae", "dc", "conflicts", "questions", "scoring", "pricing"].includes(key)) && isReady && (
-                <span className="ml-0.5 bg-primary-600 text-white text-[8px] font-bold rounded-full px-1 flex-shrink-0">
-                  IA
-                </span>
-              )}
-            </button>
-          ))}
+      {/* ── Tabs (grouped, scroll horizontal sur mobile) ── */}
+      <div className="relative border-b border-slate-200 bg-white sticky top-[73px] z-10 mt-5">
+        {/* Gradient fade indicators for scroll */}
+        <div className="pointer-events-none absolute left-0 top-0 bottom-0 w-6 bg-gradient-to-r from-white to-transparent z-10 md:hidden" />
+        <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-6 bg-gradient-to-l from-white to-transparent z-10 md:hidden" />
+        <div className="px-4 md:px-8 overflow-x-auto scrollbar-none" role="tablist" aria-label="Onglets d'analyse">
+          <div className="flex gap-0 min-w-max">
+            {TAB_GROUPS.map((group, gi) => {
+              const groupTabs = group.tabs.filter(t => visibleTabs.some(vt => vt.key === t.key));
+              if (groupTabs.length === 0) return null;
+              return (
+                <div key={group.label} className="flex items-center" role="group" aria-label={group.label}>
+                  {/* Group separator (not before first group) */}
+                  {gi > 0 && (
+                    <div className="flex flex-col items-center mx-1.5 self-stretch justify-center" aria-hidden="true">
+                      <div className="w-px h-5 bg-slate-200" />
+                    </div>
+                  )}
+                  {/* Group label (hidden on mobile for space) */}
+                  <span className="hidden lg:inline text-[9px] font-bold text-slate-300 uppercase tracking-wider px-1.5 self-center select-none" aria-hidden="true">
+                    {group.label}
+                  </span>
+                  {groupTabs.map(({ key, label, icon: Icon }) => (
+                    <button
+                      key={key}
+                      role="tab"
+                      aria-selected={activeTab === key}
+                      aria-controls={`tabpanel-${key}`}
+                      onClick={() => setActiveTab(key)}
+                      className={cn(
+                        "relative flex items-center gap-1.5 px-3 md:px-4 py-3.5 text-sm font-medium whitespace-nowrap transition-colors duration-150",
+                        activeTab === key
+                          ? "text-primary-700"
+                          : "text-slate-500 hover:text-slate-700"
+                      )}
+                    >
+                      <Icon className="w-4 h-4" aria-hidden="true" />
+                      {label}
+                      {activeTab === key && (
+                        <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary-600 rounded-t-full animate-scale-in" aria-hidden="true" />
+                      )}
+                      {key === "checklist" && isReady && (
+                        <span className="ml-0.5 bg-danger-500 text-white text-[9px] font-bold rounded-full w-4 h-4 flex items-center justify-center flex-shrink-0" aria-label="Action requise">
+                          !
+                        </span>
+                      )}
+                      {(["chat", "ccap", "rc", "ae", "dc", "conflicts", "questions", "scoring", "pricing", "cctp"].includes(key)) && isReady && (
+                        <span className="ml-0.5 bg-primary-600 text-white text-[8px] font-bold rounded-full px-1 flex-shrink-0" aria-label="Analyse IA">
+                          IA
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
 
       {/* ── Tab content ── */}
-      <div className="flex-1 p-6 md:p-8">
+      <div className="flex-1 p-6 md:p-8" role="tabpanel" id={`tabpanel-${activeTab}`} aria-labelledby={activeTab}>
 
         {/* Documents tab */}
         {activeTab === "documents" && (
@@ -636,11 +687,13 @@ export default function ProjectPage() {
             ) : (
               documents.map((doc: {
                 id: string; original_name: string; doc_type: string | null;
-                page_count: number | null; file_size_kb: number | null; status: string
+                page_count: number | null; file_size_kb: number | null; status: string;
+                ocr_quality_score?: number | null;
               }) => {
                 const docStatus = DOC_STATUS[doc.status] ?? DOC_STATUS.pending;
                 return (
-                  <div key={doc.id} className={`card p-4 flex items-center justify-between transition-all duration-150 ${docStatus.border}`}>
+                  <div key={doc.id} className="space-y-2">
+                  <div className={`card p-4 flex items-center justify-between transition-all duration-150 ${docStatus.border}`}>
                     <div className="flex items-center gap-3 min-w-0">
                       <div className="w-8 h-8 bg-slate-50 rounded-lg flex items-center justify-center flex-shrink-0">
                         <FileText className="w-4 h-4 text-slate-400" />
@@ -679,6 +732,8 @@ export default function ProjectPage() {
                       )}
                     </div>
                   </div>
+                  <OcrQualityBanner quality={doc.ocr_quality_score ?? undefined} documentName={doc.original_name} />
+                  </div>
                 );
               })
             )}
@@ -714,11 +769,14 @@ export default function ProjectPage() {
         {activeTab === "ccap"      && <CcapRiskTab  projectId={projectId} />}
         {activeTab === "rc"        && <RcAnalysisTab projectId={projectId} />}
         {activeTab === "ae"        && <AeAnalysisTab projectId={projectId} />}
+        {activeTab === "cctp"      && <CctpAnalysisTab projectId={projectId} />}
         {activeTab === "dc"        && <DcCheckTab    projectId={projectId} />}
         {activeTab === "conflicts" && <ConflictsTab  projectId={projectId} />}
         {activeTab === "questions" && <QuestionsTab  projectId={projectId} />}
         {activeTab === "scoring"   && <ScoringSimulatorTab projectId={projectId} />}
         {activeTab === "pricing"   && <DpgfPricingTab projectId={projectId} />}
+        {activeTab === "cashflow"  && <CashFlowTab  projectId={projectId} />}
+        {activeTab === "subcontracting" && <SubcontractingTab projectId={projectId} />}
         {activeTab === "timeline"  && <TimelineTab  projectId={projectId} />}
         {activeTab === "chat"      && <ChatTab      projectId={projectId} />}
         {activeTab === "export"    && <ExportTab    projectId={projectId} projectStatus={project.status} />}

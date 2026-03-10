@@ -4,13 +4,13 @@ Le RC définit QUI peut candidater et COMMENT répondre à l'appel d'offres.
 Il fixe les conditions d'accès, les modalités de groupement, les critères
 de sélection, et les règles de présentation des offres.
 """
-import logging
+import structlog
 from typing import Any
 
 from app.services.llm import llm_service
 from app.services.llm_validators import ValidatedRcAnalysis
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 # ── Prompt système spécialisé RC ──────────────────────────────────────────
 

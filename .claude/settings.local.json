@@ -183,7 +183,8 @@
       "WebFetch(domain:www.filao.io)",
       "WebFetch(domain:tensoria.fr)",
       "Bash(npx next build)",
-      "Bash(python -m json.tool)"
+      "Bash(python -m json.tool)",
+      "Bash(python3 \"C:\\\\Users\\\\adama\\\\AppData\\\\Local\\\\Temp\\\\make_frontend_zip.py\")"
     ]
   }
 }

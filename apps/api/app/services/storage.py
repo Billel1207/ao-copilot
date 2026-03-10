@@ -1,6 +1,6 @@
 import os
 import uuid
-import logging
+import structlog
 from pathlib import Path
 
 import boto3
@@ -9,7 +9,7 @@ from botocore.exceptions import ClientError, EndpointConnectionError, NoCredenti
 
 from app.config import settings
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 class LocalStorageService:

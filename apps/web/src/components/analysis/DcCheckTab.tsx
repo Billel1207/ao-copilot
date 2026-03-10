@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { useDcCheck } from "@/hooks/useAnalysis";
 import { cn } from "@/lib/utils";
+import AIDisclaimer from "@/components/ui/AIDisclaimer";
 
 interface Props {
   projectId: string;
@@ -135,7 +136,10 @@ function DocumentCard({ doc, index }: { doc: DocumentRequis; index: number }) {
           </div>
         </div>
         <div className="shrink-0">
-          <span className={cn("inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold", cfg.badgeCls)}>
+          <span
+            className={cn("inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold", cfg.badgeCls)}
+            aria-label={`Statut du document : ${cfg.label}`}
+          >
             {cfg.icon}
             {cfg.label}
           </span>
@@ -369,12 +373,18 @@ export function DcCheckTab({ projectId }: Props) {
                 </div>
                 <div className="shrink-0">
                   {att.obligatoire ? (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-800 border border-red-200">
+                    <span
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-800 border border-red-200"
+                      aria-label="Attestation : Obligatoire"
+                    >
                       <CircleAlert className="w-3.5 h-3.5" />
                       Obligatoire
                     </span>
                   ) : (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-600 border border-slate-200">
+                    <span
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-600 border border-slate-200"
+                      aria-label="Attestation : Recommandee"
+                    >
                       Recommand&eacute;e
                     </span>
                   )}
@@ -443,10 +453,8 @@ export function DcCheckTab({ projectId }: Props) {
         </div>
       )}
 
-      {/* ── Footer note ── */}
-      <p className="text-[11px] text-slate-400 text-center pb-2">
-        Analyse g&eacute;n&eacute;r&eacute;e automatiquement par IA — v&eacute;rifiez avec les documents originaux.
-      </p>
+      {/* ── Footer disclaimer ── */}
+      <AIDisclaimer />
     </div>
   );
 }

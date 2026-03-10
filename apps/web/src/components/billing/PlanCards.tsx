@@ -8,7 +8,7 @@ interface PlanCardsProps {
   onUpgrade: (planId: string) => void;
   isLoading?: boolean;
   /** Plan en cours de checkout — seul ce bouton se grise */
-  checkoutPlan?: "starter" | "pro" | "europe" | null;
+  checkoutPlan?: "starter" | "pro" | "business" | "europe" | null;
 }
 
 const PLAN_HIGHLIGHTS: Record<string, { badge?: string; borderClass: string; btnClass: string }> = {
@@ -25,6 +25,11 @@ const PLAN_HIGHLIGHTS: Record<string, { badge?: string; borderClass: string; btn
     borderClass: "border-blue-600 ring-2 ring-blue-600/20",
     btnClass: "bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-md",
   },
+  business: {
+    badge: "Enterprise",
+    borderClass: "border-amber-500 ring-2 ring-amber-500/20",
+    btnClass: "bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white shadow-md",
+  },
   europe: {
     badge: "Expansion UE",
     borderClass: "border-purple-500 ring-2 ring-purple-500/20",
@@ -36,6 +41,7 @@ const PLAN_ICONS: Record<string, string> = {
   free: "🎯",
   starter: "🚀",
   pro: "⚡",
+  business: "🏢",
   europe: "🌍",
 };
 
@@ -69,7 +75,7 @@ export default function PlanCards({
             key={plan.id}
             className={`relative flex flex-col rounded-2xl border-2 bg-white p-6 shadow-sm
               transition-shadow hover:shadow-md ${highlight.borderClass}
-              ${plan.id === "pro" || plan.id === "europe" ? "scale-[1.02]" : ""}`}
+              ${plan.id === "pro" || plan.id === "business" || plan.id === "europe" ? "scale-[1.02]" : ""}`}
           >
             {/* Badge recommandé / Expansion UE */}
             {highlight.badge && (
@@ -78,7 +84,9 @@ export default function PlanCards({
                   className={`text-white text-xs font-semibold px-3 py-1 rounded-full shadow-sm ${
                     plan.id === "europe"
                       ? "bg-gradient-to-r from-purple-600 to-indigo-600"
-                      : "bg-blue-600"
+                      : plan.id === "business"
+                        ? "bg-gradient-to-r from-amber-600 to-orange-600"
+                        : "bg-blue-600"
                   }`}
                 >
                   {highlight.badge}
@@ -152,36 +160,49 @@ export default function PlanCards({
             </div>
 
             {/* CTA Button */}
-            <button
-              onClick={() => isUpgrade && !checkoutPlan && onUpgrade(plan.id)}
-              disabled={isCurrent || plan.id === "free" || !!checkoutPlan}
-              className={`w-full py-2.5 px-4 rounded-xl text-sm font-semibold transition-all duration-200
-                disabled:cursor-not-allowed
-                ${isCurrent
-                  ? "bg-gray-100 text-gray-400 cursor-not-allowed opacity-50"
-                  : isPlanLoading
-                    ? `${highlight.btnClass} opacity-70`
-                    : checkoutPlan && !isCurrent
-                      ? `${highlight.btnClass} opacity-40`
-                      : highlight.btnClass
-                }`}
-            >
-              {isPlanLoading ? (
-                <span className="flex items-center justify-center gap-2">
-                  <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                  </svg>
-                  Redirection Stripe...
-                </span>
-              ) : isCurrent ? (
-                "Plan actuel"
-              ) : plan.id === "free" ? (
-                "Plan gratuit"
-              ) : (
-                `Passer au ${plan.name}`
-              )}
-            </button>
+            {/* Europe & Business: contact-us if Stripe not yet configured */}
+            {!isCurrent && (plan.id === "europe" || plan.id === "business") && !plan.stripe_price_id ? (
+              <a
+                href={plan.id === "business"
+                  ? "mailto:commercial@ao-copilot.fr?subject=Demande de devis — Plan Business"
+                  : "mailto:contact@ao-copilot.fr?subject=Plan Europe — AO Copilot"
+                }
+                className={`w-full py-2.5 px-4 rounded-xl text-sm font-semibold transition-all duration-200 text-center block ${highlight.btnClass}`}
+              >
+                {plan.id === "business" ? "Demander un devis" : "Contactez-nous"}
+              </a>
+            ) : (
+              <button
+                onClick={() => isUpgrade && !checkoutPlan && onUpgrade(plan.id)}
+                disabled={isCurrent || plan.id === "free" || !!checkoutPlan}
+                className={`w-full py-2.5 px-4 rounded-xl text-sm font-semibold transition-all duration-200
+                  disabled:cursor-not-allowed
+                  ${isCurrent
+                    ? "bg-gray-100 text-gray-400 cursor-not-allowed opacity-50"
+                    : isPlanLoading
+                      ? `${highlight.btnClass} opacity-70`
+                      : checkoutPlan && !isCurrent
+                        ? `${highlight.btnClass} opacity-40`
+                        : highlight.btnClass
+                  }`}
+              >
+                {isPlanLoading ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                    Redirection Stripe...
+                  </span>
+                ) : isCurrent ? (
+                  "Plan actuel"
+                ) : plan.id === "free" ? (
+                  "Plan gratuit"
+                ) : (
+                  `Passer au ${plan.name}`
+                )}
+              </button>
+            )}
 
             {/* Moyens de paiement acceptés */}
             {plan.id !== "free" && (
