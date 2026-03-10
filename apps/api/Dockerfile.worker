@@ -1,7 +1,10 @@
 FROM python:3.12-slim
 
-# Install system deps (Tesseract OCR for document processing)
+# Install system deps (Tesseract OCR + pycairo build deps)
 RUN apt-get update && apt-get install -y \
+    gcc \
+    pkg-config \
+    libcairo2-dev \
     tesseract-ocr \
     tesseract-ocr-fra \
     tesseract-ocr-eng \
