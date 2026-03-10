@@ -314,17 +314,20 @@ interface PricingCardProps {
   popular?: boolean;
   premium?: boolean;
   europe?: boolean;
+  business?: boolean;
   delay?: number;
 }
 
-function PricingCard({ name, price, period, description, features, cta, popular, premium, europe, delay = 0 }: PricingCardProps) {
+function PricingCard({ name, price, period, description, features, cta, popular, premium, europe, business, delay = 0 }: PricingCardProps) {
   const { ref, visible } = useReveal();
 
   const baseClasses = `relative rounded-2xl p-7 flex flex-col transition-all duration-500 ${
     visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"
   }`;
 
-  const styleClasses = europe
+  const styleClasses = business
+    ? "bg-gradient-to-br from-amber-900 to-orange-700 text-white shadow-elevation"
+    : europe
     ? "bg-gradient-to-br from-purple-900 to-indigo-700 text-white shadow-elevation"
     : premium
     ? "bg-gradient-to-br from-primary-900 to-primary-700 text-white shadow-elevation"
@@ -332,7 +335,9 @@ function PricingCard({ name, price, period, description, features, cta, popular,
     ? "bg-white border-2 border-primary-700 shadow-elevation"
     : "bg-white border border-slate-200 shadow-card";
 
-  const btnClasses = europe
+  const btnClasses = business
+    ? "mt-auto w-full py-3 rounded-xl font-semibold text-amber-900 bg-white hover:bg-amber-50 transition-colors text-sm text-center block"
+    : europe
     ? "mt-auto w-full py-3 rounded-xl font-semibold text-purple-900 bg-white hover:bg-purple-50 transition-colors text-sm text-center block"
     : premium
     ? "mt-auto w-full py-3 rounded-xl font-semibold text-primary-900 bg-white hover:bg-primary-50 transition-colors text-sm text-center block"
@@ -340,18 +345,19 @@ function PricingCard({ name, price, period, description, features, cta, popular,
     ? "mt-auto w-full py-3 rounded-xl font-semibold text-white bg-primary-800 hover:bg-primary-900 transition-colors text-sm text-center block"
     : "mt-auto w-full py-3 rounded-xl font-semibold text-primary-800 border-2 border-primary-800 hover:bg-primary-50 transition-colors text-sm text-center block";
 
-  const featureColor = (premium || europe) ? "text-primary-100" : "text-slate-600";
-  const checkColor = europe ? "text-purple-200" : premium ? "text-primary-200" : popular ? "text-primary-700" : "text-primary-600";
-  const descColor = (premium || europe) ? "text-primary-200" : "text-slate-500";
+  const featureColor = (premium || europe || business) ? "text-primary-100" : "text-slate-600";
+  const checkColor = business ? "text-amber-200" : europe ? "text-purple-200" : premium ? "text-primary-200" : popular ? "text-primary-700" : "text-primary-600";
+  const descColor = (premium || europe || business) ? "text-primary-200" : "text-slate-500";
 
   return (
     <div ref={ref} className={`${baseClasses} ${styleClasses}`} style={{ transitionDelay: `${delay}ms` }}>
-      {(popular || europe) && (
+      {(popular || europe || business) && (
         <div className="absolute -top-3.5 left-1/2 -translate-x-1/2">
           <span className={`text-white text-xs font-bold px-4 py-1.5 rounded-full shadow-sm ${
-            europe ? "bg-gradient-to-r from-purple-600 to-indigo-600" : "bg-primary-700"
+            business ? "bg-gradient-to-r from-amber-600 to-orange-600"
+            : europe ? "bg-gradient-to-r from-purple-600 to-indigo-600" : "bg-primary-700"
           }`}>
-            {europe ? "🌍 Expansion UE" : "Populaire"}
+            {business ? "🏢 Enterprise" : europe ? "🌍 Expansion UE" : "Populaire"}
           </span>
         </div>
       )}
@@ -727,7 +733,7 @@ export default function LandingPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6 items-start">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-5 items-start">
             <PricingCard
               name="Gratuit"
               price="0€"
@@ -735,7 +741,7 @@ export default function LandingPage() {
               description="Pour découvrir AO Copilot sans risque."
               features={[
                 "1 utilisateur",
-                "3 DCE / mois",
+                "5 DCE / mois",
                 "Analyse IA basique (résumé)",
                 "Checklist conformité",
                 "Export PDF",
@@ -746,7 +752,7 @@ export default function LandingPage() {
             />
             <PricingCard
               name="Starter"
-              price="79€"
+              price="69€"
               period="/mois HT"
               description="Pour les PME BTP qui répondent régulièrement aux AO."
               features={[
@@ -765,7 +771,7 @@ export default function LandingPage() {
             />
             <PricingCard
               name="Pro"
-              price="199€"
+              price="179€"
               period="/mois HT"
               description="Pour les équipes qui veulent tout automatiser."
               features={[
@@ -788,9 +794,9 @@ export default function LandingPage() {
               name="Europe"
               price="299€"
               period="/mois HT"
-              description="Pour les équipes actives sur les marchés UE (Wallonie, Luxembourg, TED)."
+              description="Marchés UE : Wallonie, Luxembourg, TED."
               features={[
-                "10 utilisateurs inclus",
+                "20 utilisateurs inclus",
                 "100 DCE / mois",
                 "Tout Pro +",
                 "Monitoring TED (UE)",
@@ -799,17 +805,34 @@ export default function LandingPage() {
                 "Rétention 180 jours",
                 "Support prioritaire dédié",
               ]}
-              cta="Choisir Europe"
+              cta="Contactez-nous"
               europe
               delay={300}
+            />
+            <PricingCard
+              name="Business"
+              price="499€"
+              period="/mois HT"
+              description="SSO, SLA 99.9%, API & volume illimité."
+              features={[
+                "Utilisateurs illimités",
+                "Documents illimités",
+                "Tout Europe +",
+                "SSO SAML",
+                "SLA 99.9%",
+                "API & Webhooks",
+                "Onboarding dédié",
+                "Support prioritaire 24/7",
+              ]}
+              cta="Demander un devis"
+              business
+              delay={400}
             />
           </div>
 
           <p className="text-center mt-8 text-sm text-slate-500">
-            Besoin d'un volume important, de SSO ou d'un SLA garanti ?{" "}
-            <a href="mailto:contact@ao-copilot.fr" className="text-primary-700 font-semibold hover:underline">
-              Contactez-nous pour un devis Business →
-            </a>
+            Tous les plans payants : <strong>-20% en facturation annuelle</strong>.{" "}
+            Paiement à l&apos;usage aussi disponible : <strong>3€/document</strong>.
           </p>
         </div>
       </section>
