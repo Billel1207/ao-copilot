@@ -151,6 +151,8 @@ const CATEGORY_COLORS: Record<Categorie, string> = {
   "Exigences": "bg-indigo-100 text-indigo-800 border border-indigo-200",
   "Clauses illégales": "bg-rose-100 text-rose-800 border border-rose-200",
   "Références": "bg-slate-100 text-slate-700 border border-slate-200",
+  "Dérogation CCAG": "bg-amber-100 text-amber-800 border border-amber-200",
+  "CCTP ↔ DPGF": "bg-teal-100 text-teal-800 border border-teal-200",
 };
 
 // ── Severity badge ────────────────────────────────────────────────────────

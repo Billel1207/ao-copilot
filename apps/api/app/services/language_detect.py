@@ -89,9 +89,9 @@ def detect_project_language(db: Session, project_id: str) -> str:
         # Récupérer les premières pages pour échantillon
         pages = db.query(DocumentPage).filter_by(
             document_id=doc.id,
-        ).order_by(DocumentPage.page_number).limit(5).all()
+        ).order_by(DocumentPage.page_num).limit(5).all()
 
-        sample_text = " ".join(p.text_content for p in pages if p.text_content)[:5000]
+        sample_text = " ".join(p.raw_text for p in pages if p.raw_text)[:5000]
         lang = detect_language(sample_text)
         votes[lang] += 1
 

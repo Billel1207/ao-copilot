@@ -531,6 +531,35 @@ export default function LandingPage() {
                 Voir la démo →
               </button>
             </div>
+
+            {/* Pricing tiers inline */}
+            <div
+              className={`flex flex-wrap items-center justify-center gap-3 sm:gap-4 transition-all duration-700 delay-350 ${
+                heroReveal.visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
+              }`}
+            >
+              {[
+                { name: "Gratuit", price: "0€" },
+                { name: "Starter", price: "69€" },
+                { name: "Pro", price: "179€" },
+                { name: "Europe", price: "299€" },
+                { name: "Business", price: "499€", highlight: true },
+              ].map(({ name, price, highlight }) => (
+                <button
+                  key={name}
+                  onClick={() => document.getElementById("pricing")?.scrollIntoView({ behavior: "smooth" })}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors cursor-pointer ${
+                    highlight
+                      ? "bg-amber-500/20 border border-amber-400/40 text-amber-200 hover:bg-amber-500/30"
+                      : "bg-white/10 border border-white/20 text-primary-100 hover:bg-white/20"
+                  }`}
+                >
+                  <span>{name}</span>
+                  <span className={`font-bold ${highlight ? "text-amber-300" : "text-white"}`}>{price}</span>
+                  <span className="text-primary-300 text-xs">/mois</span>
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Stats row */}

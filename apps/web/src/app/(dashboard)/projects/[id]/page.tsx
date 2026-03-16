@@ -1,6 +1,4 @@
 "use client";
-
-export const dynamic = "force-dynamic";
 import { useState, useEffect, useCallback } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
@@ -40,6 +38,7 @@ import OcrQualityBanner from "@/components/ui/OcrQualityBanner";
 import { ProgressAnalysis } from "@/components/ui/ProgressAnalysis";
 import { ProjectDetailSkeleton } from "@/components/common/Skeleton";
 import { cn, formatDate } from "@/lib/utils";
+import { useBillingStore } from "@/stores/billing";
 
 // ── Tab config (grouped into 4 categories) ──────────────────────────────
 const TAB_GROUPS = [
@@ -456,6 +455,10 @@ export default function ProjectPage() {
   const { data: summary } = useSummary(projectId, project?.status === "ready");
   const triggerAnalysis = useTriggerAnalysis(projectId);
 
+  // Billing — pour gating des exports Word/Mémoire
+  const { usage, fetchBilling } = useBillingStore();
+  useEffect(() => { if (!usage) fetchBilling(); }, [usage, fetchBilling]);
+
   const handleAnalyze = async () => {
     try {
       await triggerAnalysis.mutateAsync();
@@ -779,7 +782,7 @@ export default function ProjectPage() {
         {activeTab === "subcontracting" && <SubcontractingTab projectId={projectId} />}
         {activeTab === "timeline"  && <TimelineTab  projectId={projectId} />}
         {activeTab === "chat"      && <ChatTab      projectId={projectId} />}
-        {activeTab === "export"    && <ExportTab    projectId={projectId} projectStatus={project.status} />}
+        {activeTab === "export"    && <ExportTab    projectId={projectId} projectStatus={project.status} userPlan={usage?.plan} />}
       </div>
     </div>
   );

@@ -1,7 +1,5 @@
 "use client";
 
-export const dynamic = "force-dynamic";
-
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useBillingStore } from "@/stores/billing";
@@ -54,7 +52,7 @@ function BillingPlansSection({
   currentPlan: string;
   onUpgrade: (planId: string) => void;
   isLoading: boolean;
-  checkoutPlan: string | null;
+  checkoutPlan: "starter" | "pro" | "europe" | "business" | null;
 }) {
   const [annual, setAnnual] = useState(false);
 

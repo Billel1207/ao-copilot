@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "chmod -R 755 src || true && next build",
     "start": "next start -p ${PORT:-3000}",
     "lint": "next lint",
     "type-check": "tsc --noEmit",

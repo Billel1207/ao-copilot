@@ -103,7 +103,7 @@ export function ExportTab({
   const [downloadUrlWord, setDownloadUrlWord] = useState<string | null>(null);
   const abortedRef = useRef(false);
   const isReady = projectStatus === "ready";
-  const hasProAccess = userPlan === "pro" || userPlan === "business";
+  const hasProAccess = userPlan === "pro" || userPlan === "europe" || userPlan === "business";
 
   useEffect(() => {
     abortedRef.current = false;
@@ -294,7 +294,7 @@ export function ExportTab({
             "Plan Pro ou supérieur",
           ]}
           locked={!hasProAccess}
-          lockedMsg="L'export Word est disponible à partir du plan Pro (199€/mois)."
+          lockedMsg="L'export Word est disponible à partir du plan Pro (179€/mois)."
           action={
             downloadUrlWord ? (
               <a href={downloadUrlWord} download
@@ -338,7 +338,7 @@ export function ExportTab({
               "Plan Pro ou supérieur",
             ]}
             locked={!hasProAccess}
-            lockedMsg="La mémoire technique IA est disponible à partir du plan Pro (199€/mois)."
+            lockedMsg="La mémoire technique IA est disponible à partir du plan Pro (179€/mois)."
             action={
               loadingMemo ? (
                 <GeneratingProgress label="Génération de la mémoire..." />
@@ -368,7 +368,7 @@ export function ExportTab({
               "Plan Pro ou supérieur",
             ]}
             locked={!hasProAccess}
-            lockedMsg="L'export DPGF Excel est disponible à partir du plan Pro (199€/mois)."
+            lockedMsg="L'export DPGF Excel est disponible à partir du plan Pro (179€/mois)."
             action={
               loadingDpgf ? (
                 <GeneratingProgress label="Extraction DPGF en cours..." />

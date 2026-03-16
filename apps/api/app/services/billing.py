@@ -76,7 +76,7 @@ PLANS: dict[PlanId, PlanConfig] = {
         name="Starter",
         docs_per_month=15,
         max_users=1,
-        monthly_eur=69.0,
+        monthly_eur=79.0,
         stripe_price_id=settings.STRIPE_PRICE_STARTER,
         retention_days=30,
         word_export=True,
@@ -86,7 +86,7 @@ PLANS: dict[PlanId, PlanConfig] = {
         name="Pro",
         docs_per_month=60,
         max_users=5,
-        monthly_eur=179.0,
+        monthly_eur=199.0,
         stripe_price_id=settings.STRIPE_PRICE_PRO,
         retention_days=90,
         word_export=True,
@@ -211,6 +211,17 @@ class BillingService:
         user_email: str | None = None,
     ) -> str:
         """Crée une session Stripe Checkout et retourne l'URL de redirection."""
+
+        # ── DEV MODE : bypass Stripe, upgrade direct en DB ─────────────────
+        if getattr(settings, "APP_ENV", "production") == "development":
+            if plan_id not in PLANS:
+                raise HTTPException(status_code=400, detail=f"Plan inconnu : {plan_id}")
+            org.plan = plan_id
+            await db.commit()
+            logger.info("dev_mode_plan_upgraded", plan=plan_id, org_id=str(org.id))
+            return success_url
+        # ───────────────────────────────────────────────────────────────────
+
         # Guard : clé Stripe manquante → 503 clair au lieu d'une AuthenticationError Stripe
         if not settings.STRIPE_SECRET_KEY:
             raise HTTPException(

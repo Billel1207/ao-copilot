@@ -34,6 +34,15 @@ def retrieve_relevant_chunks(
     Returns chunks sorted by similarity DESC, filtered by min_similarity.
     Each chunk includes a 'similarity' field for downstream confidence scoring.
     """
+    # Vérification rapide : pas de chunks → retourner vide sans appel API embedding
+    count_row = db.execute(
+        text("SELECT COUNT(*) FROM chunks WHERE project_id = :pid AND embedding IS NOT NULL"),
+        {"pid": project_id},
+    ).fetchone()
+    if not count_row or count_row[0] == 0:
+        logger.warning(f"RAG: Aucun chunk pour project_id={project_id!r}, contexte vide")
+        return []
+
     query_embedding = embed_query(query)
     max_distance = 1.0 - min_similarity  # cosine distance threshold
 
@@ -46,25 +55,30 @@ def retrieve_relevant_chunks(
             c.chunk_index,
             d.original_name AS doc_name,
             d.doc_type,
-            (c.embedding_vec <=> :query_vec::vector) AS distance
+            (c.embedding <=> CAST(:query_vec AS vector)) AS distance
         FROM chunks c
         JOIN ao_documents d ON d.id = c.document_id
         WHERE c.project_id = :project_id
-          AND c.embedding_vec IS NOT NULL
-          AND (c.embedding_vec <=> :query_vec::vector) < :max_distance
+          AND c.embedding IS NOT NULL
+          AND (c.embedding <=> CAST(:query_vec AS vector)) < :max_distance
         ORDER BY distance ASC
         LIMIT :top_k
     """)
 
-    rows = db.execute(
-        sql,
-        {
-            "project_id": project_id,
-            "query_vec": json.dumps(query_embedding),
-            "max_distance": max_distance,
-            "top_k": top_k,
-        },
-    ).fetchall()
+    try:
+        rows = db.execute(
+            sql,
+            {
+                "project_id": project_id,
+                "query_vec": json.dumps(query_embedding),
+                "max_distance": max_distance,
+                "top_k": top_k,
+            },
+        ).fetchall()
+    except Exception as e:
+        logger.warning(f"RAG: pgvector query failed ({e}), contexte vide")
+        db.rollback()
+        return []
 
     if not rows:
         logger.warning(
