@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 logger = structlog.get_logger(__name__)
 
 from app.models.project import AoProject
+from app.models.document import AoDocument
 from app.models.analysis import ExtractionResult, ChecklistItem, CriteriaItem
 
 EXPORT_TEMPLATE = """
@@ -17,48 +18,278 @@ EXPORT_TEMPLATE = """
 <head>
 <meta charset="UTF-8">
 <style>
-  body { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 11px; color: #0F172A; margin: 0; padding: 0; }
-  .page { padding: 30px 40px; }
-  h1 { font-size: 20px; color: #1E40AF; border-bottom: 2px solid #1E40AF; padding-bottom: 8px; }
-  h2 { font-size: 14px; color: #1E40AF; margin-top: 24px; }
-  h3 { font-size: 12px; color: #374151; margin-top: 16px; }
-  .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: bold; }
+  body { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 10px; color: #0F172A; margin: 0; padding: 0; }
+  .page { padding: 25px 35px; }
+  h1 { font-size: 22px; color: #1E40AF; border-bottom: 3px solid #1E40AF; padding-bottom: 8px; margin-top: 0; }
+  h2 { font-size: 14px; color: #1E40AF; margin-top: 28px; border-bottom: 1px solid #CBD5E1; padding-bottom: 4px; }
+  h3 { font-size: 11px; color: #374151; margin-top: 14px; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 9px; font-weight: bold; }
   .badge-red { background: #FEE2E2; color: #DC2626; }
   .badge-yellow { background: #FEF3C7; color: #D97706; }
   .badge-green { background: #DCFCE7; color: #16A34A; }
+  .badge-blue { background: #DBEAFE; color: #1D4ED8; }
   .badge-gray { background: #F1F5F9; color: #64748B; }
-  table { width: 100%; border-collapse: collapse; margin-top: 12px; }
-  th { background: #F8FAFC; font-weight: 600; text-align: left; padding: 6px 8px; border: 1px solid #E2E8F0; font-size: 10px; }
-  td { padding: 6px 8px; border: 1px solid #E2E8F0; vertical-align: top; font-size: 10px; }
+  table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+  th { background: #1E293B; color: white; font-weight: 600; text-align: left; padding: 6px 8px; border: 1px solid #334155; font-size: 9px; }
+  td { padding: 5px 8px; border: 1px solid #E2E8F0; vertical-align: top; font-size: 9px; }
   tr:nth-child(even) { background: #F8FAFC; }
-  .citation { font-style: italic; color: #6B7280; font-size: 9px; margin-top: 3px; }
+  .citation { font-style: italic; color: #6B7280; font-size: 8px; margin-top: 2px; }
   .risk-high { background: #FEF2F2; }
   .risk-medium { background: #FFFBEB; }
-  .summary-box { background: #EFF6FF; border-left: 4px solid #1E40AF; padding: 12px 16px; margin: 12px 0; }
-  .footer { text-align: center; color: #9CA3AF; font-size: 9px; margin-top: 30px; border-top: 1px solid #E2E8F0; padding-top: 8px; }
-  @page { margin: 20mm; size: A4; }
+  .summary-box { background: #EFF6FF; border-left: 4px solid #1E40AF; padding: 10px 14px; margin: 10px 0; }
+  .gonogo-box { padding: 16px; margin: 10px 0; text-align: center; border-radius: 6px; }
+  .gonogo-go { background: #DCFCE7; border: 2px solid #16A34A; }
+  .gonogo-attention { background: #FEF3C7; border: 2px solid #D97706; }
+  .gonogo-nogo { background: #FEE2E2; border: 2px solid #DC2626; }
+  .gonogo-score { font-size: 28px; font-weight: bold; }
+  .gonogo-label { font-size: 14px; font-weight: bold; margin-top: 4px; }
+  .stat-grid { display: table; width: 100%; margin: 10px 0; }
+  .stat-cell { display: table-cell; text-align: center; padding: 10px; border: 1px solid #E2E8F0; width: 25%; }
+  .stat-number { font-size: 20px; font-weight: bold; color: #1E40AF; }
+  .stat-label { font-size: 9px; color: #64748B; margin-top: 2px; }
+  .confidence-bar { background: #E2E8F0; height: 8px; border-radius: 4px; margin-top: 4px; }
+  .confidence-fill { height: 8px; border-radius: 4px; }
+  .cover-page { text-align: center; padding-top: 120px; }
+  .cover-title { font-size: 28px; color: #1E40AF; font-weight: bold; margin-bottom: 8px; }
+  .cover-subtitle { font-size: 16px; color: #374151; margin-bottom: 40px; }
+  .cover-info { font-size: 12px; color: #64748B; margin: 6px 0; }
+  .cover-badge { display: inline-block; padding: 6px 20px; border-radius: 20px; font-size: 12px; font-weight: bold; margin-top: 20px; }
+  .disclaimer { background: #FEF3C7; border: 1px solid #F59E0B; padding: 8px 12px; font-size: 8px; color: #92400E; margin-top: 20px; border-radius: 4px; }
+  .footer { text-align: center; color: #9CA3AF; font-size: 8px; margin-top: 20px; border-top: 1px solid #E2E8F0; padding-top: 6px; }
+  .page-break { page-break-before: always; }
+  .toc { margin: 20px 0; }
+  .toc-item { padding: 4px 0; border-bottom: 1px dotted #CBD5E1; font-size: 10px; }
+  .toc-item strong { color: #1E40AF; }
+  .financial-box { background: #F0FDF4; border: 1px solid #86EFAC; padding: 10px 14px; margin: 10px 0; border-radius: 4px; }
+  .warning-box { background: #FEF2F2; border: 1px solid #FECACA; padding: 8px 12px; font-size: 9px; color: #991B1B; margin: 8px 0; border-radius: 4px; }
+  .info-box { background: #EFF6FF; border: 1px solid #BFDBFE; padding: 8px 12px; font-size: 9px; color: #1E40AF; margin: 8px 0; border-radius: 4px; }
+  @page { margin: 18mm; size: A4; }
 </style>
 </head>
 <body>
-<div class="page">
 
-  <h1>AO Copilot — Rapport d'analyse</h1>
-  <p style="color:#6B7280">Projet : <strong>{{ project.title }}</strong> &nbsp;|&nbsp; Acheteur : {{ project.buyer or 'N/A' }} &nbsp;|&nbsp; Statut : {{ project.status }}</p>
+<!-- ═══════════ PAGE DE COUVERTURE ═══════════ -->
+<div class="page cover-page">
+  <div style="font-size: 14px; color: #64748B; letter-spacing: 2px;">RAPPORT D'ANALYSE DCE</div>
+  <div class="cover-title">{{ project.title }}</div>
+  <div class="cover-subtitle">{{ project.buyer or 'Acheteur public' }}</div>
 
-  <!-- RÉSUMÉ -->
-  {% if summary %}
-  <h2>1. Résumé exécutif</h2>
+  <div style="margin-top: 40px;">
+    <div class="cover-info"><strong>Référence :</strong> {{ project.reference or 'N/A' }}</div>
+    {% if summary and summary.project_overview.deadline_submission %}
+    <div class="cover-info"><strong>Date limite :</strong> {{ summary.project_overview.deadline_submission|datefr }}</div>
+    {% endif %}
+    {% if summary and summary.project_overview.estimated_budget %}
+    <div class="cover-info"><strong>Budget estimé :</strong> {{ summary.project_overview.estimated_budget }}</div>
+    {% endif %}
+    <div class="cover-info"><strong>Lieu :</strong> {{ summary.project_overview.location if summary else 'N/A' }}</div>
+  </div>
+
+  {% if days_remaining is not none %}
+  <div style="margin-top: 30px;">
+    <div style="display: inline-block; padding: 12px 28px; border-radius: 8px; font-size: 18px; font-weight: bold;
+      {% if days_remaining <= 3 %}background: #FEE2E2; color: #DC2626; border: 2px solid #DC2626;
+      {% elif days_remaining <= 7 %}background: #FEF3C7; color: #D97706; border: 2px solid #D97706;
+      {% elif days_remaining <= 14 %}background: #DBEAFE; color: #1D4ED8; border: 2px solid #1D4ED8;
+      {% else %}background: #DCFCE7; color: #16A34A; border: 2px solid #16A34A;{% endif %}">
+      {% if days_remaining < 0 %}EXPIRÉ (J{{ days_remaining }})
+      {% elif days_remaining == 0 %}DERNIER JOUR (J-0)
+      {% else %}J-{{ days_remaining }}{% endif %}
+    </div>
+    {% if days_remaining >= 0 %}
+    <div class="cover-info" style="margin-top: 6px;">{{ days_remaining }} jour{{ 's' if days_remaining > 1 else '' }} restant{{ 's' if days_remaining > 1 else '' }} avant la date limite de remise</div>
+    {% else %}
+    <div class="cover-info" style="margin-top: 6px; color: #DC2626;">Date limite dépassée depuis {{ -days_remaining }} jour{{ 's' if -days_remaining > 1 else '' }}</div>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% if gonogo %}
+  <div style="margin-top: 20px;">
+    {% set reco = gonogo.recommendation|upper if gonogo.recommendation else 'ATTENTION' %}
+    <div class="cover-badge {% if reco == 'GO' %}badge-green{% elif reco == 'NO-GO' %}badge-red{% else %}badge-yellow{% endif %}" style="font-size: 16px; padding: 10px 30px;">
+      RECOMMANDATION : {{ reco }}
+    </div>
+    <div class="cover-info" style="margin-top: 8px;">Score Go/No-Go : <strong>{{ gonogo.score }}/100</strong></div>
+  </div>
+  {% endif %}
+
+  <div style="margin-top: 40px; color: #9CA3AF; font-size: 10px;">
+    Document généré le {{ generated_at }}<br>
+    Confiance IA : {{ "%.0f"|format(confidence * 100) if confidence else 'N/A' }}%
+  </div>
+</div>
+
+<!-- ═══════════ SOMMAIRE ═══════════ -->
+<div class="page page-break">
+  <h1>Sommaire</h1>
+  <div class="toc">
+    <div class="toc-item"><strong>1.</strong> Synthese decisionnelle — Recommandation Go/No-Go et indicateurs cles</div>
+    {% if summary %}
+    <div class="toc-item"><strong>2.</strong> Resume executif — Objet du marche, points cles extraits</div>
+    <div class="toc-item"><strong>3.</strong> Analyse des risques — {{ summary.risks|length }} risques identifies et plan d'actions 48h</div>
+    {% endif %}
+    {% if timeline %}
+    <div class="toc-item"><strong>4.</strong> Calendrier et dates cles — Echeances de soumission et d'execution</div>
+    {% endif %}
+    {% if checklist_items %}
+    <div class="toc-item"><strong>5.</strong> Checklist de conformite — {{ checklist_items|length }} exigences ({{ checklist_stats.eliminatoire }} eliminatoires)</div>
+    {% endif %}
+    {% if criteria %}
+    <div class="toc-item"><strong>6.</strong> Criteres d'attribution — Conditions d'eligibilite et grille de notation</div>
+    {% endif %}
+    {% if scoring_simulation %}
+    <div class="toc-item"><strong>6b.</strong> Simulation note acheteur — Note estimee {{ "%.1f"|format(scoring_simulation.total_score) }}/20 et leviers</div>
+    {% endif %}
+    {% if ccag_derogations %}
+    <div class="toc-item"><strong>6c.</strong> Derogations CCAG-Travaux 2021 — {{ ccag_derogations|length }} derogations detectees</div>
+    {% endif %}
+    {% if rc_analysis %}
+    <div class="toc-item"><strong>2b.</strong> Fiche signaletique du marche — Procedure, allotissement, groupement, CCAG</div>
+    {% endif %}
+    <div class="toc-item"><strong>5b.</strong> Documents prioritaires a preparer — Liste des pieces eliminatoires manquantes</div>
+    <div class="toc-item"><strong>7.</strong> Synthese financiere — Montants, avance, penalites, revision des prix</div>
+    {% if questions_list %}
+    <div class="toc-item"><strong>8.</strong> Questions prioritaires pour l'acheteur — {{ questions_list|length }} questions a poser</div>
+    {% endif %}
+    {% if documents_inventory %}
+    <div class="toc-item"><strong>A1.</strong> Inventaire des documents — {{ documents_inventory|length }} pieces DCE analysees</div>
+    {% endif %}
+    <div class="toc-item"><strong>A.</strong> Avertissement IA et mentions legales</div>
+  </div>
+
+  <div class="info-box">
+    <strong>Mode d'emploi :</strong> Ce rapport est concu pour une lecture en 3 niveaux :<br>
+    - <strong>5 minutes</strong> : Page de couverture + Synthese decisionnelle (pages 1-2)<br>
+    - <strong>15 minutes</strong> : + Resume executif + Risques + Calendrier<br>
+    - <strong>30 minutes</strong> : Rapport complet avec checklist et criteres detailles
+  </div>
+</div>
+
+<!-- ═══════════ SYNTHÈSE DÉCISIONNELLE (1 page) ═══════════ -->
+<div class="page page-break">
+  <h1>1. Synthèse décisionnelle</h1>
+  <p style="color: #64748B; font-size: 9px;">Vue d'ensemble en 1 page pour les décideurs (DG, Directeur commercial, Responsable AO)</p>
+
+  <!-- Score Go/No-Go -->
+  {% if gonogo %}
+  {% set reco = gonogo.recommendation|upper if gonogo.recommendation else 'ATTENTION' %}
+  <div class="gonogo-box {% if reco == 'GO' %}gonogo-go{% elif reco == 'NO-GO' %}gonogo-nogo{% else %}gonogo-attention{% endif %}">
+    <div class="gonogo-score">{{ gonogo.score }}/100</div>
+    <div class="gonogo-label">{{ reco }}</div>
+    <div style="font-size: 10px; margin-top: 4px;">{{ gonogo.summary }}</div>
+  </div>
+  {% endif %}
+
+  <!-- Indicateurs clés -->
+  <div class="stat-grid">
+    <div class="stat-cell">
+      <div class="stat-number">{{ checklist_stats.eliminatoire }}</div>
+      <div class="stat-label">Éliminatoires</div>
+    </div>
+    <div class="stat-cell">
+      <div class="stat-number">{{ checklist_stats.important }}</div>
+      <div class="stat-label">Importants</div>
+    </div>
+    <div class="stat-cell">
+      <div class="stat-number">{{ summary.risks|length if summary else 0 }}</div>
+      <div class="stat-label">Risques identifiés</div>
+    </div>
+    <div class="stat-cell">
+      <div class="stat-number">{{ summary.actions_next_48h|length if summary else 0 }}</div>
+      <div class="stat-label">Actions à mener</div>
+    </div>
+  </div>
+
+  <!-- Top 3 risques -->
+  {% if summary and summary.risks %}
+  <h3>Top 3 risques critiques</h3>
+  <table>
+    <tr><th>Risque</th><th>Sévérité</th><th>Impact</th></tr>
+    {% for r in summary.risks[:3] %}
+    <tr class="risk-{{ r.severity }}">
+      <td><strong>{{ r.risk }}</strong></td>
+      <td><span class="badge {% if r.severity == 'high' %}badge-red{% elif r.severity == 'medium' %}badge-yellow{% else %}badge-gray{% endif %}">{{ r.severity|upper }}</span></td>
+      <td>{{ r.why[:120] }}{% if r.why|length > 120 %}...{% endif %}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% endif %}
+
+  <!-- Forces et faiblesses Go/No-Go -->
+  {% if gonogo and (gonogo.strengths or gonogo.risks) %}
+  <div style="display: table; width: 100%; margin-top: 12px;">
+    <div style="display: table-cell; width: 48%; vertical-align: top;">
+      <h3 style="color: #16A34A;">Forces</h3>
+      {% for s in gonogo.strengths[:3] %}<div style="margin: 3px 0; font-size: 9px;">+ {{ s }}</div>{% endfor %}
+    </div>
+    <div style="display: table-cell; width: 4%;"></div>
+    <div style="display: table-cell; width: 48%; vertical-align: top;">
+      <h3 style="color: #DC2626;">Points de vigilance</h3>
+      {% for r in gonogo.risks[:3] %}<div style="margin: 3px 0; font-size: 9px;">- {{ r }}</div>{% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Dimensions Go/No-Go -->
+  {% if gonogo and gonogo.breakdown %}
+  <h3>Scores par dimension</h3>
+  <table>
+    <tr><th style="width:50%">Dimension</th><th style="width:20%">Score</th><th style="width:30%">Niveau</th></tr>
+    {% for dim_name, dim_score in [('Adéquation technique', gonogo.breakdown.technical_fit), ('Capacité financière', gonogo.breakdown.financial_capacity), ('Faisabilité planning', gonogo.breakdown.timeline_feasibility), ('Position concurrentielle', gonogo.breakdown.competitive_position)] %}
+    {% if dim_score is not none %}
+    <tr>
+      <td>{{ dim_name }}</td>
+      <td><strong>{{ dim_score }}/100</strong></td>
+      <td><span class="badge {% if dim_score >= 70 %}badge-green{% elif dim_score >= 50 %}badge-yellow{% else %}badge-red{% endif %}">{% if dim_score >= 70 %}BON{% elif dim_score >= 50 %}MOYEN{% else %}FAIBLE{% endif %}</span></td>
+    </tr>
+    {% endif %}
+    {% endfor %}
+  </table>
+  {% endif %}
+
+  <!-- Actions P0 -->
+  {% if summary and summary.actions_next_48h %}
+  <h3>Actions prioritaires P0</h3>
+  <table>
+    <tr><th>Action</th><th>Responsable</th></tr>
+    {% for a in summary.actions_next_48h if a.priority == 'P0' %}
+    <tr>
+      <td>{{ a.action[:100] }}{% if a.action|length > 100 %}...{% endif %}</td>
+      <td>{{ a.owner_role }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% endif %}
+
+  <!-- Confiance IA -->
+  {% if confidence %}
+  <div style="margin-top: 12px;">
+    <span style="font-size: 9px; color: #64748B;">Indice de confiance IA : {{ "%.0f"|format(confidence * 100) }}%</span>
+    <div class="confidence-bar">
+      <div class="confidence-fill" style="width: {{ "%.0f"|format(confidence * 100) }}%; background: {% if confidence >= 0.8 %}#16A34A{% elif confidence >= 0.6 %}#D97706{% else %}#DC2626{% endif %};"></div>
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+<!-- ═══════════ RÉSUMÉ EXÉCUTIF ═══════════ -->
+{% if summary %}
+<div class="page page-break">
+  <h1>2. Résumé exécutif</h1>
+
   <div class="summary-box">
     <strong>Objet :</strong> {{ summary.project_overview.scope }}<br>
     <strong>Acheteur :</strong> {{ summary.project_overview.buyer }}<br>
     <strong>Lieu :</strong> {{ summary.project_overview.location }}<br>
     <strong>Date limite :</strong> {{ summary.project_overview.deadline_submission }}<br>
-    {% if summary.project_overview.estimated_budget %}<strong>Budget estimé :</strong> {{ summary.project_overview.estimated_budget }}{% endif %}
+    {% if summary.project_overview.estimated_budget %}<strong>Budget estimé :</strong> {{ summary.project_overview.estimated_budget }}<br>{% endif %}
+    {% if summary.project_overview.market_type %}<strong>Type de marché :</strong> {{ summary.project_overview.market_type }}{% endif %}
   </div>
 
-  <h3>Points clés</h3>
+  <h3>Points clés extraits du DCE</h3>
   <table>
-    <tr><th>Point</th><th>Valeur</th><th>Source</th></tr>
+    <tr><th style="width:25%">Point</th><th style="width:50%">Valeur</th><th style="width:25%">Source</th></tr>
     {% for kp in summary.key_points %}
     <tr>
       <td><strong>{{ kp.label }}</strong></td>
@@ -67,22 +298,27 @@ EXPORT_TEMPLATE = """
     </tr>
     {% endfor %}
   </table>
+</div>
 
-  <h3>Risques identifiés</h3>
+<!-- ═══════════ RISQUES & ACTIONS ═══════════ -->
+<div class="page page-break">
+  <h1>3. Analyse des risques</h1>
+
+  <h3>Risques identifiés ({{ summary.risks|length }})</h3>
   <table>
-    <tr><th>Risque</th><th>Sévérité</th><th>Pourquoi</th></tr>
+    <tr><th style="width:30%">Risque</th><th style="width:10%">Sévérité</th><th style="width:60%">Analyse</th></tr>
     {% for r in summary.risks %}
     <tr class="risk-{{ r.severity }}">
-      <td>{{ r.risk }}</td>
+      <td><strong>{{ r.risk }}</strong></td>
       <td><span class="badge {% if r.severity == 'high' %}badge-red{% elif r.severity == 'medium' %}badge-yellow{% else %}badge-gray{% endif %}">{{ r.severity|upper }}</span></td>
       <td>{{ r.why }}</td>
     </tr>
     {% endfor %}
   </table>
 
-  <h3>Actions sous 48h</h3>
+  <h3>Plan d'actions sous 48h ({{ summary.actions_next_48h|length }} actions)</h3>
   <table>
-    <tr><th>Action</th><th>Responsable</th><th>Priorité</th></tr>
+    <tr><th style="width:50%">Action</th><th style="width:30%">Responsable</th><th style="width:10%">Priorité</th></tr>
     {% for a in summary.actions_next_48h %}
     <tr>
       <td>{{ a.action }}</td>
@@ -91,35 +327,120 @@ EXPORT_TEMPLATE = """
     </tr>
     {% endfor %}
   </table>
-  {% endif %}
+</div>
+{% endif %}
 
-  <!-- CHECKLIST -->
-  {% if checklist_items %}
-  <h2>2. Checklist des exigences ({{ checklist_items|length }} items)</h2>
+<!-- ═══════════ DATES CLÉS ═══════════ -->
+{% if timeline %}
+<div class="page page-break">
+  <h1>4. Calendrier et dates clés</h1>
   <table>
-    <tr><th>#</th><th>Exigence</th><th>Catégorie</th><th>Criticité</th><th>Statut</th><th>À fournir</th></tr>
+    <tr><th>Échéance</th><th>Date</th><th>Commentaire</th></tr>
+    {% if timeline.submission_deadline %}
+    <tr class="risk-high"><td><strong>Date limite de remise</strong></td><td><span class="badge badge-red">{{ timeline.submission_deadline|datefr }}</span></td><td>Heure limite absolue</td></tr>
+    {% endif %}
+    {% if timeline.questions_deadline %}
+    <tr><td>Date limite questions</td><td>{{ timeline.questions_deadline|datefr }}</td><td>Dernier jour pour poser des questions</td></tr>
+    {% endif %}
+    {% if timeline.site_visit_date %}
+    <tr><td>Visite de site</td><td>{{ timeline.site_visit_date|datefr }}</td><td>{% if summary and summary.project_overview.site_visit_required %}Obligatoire{% else %}Facultative{% endif %}</td></tr>
+    {% endif %}
+    {% if timeline.execution_start %}
+    <tr><td>Début d'exécution prévisionnel</td><td>{{ timeline.execution_start|datefr }}</td><td></td></tr>
+    {% endif %}
+    {% if timeline.execution_duration_months %}
+    <tr><td>Durée d'exécution</td><td>{{ timeline.execution_duration_months }} mois</td><td></td></tr>
+    {% endif %}
+    {% for kd in timeline.key_dates %}
+    <tr><td>{{ kd.label }}</td><td>{{ kd.date|datefr }}</td><td>{% if kd.mandatory %}<span class="badge badge-red">Obligatoire</span>{% endif %}</td></tr>
+    {% endfor %}
+  </table>
+</div>
+{% endif %}
+
+<!-- ═══════════ CHECKLIST ═══════════ -->
+{% if checklist_items %}
+<div class="page page-break">
+  <h1>5. Checklist de conformité ({{ checklist_items|length }} exigences)</h1>
+
+  <div class="info-box">
+    <strong>Note :</strong> Le statut "MANQUANT" indique les documents/justificatifs à préparer pour la soumission.
+    Utilisez cette checklist comme liste de contrôle avant le dépôt de votre offre.
+  </div>
+
+  <!-- Statistiques checklist -->
+  <div class="stat-grid">
+    <div class="stat-cell" style="border-left: 3px solid #DC2626;">
+      <div class="stat-number" style="color: #DC2626;">{{ checklist_stats.eliminatoire }}</div>
+      <div class="stat-label">Éliminatoires</div>
+    </div>
+    <div class="stat-cell" style="border-left: 3px solid #D97706;">
+      <div class="stat-number" style="color: #D97706;">{{ checklist_stats.important }}</div>
+      <div class="stat-label">Importants</div>
+    </div>
+    <div class="stat-cell" style="border-left: 3px solid #64748B;">
+      <div class="stat-number" style="color: #64748B;">{{ checklist_stats.info }}</div>
+      <div class="stat-label">Informatifs</div>
+    </div>
+    <div class="stat-cell" style="border-left: 3px solid #16A34A;">
+      <div class="stat-number" style="color: #16A34A;">{{ checklist_stats.ok }}</div>
+      <div class="stat-label">Conformes</div>
+    </div>
+  </div>
+
+  <table>
+    <tr><th style="width:3%">#</th><th style="width:35%">Exigence</th><th style="width:12%">Catégorie</th><th style="width:12%">Criticité</th><th style="width:10%">Statut</th><th style="width:28%">À fournir</th></tr>
     {% for item in checklist_items %}
     <tr>
       <td>{{ loop.index }}</td>
       <td>{{ item.requirement }}
-        {% for c in (item.citations or []) %}<div class="citation">{{ c.doc }} p.{{ c.page }} — "{{ c.quote[:80] }}"</div>{% endfor %}
+        {% for c in (item.citations or []) %}<div class="citation">{{ c.doc }} p.{{ c.page }}</div>{% endfor %}
       </td>
       <td>{{ item.category or '-' }}</td>
       <td><span class="badge {% if item.criticality == 'Éliminatoire' %}badge-red{% elif item.criticality == 'Important' %}badge-yellow{% else %}badge-gray{% endif %}">{{ item.criticality or '-' }}</span></td>
       <td><span class="badge {% if item.status == 'OK' %}badge-green{% elif item.status == 'MANQUANT' %}badge-red{% else %}badge-yellow{% endif %}">{{ item.status }}</span></td>
-      <td>{{ item.what_to_provide or '-' }}</td>
+      <td style="font-size: 8px;">{{ item.what_to_provide or '-' }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+
+  <!-- Documents prioritaires à préparer (éliminatoires MANQUANTS) -->
+  {% set elim_manquants = [] %}
+  {% for item in checklist_items %}
+    {% if item.criticality and 'liminatoire' in item.criticality|lower and item.status == 'MANQUANT' %}
+      {% if elim_manquants.append(item) %}{% endif %}
+    {% endif %}
+  {% endfor %}
+  {% if elim_manquants %}
+  <div class="page-break"></div>
+  <h2 style="color: #DC2626;">Documents prioritaires à préparer ({{ elim_manquants|length }} éliminatoires)</h2>
+  <div class="warning-box">
+    <strong>Attention :</strong> Ces {{ elim_manquants|length }} documents sont <strong>éliminatoires</strong>.
+    Leur absence entraînera le rejet automatique de votre candidature. Préparez-les en priorité absolue.
+  </div>
+  <table>
+    <tr><th style="width:5%">#</th><th style="width:50%">Document / Justificatif requis</th><th style="width:45%">Détail à fournir</th></tr>
+    {% for item in elim_manquants %}
+    <tr class="risk-high">
+      <td>{{ loop.index }}</td>
+      <td><strong>{{ item.requirement }}</strong></td>
+      <td style="font-size: 8px;">{{ item.what_to_provide or 'Voir exigences du RC/CCAP' }}</td>
     </tr>
     {% endfor %}
   </table>
   {% endif %}
+</div>
+{% endif %}
 
-  <!-- CRITÈRES -->
-  {% if criteria %}
-  <h2>3. Critères d'attribution</h2>
+<!-- ═══════════ CRITÈRES D'ATTRIBUTION ═══════════ -->
+{% if criteria %}
+<div class="page page-break">
+  <h1>6. Critères d'attribution</h1>
+
   {% if criteria.evaluation.eligibility_conditions %}
-  <h3>Conditions d'éligibilité</h3>
+  <h3>Conditions d'éligibilité ({{ criteria.evaluation.eligibility_conditions|length }})</h3>
   <table>
-    <tr><th>Condition</th><th>Type</th></tr>
+    <tr><th style="width:80%">Condition</th><th style="width:20%">Type</th></tr>
     {% for c in criteria.evaluation.eligibility_conditions %}
     <tr>
       <td>{{ c.condition }}</td>
@@ -128,23 +449,274 @@ EXPORT_TEMPLATE = """
     {% endfor %}
   </table>
   {% endif %}
+
   {% if criteria.evaluation.scoring_criteria %}
-  <h3>Critères de notation</h3>
+  <h3>Grille de notation</h3>
   <table>
-    <tr><th>Critère</th><th>Pondération</th><th>Notes</th></tr>
+    <tr><th style="width:40%">Critère</th><th style="width:15%">Pondération</th><th style="width:45%">Notes et recommandations</th></tr>
     {% for c in criteria.evaluation.scoring_criteria %}
     <tr>
-      <td>{{ c.criterion }}</td>
-      <td>{% if c.weight_percent %}{{ c.weight_percent }}%{% else %}N/S{% endif %}</td>
+      <td><strong>{{ c.criterion }}</strong></td>
+      <td><span class="badge badge-blue">{% if c.weight_percent %}{{ c.weight_percent }}%{% else %}N/S{% endif %}</span></td>
       <td>{{ c.notes or '-' }}</td>
     </tr>
     {% endfor %}
   </table>
   {% endif %}
+</div>
+{% endif %}
+
+<!-- ═══════════ SIMULATION NOTE ACHETEUR ═══════════ -->
+{% if scoring_simulation %}
+<div class="page page-break">
+  <h1>6b. Simulation de la note acheteur</h1>
+  <p style="color: #64748B; font-size: 9px;">Estimation de votre note finale basée sur les critères de notation du DCE et votre profil entreprise</p>
+
+  <div class="gonogo-box" style="background: #EFF6FF; border: 2px solid #1E40AF;">
+    <div class="gonogo-score" style="color: #1E40AF;">{{ "%.1f"|format(scoring_simulation.total_score) }}/20</div>
+    <div class="gonogo-label" style="color: #1E40AF;">Note estimée</div>
+    {% if scoring_simulation.rank_estimate %}
+    <div style="font-size: 10px; margin-top: 4px; color: #64748B;">Position estimée : {{ scoring_simulation.rank_estimate }}</div>
+    {% endif %}
+  </div>
+
+  {% if scoring_simulation.criteria_scores %}
+  <h3>Détail par critère</h3>
+  <table>
+    <tr><th style="width:35%">Critère</th><th style="width:15%">Pondération</th><th style="width:15%">Note estimée</th><th style="width:35%">Recommandation</th></tr>
+    {% for cs in scoring_simulation.criteria_scores %}
+    <tr>
+      <td><strong>{{ cs.criterion }}</strong></td>
+      <td>{{ cs.weight }}%</td>
+      <td><span class="badge {% if cs.score >= 14 %}badge-green{% elif cs.score >= 10 %}badge-yellow{% else %}badge-red{% endif %}">{{ "%.1f"|format(cs.score) }}/20</span></td>
+      <td style="font-size: 8px;">{{ cs.recommendation or '-' }}</td>
+    </tr>
+    {% endfor %}
+  </table>
   {% endif %}
 
-  <div class="footer">Généré par AO Copilot — aocopilot.fr — {{ generated_at }}</div>
+  {% if scoring_simulation.improvement_levers %}
+  <h3>Leviers d'amélioration (gain potentiel)</h3>
+  <table>
+    <tr><th style="width:40%">Action</th><th style="width:15%">Gain estimé</th><th style="width:45%">Détail</th></tr>
+    {% for lever in scoring_simulation.improvement_levers[:5] %}
+    <tr>
+      <td><strong>{{ lever.action }}</strong></td>
+      <td><span class="badge badge-green">+{{ "%.1f"|format(lever.gain) }} pts</span></td>
+      <td style="font-size: 8px;">{{ lever.detail or '' }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% endif %}
+
+  <div class="info-box">
+    <strong>Note :</strong> Cette simulation est indicative. La note réelle dépend de la qualité de votre offre technique,
+    du nombre de concurrents et de l'appréciation subjective de la commission d'attribution.
+  </div>
 </div>
+{% endif %}
+
+<!-- ═══════════ DÉROGATIONS CCAG ═══════════ -->
+{% if ccag_derogations %}
+<div class="page page-break">
+  <h1>6c. Dérogations au CCAG-Travaux 2021</h1>
+  <p style="color: #64748B; font-size: 9px;">Clauses du CCAP/CCTP qui dérogent au CCAG-Travaux 2021 — à vérifier pour le chiffrage</p>
+
+  <div class="warning-box">
+    <strong>Attention :</strong> {{ ccag_derogations|length }} dérogation{{ 's' if ccag_derogations|length > 1 else '' }}
+    au CCAG-Travaux 2021 détectée{{ 's' if ccag_derogations|length > 1 else '' }}.
+    Certaines peuvent avoir un impact significatif sur votre prix et vos risques contractuels.
+  </div>
+
+  <table>
+    <tr><th style="width:15%">Article CCAG</th><th style="width:30%">Clause standard</th><th style="width:30%">Dérogation CCAP</th><th style="width:10%">Impact</th><th style="width:15%">Risque</th></tr>
+    {% for d in ccag_derogations %}
+    <tr>
+      <td><strong>Art. {{ d.article }}</strong></td>
+      <td style="font-size: 8px;">{{ d.standard_clause }}</td>
+      <td style="font-size: 8px;">{{ d.derogation }}</td>
+      <td><span class="badge {% if d.impact == 'fort' %}badge-red{% elif d.impact == 'moyen' %}badge-yellow{% else %}badge-gray{% endif %}">{{ d.impact|upper }}</span></td>
+      <td style="font-size: 8px;">{{ d.risk_comment or '' }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+
+  <div class="info-box">
+    <strong>Conseil :</strong> Intégrez ces dérogations dans votre chiffrage. En particulier, vérifiez les pénalités
+    (art. 20), les délais de paiement (art. 11), la retenue de garantie (art. 32) et les conditions de résiliation (art. 46).
+  </div>
+</div>
+{% endif %}
+
+<!-- ═══════════ FICHE SIGNALÉTIQUE DU MARCHÉ ═══════════ -->
+{% if rc_analysis %}
+<div class="page page-break">
+  <h1>2b. Fiche signalétique du marché</h1>
+  <p style="color: #64748B; font-size: 9px;">Données extraites du Règlement de Consultation (RC) et des pièces contractuelles</p>
+
+  <table>
+    <tr><th style="width:35%">Élément</th><th style="width:65%">Valeur</th></tr>
+    {% if rc_analysis.procedure_type %}
+    <tr><td><strong>Procédure</strong></td><td>{{ rc_analysis.procedure_type }}</td></tr>
+    {% endif %}
+    {% if rc_analysis.allotissement %}
+    <tr><td><strong>Allotissement</strong></td><td>{{ rc_analysis.allotissement }}</td></tr>
+    {% endif %}
+    {% if rc_analysis.groupement %}
+    <tr><td><strong>Groupement</strong></td><td>{{ rc_analysis.groupement }}</td></tr>
+    {% endif %}
+    {% if rc_analysis.variantes %}
+    <tr><td><strong>Variantes</strong></td><td>{{ rc_analysis.variantes }}</td></tr>
+    {% endif %}
+    {% if rc_analysis.subcontracting_allowed is not none %}
+    <tr><td><strong>Sous-traitance</strong></td><td>{% if rc_analysis.subcontracting_allowed %}Autorisée{% else %}Non autorisée{% endif %}</td></tr>
+    {% endif %}
+    {% if rc_analysis.ccag_reference %}
+    <tr><td><strong>CCAG de référence</strong></td><td>{{ rc_analysis.ccag_reference }}</td></tr>
+    {% endif %}
+    {% if rc_analysis.visite_obligatoire is not none %}
+    <tr><td><strong>Visite de site</strong></td><td>{% if rc_analysis.visite_obligatoire %}<span class="badge badge-red">OBLIGATOIRE</span>{% else %}Facultative{% endif %}</td></tr>
+    {% endif %}
+    {% if rc_analysis.dume_required is not none %}
+    <tr><td><strong>DUME</strong></td><td>{% if rc_analysis.dume_required %}Requis{% else %}Non requis{% endif %}</td></tr>
+    {% endif %}
+  </table>
+
+  {% if rc_analysis.lots %}
+  <h3>Décomposition en lots</h3>
+  <table>
+    <tr><th style="width:10%">N°</th><th style="width:50%">Intitulé</th><th style="width:40%">Montant estimé</th></tr>
+    {% for lot in rc_analysis.lots %}
+    <tr>
+      <td>{{ lot.number }}</td>
+      <td>{{ lot.title }}</td>
+      <td>{{ lot.estimated_amount or 'Non précisé' }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% endif %}
+</div>
+{% endif %}
+
+<!-- ═══════════ QUESTIONS POUR L'ACHETEUR ═══════════ -->
+{% if questions_list %}
+<div class="page page-break">
+  <h1>8. Questions prioritaires pour l'acheteur</h1>
+  <p style="color: #64748B; font-size: 9px;">Questions à poser à l'acheteur avant la date limite — classées par priorité</p>
+
+  <div class="info-box">
+    <strong>Conseil :</strong> Posez ces questions via la plateforme de dématérialisation
+    avant la date limite de questions. Les réponses seront diffusées à tous les candidats.
+  </div>
+
+  <table>
+    <tr><th style="width:5%">#</th><th style="width:10%">Priorité</th><th style="width:55%">Question</th><th style="width:30%">Justification</th></tr>
+    {% for q in questions_list[:15] %}
+    <tr>
+      <td>{{ loop.index }}</td>
+      <td><span class="badge {% if q.priority == 'high' %}badge-red{% elif q.priority == 'medium' %}badge-yellow{% else %}badge-gray{% endif %}">{{ q.priority|upper if q.priority else 'INFO' }}</span></td>
+      <td>{{ q.question }}</td>
+      <td style="font-size: 8px;">{{ q.justification or '' }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+{% endif %}
+
+<!-- ═══════════ INVENTAIRE DOCUMENTS ANALYSÉS ═══════════ -->
+{% if documents_inventory %}
+<div class="page page-break">
+  <h1>A1. Inventaire des documents analysés</h1>
+  <p style="color: #64748B; font-size: 9px;">Liste des pièces du DCE prises en compte dans cette analyse</p>
+
+  <table>
+    <tr><th style="width:5%">#</th><th style="width:40%">Document</th><th style="width:15%">Type</th><th style="width:10%">Pages</th><th style="width:15%">Taille</th><th style="width:15%">Qualité OCR</th></tr>
+    {% for doc in documents_inventory %}
+    <tr>
+      <td>{{ loop.index }}</td>
+      <td>{{ doc.name }}</td>
+      <td><span class="badge badge-blue">{{ doc.doc_type or 'AUTRES' }}</span></td>
+      <td>{{ doc.pages or '—' }}</td>
+      <td>{{ doc.size_display }}</td>
+      <td>
+        {% if doc.ocr_quality %}
+        <span class="badge {% if doc.ocr_quality >= 70 %}badge-green{% elif doc.ocr_quality >= 40 %}badge-yellow{% else %}badge-red{% endif %}">{{ "%.0f"|format(doc.ocr_quality) }}%</span>
+        {% else %}—{% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+
+  <div style="margin-top: 8px; font-size: 9px; color: #64748B;">
+    Total : {{ documents_inventory|length }} document{{ 's' if documents_inventory|length > 1 else '' }}
+    {% set total_pages = documents_inventory|sum(attribute='pages') %}
+    {% if total_pages %} — {{ total_pages }} pages analysées{% endif %}
+  </div>
+</div>
+{% endif %}
+
+<!-- ═══════════ SYNTHÈSE FINANCIÈRE ═══════════ -->
+{% if summary %}
+<div class="page page-break">
+  <h1>7. Synthèse financière</h1>
+  <p style="color: #64748B; font-size: 9px;">Éléments financiers clés extraits du DCE pour l'aide à la décision</p>
+
+  <div class="financial-box">
+    <strong>Budget global estimé :</strong> {{ summary.project_overview.estimated_budget or 'Non précisé dans le DCE' }}<br>
+    <strong>Type de prix :</strong> {{ summary.project_overview.market_type or 'Non précisé' }}
+  </div>
+
+  <!-- Extraction des données financières depuis key_points -->
+  <h3>Éléments financiers extraits</h3>
+  <table>
+    <tr><th style="width:40%">Élément</th><th style="width:60%">Détail</th></tr>
+    {% for kp in summary.key_points %}
+    {% if 'prix' in kp.label|lower or 'avance' in kp.label|lower or 'retenue' in kp.label|lower or 'paiement' in kp.label|lower or 'pénalité' in kp.label|lower or 'révision' in kp.label|lower or 'financ' in kp.label|lower or 'budget' in kp.label|lower or 'garantie' in kp.label|lower %}
+    <tr>
+      <td><strong>{{ kp.label }}</strong></td>
+      <td>{{ kp.value }}</td>
+    </tr>
+    {% endif %}
+    {% endfor %}
+  </table>
+
+  {% if summary.risks %}
+  <h3>Risques financiers identifiés</h3>
+  <table>
+    <tr><th style="width:40%">Risque</th><th style="width:10%">Sévérité</th><th style="width:50%">Impact financier</th></tr>
+    {% for r in summary.risks %}
+    {% if 'financ' in r.why|lower or 'prix' in r.risk|lower or 'pénalité' in r.risk|lower or 'coût' in r.why|lower or 'trésorerie' in r.why|lower or 'paiement' in r.risk|lower %}
+    <tr class="risk-{{ r.severity }}">
+      <td><strong>{{ r.risk }}</strong></td>
+      <td><span class="badge {% if r.severity == 'high' %}badge-red{% elif r.severity == 'medium' %}badge-yellow{% else %}badge-gray{% endif %}">{{ r.severity|upper }}</span></td>
+      <td>{{ r.why }}</td>
+    </tr>
+    {% endif %}
+    {% endfor %}
+  </table>
+  {% endif %}
+
+  <div class="warning-box">
+    <strong>Recommandation :</strong> Avant de chiffrer votre offre, vérifiez les éléments suivants :
+    formule de révision des prix, montant de l'avance, conditions de paiement, pénalités de retard,
+    retenue de garantie, et tout risque de surcoût identifié (pollution, aléas géotechniques, etc.).
+  </div>
+</div>
+{% endif %}
+
+<!-- ═══════════ FOOTER & DISCLAIMER ═══════════ -->
+<div class="page page-break">
+  <div class="disclaimer">
+    <strong>Avertissement IA :</strong> Ce rapport est généré par intelligence artificielle (Claude, Anthropic) à partir des documents du DCE fournis.
+    Il constitue une aide à la décision et ne se substitue pas à l'analyse humaine d'un expert marchés publics.
+    Les informations doivent être vérifiées avant toute soumission d'offre.
+    Confiance globale de l'analyse : {{ "%.0f"|format(confidence * 100) if confidence else 'N/A' }}%.
+  </div>
+  <div class="footer">
+    Généré par AO Copilot — aocopilot.fr — {{ generated_at }} — Rapport confidentiel
+  </div>
+</div>
+
 </body>
 </html>
 """
@@ -155,20 +727,153 @@ def generate_export_pdf(db: Session, project_id: str) -> bytes:
     if not project:
         raise ValueError("Projet introuvable")
 
+    pid = uuid.UUID(project_id)
+
     summary_result = db.query(ExtractionResult).filter_by(
-        project_id=uuid.UUID(project_id), result_type="summary"
+        project_id=pid, result_type="summary"
     ).order_by(ExtractionResult.version.desc()).first()
 
     criteria_result = db.query(ExtractionResult).filter_by(
-        project_id=uuid.UUID(project_id), result_type="criteria"
+        project_id=pid, result_type="criteria"
+    ).order_by(ExtractionResult.version.desc()).first()
+
+    gonogo_result = db.query(ExtractionResult).filter_by(
+        project_id=pid, result_type="gonogo"
+    ).order_by(ExtractionResult.version.desc()).first()
+
+    timeline_result = db.query(ExtractionResult).filter_by(
+        project_id=pid, result_type="timeline"
     ).order_by(ExtractionResult.version.desc()).first()
 
     checklist_items = db.query(ChecklistItem).filter_by(
-        project_id=uuid.UUID(project_id)
+        project_id=pid
     ).order_by(ChecklistItem.criticality, ChecklistItem.category).all()
 
-    from datetime import datetime
+    # ── Compute checklist statistics ──
+    checklist_stats = {"eliminatoire": 0, "important": 0, "info": 0, "ok": 0}
+    for item in checklist_items:
+        crit = (item.criticality or "").lower()
+        status = (item.status or "").upper()
+        if "liminatoire" in crit:
+            checklist_stats["eliminatoire"] += 1
+        elif "important" in crit:
+            checklist_stats["important"] += 1
+        else:
+            checklist_stats["info"] += 1
+        if status == "OK":
+            checklist_stats["ok"] += 1
+
+    # ── Extract confidence from summary ──
+    confidence = None
+    if summary_result and summary_result.payload:
+        confidence = summary_result.payload.get("confidence_overall") or summary_result.payload.get("confidence")
+
+    # ── Prepare gonogo & timeline payloads ──
+    gonogo = gonogo_result.payload if gonogo_result else None
+    timeline = timeline_result.payload if timeline_result else None
+
+    # Convert dicts to object-like access for Jinja2 dot notation
+    class _DictObj:
+        """Allow dict.key access in Jinja2 templates."""
+        def __init__(self, d):
+            for k, v in (d or {}).items():
+                if isinstance(v, list):
+                    setattr(self, k, [_DictObj(i) if isinstance(i, dict) else i for i in v])
+                elif isinstance(v, dict):
+                    setattr(self, k, _DictObj(v))
+                else:
+                    setattr(self, k, v)
+        def __bool__(self):
+            return True
+        def __getattr__(self, name):
+            return None  # Return None for missing attributes instead of raising
+
+    gonogo_obj = _DictObj(gonogo) if gonogo else None
+    timeline_obj = _DictObj(timeline) if timeline else None
+
+    # ── Compute days remaining until submission deadline ──
+    days_remaining = None
+    deadline_str = None
+    if summary_result and summary_result.payload:
+        po = summary_result.payload.get("project_overview", {})
+        deadline_str = po.get("deadline_submission")
+    if not deadline_str and timeline:
+        deadline_str = timeline.get("submission_deadline")
+    if deadline_str:
+        try:
+            dl = deadline_str
+            if 'T' in str(dl):
+                deadline_dt = datetime.fromisoformat(str(dl).replace('Z', '+00:00')).replace(tzinfo=None)
+            else:
+                deadline_dt = datetime.strptime(str(dl)[:10], '%Y-%m-%d')
+            days_remaining = (deadline_dt - datetime.now()).days
+        except (ValueError, TypeError):
+            days_remaining = None
+
+    # ── Extract scoring simulation (if available) ──
+    scoring_result = db.query(ExtractionResult).filter_by(
+        project_id=pid, result_type="scoring"
+    ).order_by(ExtractionResult.version.desc()).first()
+    scoring_simulation = scoring_result.payload if scoring_result else None
+
+    # ── Extract CCAG derogations from CCAP analysis (if available) ──
+    ccap_result = db.query(ExtractionResult).filter_by(
+        project_id=pid, result_type="ccap"
+    ).order_by(ExtractionResult.version.desc()).first()
+    ccag_derogations = None
+    if ccap_result and ccap_result.payload:
+        ccag_derogations = ccap_result.payload.get("ccag_derogations") or ccap_result.payload.get("derogations")
+
+    # ── Extract RC analysis for fiche signalétique (if available) ──
+    rc_result = db.query(ExtractionResult).filter_by(
+        project_id=pid, result_type="rc"
+    ).order_by(ExtractionResult.version.desc()).first()
+    rc_analysis = rc_result.payload if rc_result else None
+
+    # ── Extract questions for buyer (if available) ──
+    questions_result = db.query(ExtractionResult).filter_by(
+        project_id=pid, result_type="questions"
+    ).order_by(ExtractionResult.version.desc()).first()
+    questions_list = None
+    if questions_result and questions_result.payload:
+        questions_list = questions_result.payload.get("questions") or questions_result.payload.get("priority_questions")
+
+    # ── Build documents inventory ──
+    docs = db.query(AoDocument).filter_by(
+        project_id=pid
+    ).order_by(AoDocument.doc_type, AoDocument.original_name).all()
+    documents_inventory = []
+    for doc in docs:
+        size_kb = doc.file_size_kb or 0
+        size_display = f"{size_kb} Ko" if size_kb < 1024 else f"{size_kb / 1024:.1f} Mo"
+        documents_inventory.append({
+            "name": doc.original_name,
+            "doc_type": doc.doc_type,
+            "pages": doc.page_count or 0,
+            "size_display": size_display,
+            "ocr_quality": doc.ocr_quality_score,
+        })
+
     env = Environment(loader=BaseLoader(), autoescape=True)
+
+    # Custom Jinja2 filter to format ISO dates nicely
+    def format_date_fr(value):
+        """Convert ISO date string to French format: 15/04/2026 à 12h00."""
+        if not value or not isinstance(value, str):
+            return value or ''
+        try:
+            # Handle ISO datetime: 2026-04-15T12:00:00
+            if 'T' in str(value):
+                dt = datetime.fromisoformat(str(value).replace('Z', '+00:00'))
+                return dt.strftime('%d/%m/%Y à %Hh%M')
+            # Handle ISO date: 2026-04-15
+            dt = datetime.strptime(str(value)[:10], '%Y-%m-%d')
+            return dt.strftime('%d/%m/%Y')
+        except (ValueError, TypeError):
+            return str(value)
+
+    env.filters['datefr'] = format_date_fr
+
     template = env.from_string(EXPORT_TEMPLATE)
 
     try:
@@ -177,6 +882,16 @@ def generate_export_pdf(db: Session, project_id: str) -> bytes:
             summary=summary_result.payload if summary_result else None,
             checklist_items=checklist_items,
             criteria=criteria_result.payload if criteria_result else None,
+            gonogo=gonogo_obj,
+            timeline=timeline_obj,
+            checklist_stats=checklist_stats,
+            confidence=confidence,
+            days_remaining=days_remaining,
+            scoring_simulation=_DictObj(scoring_simulation) if scoring_simulation else None,
+            ccag_derogations=[_DictObj(d) for d in ccag_derogations] if ccag_derogations else None,
+            rc_analysis=_DictObj(rc_analysis) if rc_analysis else None,
+            questions_list=[_DictObj(q) if isinstance(q, dict) else q for q in questions_list] if questions_list else None,
+            documents_inventory=[_DictObj(d) for d in documents_inventory] if documents_inventory else None,
             generated_at=datetime.now().strftime("%d/%m/%Y %H:%M"),
         )
     except Exception as exc:
