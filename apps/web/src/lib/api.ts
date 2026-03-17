@@ -57,7 +57,8 @@ api.interceptors.response.use(
           failedQueue.push({ resolve, reject });
         }).then((token) => {
           original!.headers!["Authorization"] = `Bearer ${token}`;
-          return api(original!);
+          // Strip AbortSignal — it may already be aborted (React Query cancels the original)
+          return api({ ...original!, signal: undefined });
         });
       }
 
@@ -75,8 +76,10 @@ api.interceptors.response.use(
           secure: process.env.NODE_ENV === "production",
         });
         original!.headers!["Authorization"] = `Bearer ${data.access_token}`;
+        // Strip AbortSignal — it may already be aborted (React Query cancels the original)
+        const retryConfig = { ...original, signal: undefined };
         processQueue(null, data.access_token);
-        return api(original!);
+        return api(retryConfig);
       } catch (refreshError) {
         processQueue(refreshError, null);
         Cookies.remove("access_token");
@@ -167,17 +170,17 @@ export const analysisApi = {
   ccapRisks: (projectId: string) => api.get(`/projects/${projectId}/ccap-risks`),
   // Deadlines / Alertes dates clés
   deadlines: (projectId: string) => api.get(`/projects/${projectId}/deadlines`),
-  // Sprint V+W — Nouvelles analyses
-  rcAnalysis: (projectId: string) => api.get(`/projects/${projectId}/rc-analysis`),
-  aeAnalysis: (projectId: string) => api.get(`/projects/${projectId}/ae-analysis`),
-  cctpAnalysis: (projectId: string) => api.get(`/projects/${projectId}/cctp-analysis`),
-  dcCheck: (projectId: string) => api.get(`/projects/${projectId}/dc-check`),
-  conflicts: (projectId: string) => api.get(`/projects/${projectId}/conflicts`),
-  questions: (projectId: string) => api.get(`/projects/${projectId}/questions`),
-  scoringSimulation: (projectId: string) => api.get(`/projects/${projectId}/scoring-simulation`),
-  dpgfPricing: (projectId: string) => api.get(`/projects/${projectId}/dpgf-pricing`),
-  cashflowSimulation: (projectId: string) => api.get(`/projects/${projectId}/cashflow-simulation`),
-  subcontracting: (projectId: string) => api.get(`/projects/${projectId}/subcontracting`),
+  // Sprint V+W — Nouvelles analyses (LLM-backed: 120s timeout)
+  rcAnalysis: (projectId: string) => api.get(`/projects/${projectId}/rc-analysis`, { timeout: 120_000 }),
+  aeAnalysis: (projectId: string) => api.get(`/projects/${projectId}/ae-analysis`, { timeout: 120_000 }),
+  cctpAnalysis: (projectId: string) => api.get(`/projects/${projectId}/cctp-analysis`, { timeout: 120_000 }),
+  dcCheck: (projectId: string) => api.get(`/projects/${projectId}/dc-check`, { timeout: 120_000 }),
+  conflicts: (projectId: string) => api.get(`/projects/${projectId}/conflicts`, { timeout: 120_000 }),
+  questions: (projectId: string) => api.get(`/projects/${projectId}/questions`, { timeout: 120_000 }),
+  scoringSimulation: (projectId: string) => api.get(`/projects/${projectId}/scoring-simulation`, { timeout: 120_000 }),
+  dpgfPricing: (projectId: string) => api.get(`/projects/${projectId}/dpgf-pricing`, { timeout: 120_000 }),
+  cashflowSimulation: (projectId: string) => api.get(`/projects/${projectId}/cashflow-simulation`, { timeout: 120_000 }),
+  subcontracting: (projectId: string) => api.get(`/projects/${projectId}/subcontracting`, { timeout: 120_000 }),
 };
 
 // ── Company profile ────────────────────────────────────────────

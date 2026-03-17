@@ -1,6 +1,4 @@
 "use client";
-
-export const dynamic = "force-dynamic";
 import { useCallback, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useDropzone } from "react-dropzone";

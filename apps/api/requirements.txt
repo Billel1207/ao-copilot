@@ -57,6 +57,7 @@ python-dotenv==1.0.1
 httpx==0.28.1
 structlog==24.4.0
 sentry-sdk[fastapi]==2.19.2
+pybreaker>=1.2.0
 
 # Rate limiting
 slowapi==0.1.9

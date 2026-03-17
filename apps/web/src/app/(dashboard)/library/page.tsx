@@ -1,6 +1,4 @@
 "use client";
-
-export const dynamic = "force-dynamic";
 import { useState, useMemo } from "react";
 import {
   BookOpen, Plus, Search, Copy, Check, Pencil, Trash2,

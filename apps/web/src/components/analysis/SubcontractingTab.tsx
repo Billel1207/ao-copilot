@@ -143,6 +143,24 @@ export function SubcontractingTab({ projectId }: { projectId: string }) {
         </div>
       )}
 
+      {/* Legal obligations — matching PDF/DOCX report */}
+      {data.legal_obligations && data.legal_obligations.length > 0 && (
+        <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg">
+          <h3 className="text-sm font-semibold text-slate-800 mb-2 flex items-center gap-1.5">
+            <ShieldAlert className="w-4 h-4 text-slate-600" />
+            Obligations légales
+          </h3>
+          <ul className="space-y-1">
+            {data.legal_obligations.map((o: string, i: number) => (
+              <li key={i} className="text-sm text-slate-700 flex items-start gap-2">
+                <span className="text-slate-400 mt-1">&#8226;</span>
+                {o}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {/* Recommandations */}
       {data.recommandations && data.recommandations.length > 0 && (
         <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">

@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
 import sentry_sdk
@@ -88,6 +89,8 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "Accept", "X-Requested-With", "Cookie"],
 )
+
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 # Routers
 app.include_router(auth_router, prefix="/api/v1/auth", tags=["auth"])

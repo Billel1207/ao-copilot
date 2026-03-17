@@ -24,6 +24,23 @@ class LLMCitation(BaseModel):
     page: int = 0
     quote: str = ""
 
+    @field_validator("page", mode="before")
+    @classmethod
+    def coerce_page(cls, v: Any) -> int:
+        """Coerce LLM string page refs like 'p.1', 'p.1-2', '1–3' to int."""
+        if isinstance(v, int):
+            return v
+        if isinstance(v, float):
+            return int(v)
+        if isinstance(v, str):
+            import re
+            # Strip prefix 'p.' or 'page ' then take the first number
+            cleaned = re.sub(r"^[pP]\.?\s*|^[pP]age\s*", "", v.strip())
+            m = re.search(r"\d+", cleaned)
+            if m:
+                return int(m.group())
+        return 0
+
 class LLMProjectOverview(BaseModel):
     title: str = ""
     buyer: str = ""
@@ -33,6 +50,10 @@ class LLMProjectOverview(BaseModel):
     site_visit_required: bool = False
     market_type: str | None = None
     estimated_budget: str | None = None
+    procedure: str | None = None
+    allotissement: str | None = None
+    duree_marche: str | None = None
+    ccag_reference: str | None = None
 
     @field_validator("deadline_submission")
     @classmethod
@@ -48,14 +69,28 @@ class LLMProjectOverview(BaseModel):
         return v
 
 class LLMKeyPoint(BaseModel):
-    label: str
-    value: str
+    label: str = ""
+    value: str = ""
+    point: str = ""          # Nouveau champ enrichi
+    importance: str = "medium"  # high|medium|low
     citations: list[LLMCitation] = []
+
+    @model_validator(mode="after")
+    def ensure_content(self):
+        """Assure la compatibilité ancien/nouveau format."""
+        # Si 'point' est rempli mais pas 'value', copier
+        if self.point and not self.value:
+            self.value = self.point
+        # Si 'value' est rempli mais pas 'point', copier
+        if self.value and not self.point:
+            self.point = self.value
+        return self
 
 class LLMRisk(BaseModel):
     risk: str
     severity: str = "medium"
     why: str = ""
+    mitigation: str = ""     # Action recommandée pour atténuer
     citations: list[LLMCitation] = []
 
     @field_validator("severity")
@@ -70,6 +105,7 @@ class LLMNextAction(BaseModel):
     action: str
     owner_role: str = ""
     priority: str = "P1"
+    deadline_relative: str = ""
 
     @field_validator("priority")
     @classmethod

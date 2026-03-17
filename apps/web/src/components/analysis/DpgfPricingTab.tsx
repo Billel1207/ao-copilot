@@ -25,15 +25,20 @@ type PricingStatus = "SOUS_EVALUE" | "NORMAL" | "SUR_EVALUE" | "INCONNU";
 
 interface PricingLine {
   designation: string;
-  prix_unitaire: number;
+  prix_unitaire: number | null;
   status: PricingStatus;
-  ratio_vs_moyen: number;
-  message: string;
-  reference_nom: string;
-  reference_prix_bas: number;
-  reference_prix_haut: number;
-  reference_prix_moyen: number;
-  reference_unite: string;
+  ratio_vs_moyen: number | null;
+  // Backend may return either naming convention
+  message?: string;
+  alerte?: string;
+  reference_nom?: string;
+  reference_match?: string;
+  reference_prix_bas?: number | null;
+  reference_prix_haut?: number | null;
+  reference_prix_min?: number | null;
+  reference_prix_max?: number | null;
+  reference_prix_moyen?: number | null;
+  reference_unite?: string | null;
 }
 
 interface DpgfPricingData {
@@ -141,32 +146,53 @@ function AlertCard({ line }: { line: PricingLine }) {
       </div>
 
       <p className="text-xs text-slate-600 leading-relaxed">
-        {line.message}
+        {getMessage(line)}
       </p>
 
       <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-500">
         <span>
-          Prix unitaire : <strong className="text-slate-700">{line.prix_unitaire.toFixed(2)} &euro;</strong>
+          Prix unitaire : <strong className="text-slate-700">{fmtEur(line.prix_unitaire)} &euro;</strong>
         </span>
         <span>
-          Ref. marche : {line.reference_prix_bas.toFixed(2)} &ndash; {line.reference_prix_haut.toFixed(2)} &euro;
+          Ref. marche : {fmtEur(getRefPrixBas(line))} &ndash; {fmtEur(getRefPrixHaut(line))} &euro;
           {line.reference_unite && ` / ${line.reference_unite}`}
         </span>
         <span>
           Ratio : <strong className={cn(
+            line.ratio_vs_moyen == null ? "text-slate-400" :
             line.ratio_vs_moyen < 0.8 ? "text-orange-600" :
             line.ratio_vs_moyen > 1.2 ? "text-red-600" : "text-green-600"
-          )}>{(line.ratio_vs_moyen * 100).toFixed(0)}%</strong>
+          )}>{fmtRatio(line.ratio_vs_moyen)}</strong>
         </span>
       </div>
     </div>
   );
 }
 
+// -- Normalize field names (backend uses reference_prix_min/max, frontend expected _bas/_haut) --
+
+function getRefPrixBas(line: PricingLine): number | null {
+  return line.reference_prix_bas ?? line.reference_prix_min ?? null;
+}
+
+function getRefPrixHaut(line: PricingLine): number | null {
+  return line.reference_prix_haut ?? line.reference_prix_max ?? null;
+}
+
+function getMessage(line: PricingLine): string {
+  return line.message ?? line.alerte ?? "";
+}
+
 // -- Format currency helper --------------------------------------------------
 
-function fmtEur(v: number): string {
+function fmtEur(v: number | null | undefined): string {
+  if (v == null) return "—";
   return v.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function fmtRatio(v: number | null | undefined): string {
+  if (v == null) return "—";
+  return (v * 100).toFixed(0) + "%";
 }
 
 // -- Skeleton ----------------------------------------------------------------
@@ -413,7 +439,7 @@ export function DpgfPricingTab({ projectId }: Props) {
                         {fmtEur(line.prix_unitaire)} &euro;
                       </td>
                       <td className="px-4 py-2.5 text-xs text-slate-500 text-right whitespace-nowrap">
-                        {fmtEur(line.reference_prix_bas)} &ndash; {fmtEur(line.reference_prix_haut)} &euro;
+                        {fmtEur(getRefPrixBas(line))} &ndash; {fmtEur(getRefPrixHaut(line))} &euro;
                         {line.reference_unite && (
                           <span className="text-slate-400 ml-0.5">/ {line.reference_unite}</span>
                         )}
@@ -422,11 +448,12 @@ export function DpgfPricingTab({ projectId }: Props) {
                         <span
                           className={cn(
                             "text-xs font-bold",
+                            line.ratio_vs_moyen == null ? "text-slate-400" :
                             line.ratio_vs_moyen < 0.8 ? "text-orange-600" :
                             line.ratio_vs_moyen > 1.2 ? "text-red-600" : "text-green-600"
                           )}
                         >
-                          {(line.ratio_vs_moyen * 100).toFixed(0)}%
+                          {fmtRatio(line.ratio_vs_moyen)}
                         </span>
                       </td>
                       <td className="px-4 py-2.5 text-center">

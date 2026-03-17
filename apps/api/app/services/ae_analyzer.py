@@ -285,6 +285,7 @@ def analyze_ae(text: str, project_id: str | None = None) -> dict[str, Any]:
         "ccag_derogations": validated_derogations,
         "nb_derogations_defavorables": nb_derogations_defavorables,
         "score_risque_global": score,
+        "score_risque": score,
         "nb_clauses_critiques": nb_critiques,
         "nb_clauses_hautes": nb_hautes,
         "resume": result.get("resume", ""),

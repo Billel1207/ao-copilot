@@ -149,10 +149,10 @@ def generate_questions(
     )
 
     try:
-        result = llm_service.complete_json(
+        result = llm_service.complete_json_with_thinking(
             system_prompt=QUESTIONS_SYSTEM_PROMPT,
             user_prompt=user_prompt,
-            required_keys=["questions"],
+            thinking_budget=6000,
             validator=ValidatedQuestions,
         )
     except ValueError as exc:

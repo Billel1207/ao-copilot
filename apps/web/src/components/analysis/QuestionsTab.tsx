@@ -30,6 +30,7 @@ interface Question {
   priority: Priority;
   related_doc: string;
   related_article: string;
+  justification?: string;
 }
 
 interface QuestionsData {
@@ -189,6 +190,16 @@ function QuestionCard({
         <p className="text-xs text-slate-500 leading-relaxed">
           {question.context}
         </p>
+      )}
+
+      {/* Justification — matching PDF/DOCX report */}
+      {question.justification && (
+        <div className="mt-1 pt-1.5 border-t border-slate-100">
+          <p className="text-xs text-slate-500 leading-relaxed">
+            <span className="font-semibold text-slate-600">Justification :</span>{" "}
+            {question.justification}
+          </p>
+        </div>
       )}
     </div>
   );

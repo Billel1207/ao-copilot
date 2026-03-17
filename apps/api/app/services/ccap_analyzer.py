@@ -116,10 +116,10 @@ def analyze_ccap_risks(text: str, project_id: str | None = None) -> dict[str, An
     logger.info(f"{log_prefix}Analyse CCAP — {len(text)} caractères")
 
     try:
-        result = llm_service.complete_json(
+        result = llm_service.complete_json_with_thinking(
             system_prompt=CCAP_SYSTEM_PROMPT,
             user_prompt=user_prompt,
-            required_keys=["clauses_risquees", "score_risque_global"],
+            thinking_budget=6000,
             validator=ValidatedCcapAnalysis,
         )
     except ValueError as exc:

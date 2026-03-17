@@ -273,10 +273,10 @@ def detect_conflicts(
     )
 
     try:
-        result = llm_service.complete_json(
+        result = llm_service.complete_json_with_thinking(
             system_prompt=CONFLICT_SYSTEM_PROMPT,
             user_prompt=user_prompt,
-            required_keys=["conflicts"],
+            thinking_budget=8000,
             validator=ValidatedConflicts,
         )
     except ValueError as exc:

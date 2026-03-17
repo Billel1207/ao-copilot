@@ -98,7 +98,8 @@ const CLASSEMENT_CONFIG: Record<ClassementProbable, {
 
 // -- Score circle /20 --------------------------------------------------------
 
-function ScoreCircle20({ score, label }: { score: number; label?: string }) {
+function ScoreCircle20({ score: rawScore, label }: { score: number; label?: string }) {
+  const score = Number.isFinite(rawScore) ? rawScore : 0;
   const size = 96;
   const strokeWidth = 8;
   const radius = (size - strokeWidth) / 2;

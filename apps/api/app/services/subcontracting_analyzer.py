@@ -15,8 +15,8 @@ from sqlalchemy import select
 
 from app.models.analysis import ExtractionResult
 from app.models.company_profile import CompanyProfile
-from app.services.llm import complete_json
-from app.services.retriever import get_relevant_chunks
+from app.services.llm import llm_service
+from app.services.retriever import retrieve_relevant_chunks, format_context
 
 logger = structlog.get_logger(__name__)
 
@@ -92,25 +92,24 @@ async def analyze_subcontracting(
         specialties = profile.specialties or []
         certifications = profile.certifications or []
         company_context = (
-            f"Entreprise : {profile.company_name or 'N/A'}\n"
             f"Spécialités : {', '.join(specialties) if specialties else 'Non renseignées'}\n"
             f"Certifications : {', '.join(certifications) if certifications else 'Aucune'}\n"
             f"Effectif : {profile.employee_count or 'N/A'}\n"
-            f"CA annuel : {profile.revenue_annual_eur or 'N/A'} EUR"
+            f"CA annuel : {profile.revenue_eur or 'N/A'} EUR"
         )
         if hasattr(profile, 'partenaires_specialites') and profile.partenaires_specialites:
             company_context += f"\nPartenaires sous-traitants : {', '.join(profile.partenaires_specialites)}"
 
     # Récupérer les chunks pertinents
-    rc_chunks = get_relevant_chunks(
-        db, project_id, "sous-traitance groupement cotraitance", top_k=5, doc_types=["RC"]
+    rc_chunks = retrieve_relevant_chunks(
+        db, project_id, "sous-traitance groupement cotraitance", top_k=5
     )
-    cctp_chunks = get_relevant_chunks(
-        db, project_id, "lots compétences techniques spécialités travaux", top_k=5, doc_types=["CCTP"]
+    cctp_chunks = retrieve_relevant_chunks(
+        db, project_id, "lots compétences techniques spécialités travaux", top_k=5
     )
 
-    rc_context = "\n\n".join([c.content for c in rc_chunks]) if rc_chunks else "Aucune information RC disponible."
-    cctp_context = "\n\n".join([c.content for c in cctp_chunks]) if cctp_chunks else "Aucune information CCTP disponible."
+    rc_context = format_context(rc_chunks) if rc_chunks else "Aucune information RC disponible."
+    cctp_context = format_context(cctp_chunks) if cctp_chunks else "Aucune information CCTP disponible."
 
     prompt = SUBCONTRACTING_PROMPT.format(
         company_context=company_context,
@@ -118,9 +117,9 @@ async def analyze_subcontracting(
         cctp_context=cctp_context[:4000],
     )
 
-    result = complete_json(
-        system=prompt,
-        user="Analyse la stratégie de sous-traitance optimale pour ce marché.",
+    result = llm_service.complete_json(
+        system_prompt=prompt,
+        user_prompt="Analyse la stratégie de sous-traitance optimale pour ce marché.",
     )
 
     if not result:

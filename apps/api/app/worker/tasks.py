@@ -138,9 +138,10 @@ def _check_and_trigger_analysis(db, project_id: str):
         analyze_project.delay(project_id)
 
 
-@celery_app.task(bind=True, name="analyze_project", max_retries=1, time_limit=600, soft_time_limit=570)
+@celery_app.task(bind=True, name="analyze_project", max_retries=1, time_limit=1800, soft_time_limit=1740)
 def analyze_project(self, project_id: str):
-    """Pipeline IA complet : RAG + génération résumé/checklist/critères."""
+    """Pipeline IA complet 15 étapes : résumé, checklist, critères, Go/No-Go,
+    timeline, CCAP, RC, AE, CCTP, DC, conflits, questions, scoring, cashflow."""
     from app.models.project import AoProject
     from app.services.analyzer import run_full_analysis
 
@@ -153,7 +154,7 @@ def analyze_project(self, project_id: str):
         project.status = "analyzing"
         db.commit()
 
-        _set_progress(self.request.id, 10, "Analyse en cours — résumé")
+        _set_progress(self.request.id, 5, "Analyse complète en cours — 15 étapes")
         results = run_full_analysis(db, project_id)
 
         project.status = "ready"
