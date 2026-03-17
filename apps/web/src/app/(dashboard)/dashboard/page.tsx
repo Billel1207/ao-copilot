@@ -1,6 +1,4 @@
 "use client";
-
-export const dynamic = "force-dynamic";
 import Link from "next/link";
 import {
   Plus, FolderOpen, Clock, CheckCircle, AlertCircle,
@@ -154,8 +152,8 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* ── Getting started guide (shown when projects exist but none analyzed) ── */}
-      {!isLoading && projects.length > 0 && readyCount === 0 && (
+      {/* ── Getting started guide (shown when no project is analyzed yet) ── */}
+      {!isLoading && readyCount === 0 && (
         <div className="rounded-xl border border-primary-200 bg-gradient-to-r from-primary-50 to-blue-50 p-5 animate-fade-in">
           <h3 className="font-semibold text-primary-800 text-sm mb-3">Premiers pas avec AO Copilot</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">

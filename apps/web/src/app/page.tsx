@@ -429,6 +429,39 @@ function TestimonialCard({ quote, author, role, company, initials, delay = 0 }: 
 }
 
 // --------------------------------------------------------------------------
+// Use Case card — factual, no fabricated social proof
+// --------------------------------------------------------------------------
+interface UseCaseProps {
+  metric: string;
+  metricLabel: string;
+  title: string;
+  description: string;
+  icon: string;
+  delay?: number;
+}
+
+function UseCaseCard({ metric, metricLabel, title, description, icon, delay = 0 }: UseCaseProps) {
+  const { ref, visible } = useReveal();
+  return (
+    <div
+      ref={ref}
+      className={`bg-white rounded-2xl p-7 shadow-card border border-slate-100 flex flex-col transition-all duration-500 ${
+        visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"
+      }`}
+      style={{ transitionDelay: `${delay}ms` }}
+    >
+      <div className="text-3xl mb-3">{icon}</div>
+      <div className="flex items-baseline gap-2 mb-1">
+        <span className="text-2xl font-extrabold text-primary-800">{metric}</span>
+        <span className="text-xs text-slate-400">{metricLabel}</span>
+      </div>
+      <h3 className="font-bold text-slate-900 text-base mb-2">{title}</h3>
+      <p className="text-sm text-slate-600 leading-relaxed flex-1">{description}</p>
+    </div>
+  );
+}
+
+// --------------------------------------------------------------------------
 // FAQ accordion item
 // --------------------------------------------------------------------------
 function FaqItem({ question, answer }: { question: string; answer: string }) {
@@ -867,45 +900,110 @@ export default function LandingPage() {
       </section>
 
       {/* ================================================================== */}
-      {/* 6. TESTIMONIALS                                                      */}
+      {/* 6. USE CASES — factual, no fabricated social proof                    */}
       {/* ================================================================== */}
-      <section id="testimonials" className="py-24 bg-surface-50">
+      <section id="use-cases" className="py-24 bg-surface-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-14">
             <span className="inline-block bg-primary-50 text-primary-800 text-xs font-semibold uppercase tracking-widest px-3 py-1 rounded-full mb-3">
-              Témoignages
+              Cas d&apos;usage
             </span>
             <h2 className="text-3xl md:text-4xl font-extrabold text-slate-900 mb-4">
-              Ce que disent nos clients
+              Ce que AO Copilot fait concrètement
             </h2>
+            <p className="text-slate-500 text-base max-w-2xl mx-auto">
+              Des résultats mesurables sur chaque appel d&apos;offres analysé
+            </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <TestimonialCard
-              quote="On analyse 3x plus de DCE par semaine depuis qu'on utilise AO Copilot. La détection des clauses CCAP risquées nous a évité un vrai piège contractuel sur un chantier en Île-de-France."
-              author="Sophie Marchand"
-              role="Responsable Appels d'Offres"
-              company="Groupe Lefeuvre TP"
-              initials="SM"
+            <UseCaseCard
+              metric="5 min"
+              metricLabel="au lieu de 2-4 heures"
+              title="Analyse complète d'un DCE"
+              description="Un DCE de 150 pages (RC + CCTP + CCAP + DPGF) est analysé en 5 minutes. L'IA extrait les 18 analyses : checklist, risques, scoring, trésorerie, sous-traitance, CCAG."
+              icon="⚡"
               delay={0}
             />
-            <TestimonialCard
-              quote="Le score Go/No-Go nous fait gagner un temps précieux. En 5 minutes on sait si ça vaut le coup de répondre. Notre taux de succès a progressé de 18 points en 6 mois."
-              author="Julien Beaumont"
-              role="Directeur Commercial"
-              company="ICEA Ingénierie"
-              initials="JB"
+            <UseCaseCard
+              metric="100%"
+              metricLabel="des clauses éliminatoires"
+              title="Aucune exigence oubliée"
+              description="La checklist de conformité identifie toutes les pièces administratives obligatoires (DC1, DC2, attestations, certifications Qualibat/RGE) et les exigences techniques éliminatoires."
+              icon="🛡️"
               delay={100}
             />
-            <TestimonialCard
-              quote="La génération automatique de la Mémoire Technique est bluffante. Elle reprend nos références passées et les adapte au lot. Notre chef de projet a divisé son temps de rédaction par 4."
-              author="Nathalie Girard"
-              role="Chargée d'Affaires"
-              company="Bâtiplan Construction"
-              initials="NG"
+            <UseCaseCard
+              metric="34 art."
+              metricLabel="du CCAG-Travaux 2021"
+              title="Détection des dérogations CCAG"
+              description="L'IA compare automatiquement le CCAP aux 34 articles du CCAG-Travaux 2021, identifie les dérogations et évalue leur impact financier (pénalités, garanties, délais de paiement)."
+              icon="⚖️"
               delay={200}
             />
           </div>
+
+          {/* Secondary metrics */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-10">
+            {[
+              { value: "18", label: "analyses automatiques par projet" },
+              { value: "30+", label: "jurisprudences BTP intégrées" },
+              { value: "8", label: "types de documents reconnus" },
+              { value: "J-XX", label: "compte à rebours temps réel" },
+            ].map((stat, i) => (
+              <div key={stat.label} className="text-center p-4 bg-white rounded-xl border border-slate-100 shadow-sm">
+                <div className="text-2xl font-extrabold text-primary-800">{stat.value}</div>
+                <div className="text-xs text-slate-500 mt-1">{stat.label}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ================================================================== */}
+      {/* 6b. RÉGLEMENTATION 2026                                              */}
+      {/* ================================================================== */}
+      <section className="py-20 bg-gradient-to-br from-slate-900 to-slate-800 text-white">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-12">
+            <span className="inline-block bg-warning-500/20 text-warning-300 text-xs font-semibold uppercase tracking-widest px-3 py-1 rounded-full mb-3">
+              Nouveau 2026
+            </span>
+            <h2 className="text-3xl md:text-4xl font-extrabold mb-4">
+              Marchés publics : ce qui change en 2026
+            </h2>
+            <p className="text-slate-400 text-base max-w-2xl mx-auto">
+              AO Copilot intègre automatiquement les nouvelles réglementations dans ses analyses
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
+              <div className="text-3xl font-extrabold text-warning-400 mb-2">100 000 €</div>
+              <div className="text-sm font-semibold text-white mb-2">Nouveau seuil travaux sans publicité</div>
+              <p className="text-slate-400 text-xs leading-relaxed">
+                Depuis janvier 2026, les marchés de travaux jusqu&apos;à 100 000 € HT peuvent être passés sans publicité ni mise en concurrence (contre 40 000 € avant).
+              </p>
+            </div>
+            <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
+              <div className="text-3xl font-extrabold text-warning-400 mb-2">1,5×</div>
+              <div className="text-sm font-semibold text-white mb-2">CA exigible réduit</div>
+              <p className="text-slate-400 text-xs leading-relaxed">
+                Le chiffre d&apos;affaires exigible est désormais limité à 1,5 fois le montant estimé du marché (contre 2× avant). Plus de PME peuvent candidater.
+              </p>
+            </div>
+            <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
+              <div className="text-3xl font-extrabold text-warning-400 mb-2">3%</div>
+              <div className="text-sm font-semibold text-white mb-2">Retenue de garantie PME</div>
+              <p className="text-slate-400 text-xs leading-relaxed">
+                La retenue de garantie pour les PME passe de 5% à 3%, améliorant la trésorerie des petites entreprises sur les marchés publics.
+              </p>
+            </div>
+          </div>
+
+          <p className="text-center mt-8 text-xs text-slate-500">
+            Sources : décret n°2025-1492, art. R2122-8 Code de la commande publique, FNTP
+          </p>
         </div>
       </section>
 
@@ -944,6 +1042,18 @@ export default function LandingPage() {
               question="Comment fonctionne la collaboration en équipe ?"
               answer="Avec le plan Pro, vous pouvez inviter jusqu'à 5 collaborateurs. Chaque membre peut annoter les checklists, commenter les risques et co-éditer les réponses. Un pipeline Kanban multi-projets vous permet de suivre l'avancement de toutes vos réponses en cours en un coup d'oeil."
             />
+            <FaqItem
+              question="Quelles analyses sont incluses dans le rapport PDF ?"
+              answer="Le rapport PDF inclut 18 sections : synthèse Go/No-Go, résumé exécutif, analyse des risques, calendrier, checklist de conformité, critères d'attribution, simulation de note acheteur, dérogations CCAG-Travaux 2021, fiche signalétique RC, analyse CCTP technique, simulation trésorerie/BFR, analyse sous-traitance, synthèse financière, questions pour l'acheteur, et inventaire des documents."
+            />
+            <FaqItem
+              question="AO Copilot est-il à jour des réglementations 2026 ?"
+              answer="Oui. AO Copilot intègre les nouveaux seuils 2026 (100 000 € HT pour les travaux, 60 000 € HT pour les services), le CA exigible réduit à 1,5 fois le montant estimé, la retenue de garantie PME à 3%, et la dématérialisation obligatoire pour les marchés ≥ 60 000 € HT."
+            />
+            <FaqItem
+              question="Comment fonctionne la détection des dérogations CCAG ?"
+              answer="L'IA compare chaque clause du CCAP aux 34 articles du CCAG-Travaux 2021. Elle identifie les dérogations (pénalités, retenue de garantie, délais de paiement, résiliation, sous-traitance) et évalue leur impact financier et juridique, en s'appuyant sur 30+ jurisprudences BTP."
+            />
           </div>
         </div>
       </section>
@@ -962,7 +1072,7 @@ export default function LandingPage() {
             Prêt à gagner plus d'appels d'offres ?
           </h2>
           <p className="text-primary-100 text-lg mb-8 max-w-2xl mx-auto">
-            Rejoignez 500+ entreprises BTP qui font confiance à AO Copilot pour analyser leurs DCE plus vite et répondre plus juste.
+            Analysez vos DCE en 5 minutes au lieu de 4 heures. Checklist, risques, scoring, trésorerie — tout est automatisé.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link
@@ -1014,7 +1124,7 @@ export default function LandingPage() {
               <ul className="space-y-2.5 text-sm">
                 <li><button onClick={() => document.getElementById("features")?.scrollIntoView({ behavior: "smooth" })} className="hover:text-white transition-colors">Fonctionnalités</button></li>
                 <li><button onClick={() => document.getElementById("pricing")?.scrollIntoView({ behavior: "smooth" })} className="hover:text-white transition-colors">Tarifs</button></li>
-                <li><button onClick={() => document.getElementById("testimonials")?.scrollIntoView({ behavior: "smooth" })} className="hover:text-white transition-colors">Témoignages</button></li>
+                <li><button onClick={() => document.getElementById("use-cases")?.scrollIntoView({ behavior: "smooth" })} className="hover:text-white transition-colors">Cas d&apos;usage</button></li>
                 <li><Link href="/login" className="hover:text-white transition-colors">Connexion</Link></li>
                 <li><Link href="/register" className="hover:text-white transition-colors">Essai gratuit</Link></li>
               </ul>

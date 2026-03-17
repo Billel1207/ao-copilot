@@ -152,6 +152,15 @@ EXPORT_TEMPLATE = """
     {% if questions_list %}
     <div class="toc-item"><strong>8.</strong> Questions prioritaires pour l'acheteur — {{ questions_list|length }} questions a poser</div>
     {% endif %}
+    {% if cctp_analysis %}
+    <div class="toc-item"><strong>9.</strong> Analyse technique CCTP — Exigences techniques, normes DTU, contradictions</div>
+    {% endif %}
+    {% if cashflow_data %}
+    <div class="toc-item"><strong>10.</strong> Simulation tresorerie et BFR — Impact financier previsionnel</div>
+    {% endif %}
+    {% if subcontracting %}
+    <div class="toc-item"><strong>11.</strong> Analyse sous-traitance — Obligations, risques, conformite loi 1975</div>
+    {% endif %}
     {% if documents_inventory %}
     <div class="toc-item"><strong>A1.</strong> Inventaire des documents — {{ documents_inventory|length }} pieces DCE analysees</div>
     {% endif %}
@@ -598,6 +607,158 @@ EXPORT_TEMPLATE = """
 </div>
 {% endif %}
 
+<!-- ═══════════ ANALYSE CCTP ═══════════ -->
+{% if cctp_analysis %}
+<div class="page page-break">
+  <h1>9. Analyse technique CCTP</h1>
+  <p style="color: #64748B; font-size: 9px;">Synthèse des exigences techniques extraites du Cahier des Clauses Techniques Particulières</p>
+
+  {% if cctp_analysis.technical_summary %}
+  <div class="summary-box">
+    <strong>Synthèse technique :</strong> {{ cctp_analysis.technical_summary }}
+  </div>
+  {% endif %}
+
+  {% if cctp_analysis.categories %}
+  {% for cat in cctp_analysis.categories %}
+  <h3>{{ cat.name or 'Catégorie' }} {% if cat.risk_level %}<span class="badge {% if cat.risk_level == 'high' %}badge-red{% elif cat.risk_level == 'medium' %}badge-yellow{% else %}badge-green{% endif %}">{{ cat.risk_level|upper }}</span>{% endif %}</h3>
+  {% if cat.items %}
+  <table>
+    <tr><th style="width:40%">Exigence</th><th style="width:35%">Détail</th><th style="width:15%">Norme/DTU</th><th style="width:10%">Risque</th></tr>
+    {% for item in cat.items[:8] %}
+    <tr>
+      <td><strong>{{ item.requirement or item.label or '' }}</strong></td>
+      <td style="font-size: 8px;">{{ item.detail or item.value or '' }}</td>
+      <td style="font-size: 8px;">{{ item.norm or item.standard or '' }}</td>
+      <td><span class="badge {% if item.risk == 'high' %}badge-red{% elif item.risk == 'medium' %}badge-yellow{% else %}badge-gray{% endif %}">{{ item.risk|upper if item.risk else 'INFO' }}</span></td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% endif %}
+  {% endfor %}
+  {% endif %}
+
+  {% if cctp_analysis.contradictions %}
+  <h3 style="color: #DC2626;">Contradictions détectées dans le CCTP</h3>
+  <div class="warning-box">
+    <strong>Attention :</strong> {{ cctp_analysis.contradictions|length }} contradiction{{ 's' if cctp_analysis.contradictions|length > 1 else '' }}
+    interne{{ 's' if cctp_analysis.contradictions|length > 1 else '' }} détectée{{ 's' if cctp_analysis.contradictions|length > 1 else '' }} dans le CCTP.
+    Posez la question à l'acheteur avant la date limite.
+  </div>
+  <table>
+    <tr><th style="width:50%">Contradiction</th><th style="width:30%">Références</th><th style="width:20%">Recommandation</th></tr>
+    {% for c in cctp_analysis.contradictions[:5] %}
+    <tr class="risk-high">
+      <td>{{ c.description or c.issue or '' }}</td>
+      <td style="font-size: 8px;">{{ c.references or c.source or '' }}</td>
+      <td style="font-size: 8px;">{{ c.recommendation or 'Demander clarification' }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% endif %}
+
+  {% if cctp_analysis.environmental_requirements %}
+  <h3>Exigences environnementales</h3>
+  <div class="info-box">
+    {% for req in cctp_analysis.environmental_requirements[:5] %}
+    <div style="margin: 3px 0; font-size: 9px;">• {{ req }}</div>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+
+<!-- ═══════════ SIMULATION TRÉSORERIE / BFR ═══════════ -->
+{% if cashflow_data %}
+<div class="page page-break">
+  <h1>10. Simulation trésorerie et BFR</h1>
+  <p style="color: #64748B; font-size: 9px;">Impact prévisionnel sur la trésorerie de l'entreprise — aide à la décision financière</p>
+
+  {% if cashflow_data.bfr_peak %}
+  <div class="financial-box">
+    <strong>BFR maximal estimé :</strong> {{ "{:,.0f}".format(cashflow_data.bfr_peak).replace(",", " ") }} €
+    {% if cashflow_data.bfr_month %} — atteint au mois {{ cashflow_data.bfr_month }}{% endif %}<br>
+    {% if cashflow_data.margin_estimate %}
+    <strong>Marge estimée :</strong> {{ "%.1f"|format(cashflow_data.margin_estimate) }}%
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% if cashflow_data.monthly_cashflow %}
+  <h3>Trésorerie mensuelle prévisionnelle</h3>
+  <table>
+    <tr><th>Mois</th><th>Dépenses</th><th>Encaissements</th><th>Solde cumulé</th><th>BFR</th></tr>
+    {% for m in cashflow_data.monthly_cashflow[:12] %}
+    <tr>
+      <td>M{{ m.month }}</td>
+      <td style="color: #DC2626;">-{{ "{:,.0f}".format(m.expenses or 0).replace(",", " ") }} €</td>
+      <td style="color: #16A34A;">+{{ "{:,.0f}".format(m.income or 0).replace(",", " ") }} €</td>
+      <td><strong>{{ "{:,.0f}".format(m.cumulative or 0).replace(",", " ") }} €</strong></td>
+      <td><span class="badge {% if (m.bfr or 0) > 0 %}badge-red{% else %}badge-green{% endif %}">{{ "{:,.0f}".format(m.bfr or 0).replace(",", " ") }} €</span></td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% endif %}
+
+  {% if cashflow_data.warnings %}
+  <h3>Alertes trésorerie</h3>
+  {% for w in cashflow_data.warnings[:5] %}
+  <div class="warning-box">{{ w }}</div>
+  {% endfor %}
+  {% endif %}
+
+  <div class="info-box">
+    <strong>Hypothèses :</strong> Délai de paiement acheteur 30j, avance forfaitaire {{ cashflow_data.advance_percent or 5 }}%,
+    retenue de garantie {{ cashflow_data.retention_percent or 5 }}%. Ajustez selon les termes du CCAP.
+  </div>
+</div>
+{% endif %}
+
+<!-- ═══════════ ANALYSE SOUS-TRAITANCE ═══════════ -->
+{% if subcontracting %}
+<div class="page page-break">
+  <h1>11. Analyse sous-traitance</h1>
+  <p style="color: #64748B; font-size: 9px;">Obligations et risques liés à la sous-traitance — conformité loi du 31/12/1975</p>
+
+  {% if subcontracting.summary %}
+  <div class="summary-box">{{ subcontracting.summary }}</div>
+  {% endif %}
+
+  {% if subcontracting.conditions %}
+  <h3>Conditions contractuelles</h3>
+  <table>
+    <tr><th style="width:40%">Condition</th><th style="width:50%">Détail</th><th style="width:10%">Risque</th></tr>
+    {% for c in subcontracting.conditions %}
+    <tr>
+      <td><strong>{{ c.label or c.condition or '' }}</strong></td>
+      <td style="font-size: 8px;">{{ c.detail or c.value or '' }}</td>
+      <td><span class="badge {% if c.risk == 'high' %}badge-red{% elif c.risk == 'medium' %}badge-yellow{% else %}badge-green{% endif %}">{{ c.risk|upper if c.risk else 'INFO' }}</span></td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% endif %}
+
+  {% if subcontracting.risks %}
+  <h3>Risques identifiés</h3>
+  {% for r in subcontracting.risks[:5] %}
+  <div class="warning-box">
+    <strong>{{ r.risk or r.title or '' }} :</strong> {{ r.detail or r.description or '' }}
+    {% if r.mitigation %}<br><em style="color: #1E40AF;">Mitigation : {{ r.mitigation }}</em>{% endif %}
+  </div>
+  {% endfor %}
+  {% endif %}
+
+  {% if subcontracting.legal_obligations %}
+  <h3>Obligations légales</h3>
+  <div class="info-box">
+    {% for o in subcontracting.legal_obligations[:6] %}
+    <div style="margin: 3px 0; font-size: 9px;">• {{ o }}</div>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+
 <!-- ═══════════ QUESTIONS POUR L'ACHETEUR ═══════════ -->
 {% if questions_list %}
 <div class="page page-break">
@@ -838,6 +999,24 @@ def generate_export_pdf(db: Session, project_id: str) -> bytes:
     if questions_result and questions_result.payload:
         questions_list = questions_result.payload.get("questions") or questions_result.payload.get("priority_questions")
 
+    # ── Extract CCTP analysis (if available) ──
+    cctp_result = db.query(ExtractionResult).filter_by(
+        project_id=pid, result_type="cctp"
+    ).order_by(ExtractionResult.version.desc()).first()
+    cctp_analysis = cctp_result.payload if cctp_result else None
+
+    # ── Extract Cashflow / BFR simulation (if available) ──
+    cashflow_result = db.query(ExtractionResult).filter_by(
+        project_id=pid, result_type="cashflow"
+    ).order_by(ExtractionResult.version.desc()).first()
+    cashflow_data = cashflow_result.payload if cashflow_result else None
+
+    # ── Extract Subcontracting analysis (if available) ──
+    subcontracting_result = db.query(ExtractionResult).filter_by(
+        project_id=pid, result_type="subcontracting"
+    ).order_by(ExtractionResult.version.desc()).first()
+    subcontracting = subcontracting_result.payload if subcontracting_result else None
+
     # ── Build documents inventory ──
     docs = db.query(AoDocument).filter_by(
         project_id=pid
@@ -892,6 +1071,9 @@ def generate_export_pdf(db: Session, project_id: str) -> bytes:
             rc_analysis=_DictObj(rc_analysis) if rc_analysis else None,
             questions_list=[_DictObj(q) if isinstance(q, dict) else q for q in questions_list] if questions_list else None,
             documents_inventory=[_DictObj(d) for d in documents_inventory] if documents_inventory else None,
+            cctp_analysis=_DictObj(cctp_analysis) if cctp_analysis else None,
+            cashflow_data=_DictObj(cashflow_data) if cashflow_data else None,
+            subcontracting=_DictObj(subcontracting) if subcontracting else None,
             generated_at=datetime.now().strftime("%d/%m/%Y %H:%M"),
         )
     except Exception as exc:

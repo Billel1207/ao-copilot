@@ -1,11 +1,10 @@
 "use client";
-
-export const dynamic = "force-dynamic";
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import {
   Plus, Search, FolderOpen, Clock, CheckCircle2,
-  Loader2, AlertCircle, ChevronRight, FileText, Calendar
+  Loader2, AlertCircle, ChevronRight, FileText, Calendar,
+  ArrowUpDown
 } from "lucide-react";
 import { useProjects } from "@/hooks/useProjects";
 import { formatDate, cn } from "@/lib/utils";
@@ -99,10 +98,20 @@ function ProjectCard({ project }: { project: Project }) {
 
 // ── Main Page ─────────────────────────────────────────────────────────────
 
+type SortKey = "deadline" | "title" | "status" | "";
+
+const SORT_OPTIONS: { value: SortKey; label: string }[] = [
+  { value: "",         label: "Par défaut" },
+  { value: "deadline", label: "Date limite ↑" },
+  { value: "title",    label: "Nom A→Z" },
+  { value: "status",   label: "Statut" },
+];
+
 export default function ProjectsPage() {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [sortBy, setSortBy] = useState<SortKey>("");
 
   // Debounce 300ms — envoie la recherche au serveur seulement après pause
   useEffect(() => {
@@ -118,7 +127,19 @@ export default function ProjectsPage() {
   });
 
   const projects: Project[] = data?.items ?? [];
-  const filtered = projects;
+
+  // Sort projects client-side based on selected sort key
+  const STATUS_ORDER: Record<string, number> = { analyzing: 0, draft: 1, processing: 2, ready: 3, error: 4, archived: 5 };
+  const filtered = [...projects].sort((a, b) => {
+    if (sortBy === "deadline") {
+      const da = a.submission_deadline ? new Date(a.submission_deadline).getTime() : Infinity;
+      const db = b.submission_deadline ? new Date(b.submission_deadline).getTime() : Infinity;
+      return da - db;
+    }
+    if (sortBy === "title") return (a.title || "").localeCompare(b.title || "", "fr");
+    if (sortBy === "status") return (STATUS_ORDER[a.status] ?? 9) - (STATUS_ORDER[b.status] ?? 9);
+    return 0;
+  });
 
   return (
     <div className="p-6 md:p-8 animate-fade-in">
@@ -165,6 +186,20 @@ export default function ProjectsPage() {
               {f.label}
             </button>
           ))}
+        </div>
+
+        {/* Tri */}
+        <div className="flex items-center gap-1.5">
+          <ArrowUpDown className="w-3.5 h-3.5 text-slate-400" />
+          <select
+            value={sortBy}
+            onChange={e => setSortBy(e.target.value as SortKey)}
+            className="text-xs border border-slate-200 rounded-xl px-3 py-2 bg-white text-slate-600 focus:ring-1 focus:ring-primary-300 focus:border-primary-300 outline-none"
+          >
+            {SORT_OPTIONS.map(o => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
         </div>
       </div>
 
