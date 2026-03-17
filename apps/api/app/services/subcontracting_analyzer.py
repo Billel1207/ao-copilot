@@ -73,7 +73,7 @@ Règles :
 """
 
 
-async def analyze_subcontracting(
+def analyze_subcontracting(
     project_id: str,
     db: Session,
 ) -> dict:

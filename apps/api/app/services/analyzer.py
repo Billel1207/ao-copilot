@@ -578,8 +578,7 @@ def run_full_analysis(db: Session, project_id: str) -> dict:
     logger.info(f"[{project_id}] Batch 3 — sous-traitance")
     try:
         from app.services.subcontracting_analyzer import analyze_subcontracting
-        import asyncio
-        subcontracting_payload = asyncio.run(analyze_subcontracting(project_id, db))
+        subcontracting_payload = analyze_subcontracting(project_id, db)
         if subcontracting_payload and not subcontracting_payload.get("error"):
             _save_result(db, project_id, "subcontracting", subcontracting_payload,
                          confidence=subcontracting_payload.get("confidence_overall"))
@@ -590,6 +589,37 @@ def run_full_analysis(db: Session, project_id: str) -> dict:
     except Exception as exc:
         _report_to_sentry(exc, "subcontracting")
         logger.warning(f"[{project_id}] Erreur analyse sous-traitance (non bloquant): {exc}")
+
+    # ── Post-pipeline: self-verification ────────────────────────────────
+    try:
+        from app.services.verification import verify_cross_analysis_consistency
+        verification = verify_cross_analysis_consistency(project_id, results)
+        _save_result(db, project_id, "verification", verification)
+        results["verification"] = verification
+        if verification["status"] != "verified":
+            logger.warning(
+                f"[{project_id}] Vérification croisée : {verification['status']} "
+                f"({len(verification['issues'])} problème(s), score={verification['score']})"
+            )
+        else:
+            logger.info(f"[{project_id}] Vérification croisée : OK (score={verification['score']})")
+    except Exception as exc:
+        _report_to_sentry(exc, "verification")
+        logger.warning(f"[{project_id}] Erreur vérification (non bloquant): {exc}")
+
+    # ── Post-pipeline: persist LLM usage/cost ───────────────────────────
+    try:
+        usage_summary = llm_service.get_usage_summary()
+        if usage_summary.get("steps", 0) > 0:
+            _save_result(db, project_id, "llm_usage", usage_summary)
+            logger.info(
+                f"[{project_id}] Coût LLM estimé : {usage_summary['estimated_cost_eur']}€ "
+                f"({usage_summary['total_input']} tokens input, "
+                f"{usage_summary['total_cached']} cached, "
+                f"{usage_summary['steps']} étapes)"
+            )
+    except Exception as exc:
+        logger.warning(f"[{project_id}] Erreur persist usage LLM (non bloquant): {exc}")
 
     db.commit()
     nb_analyses = sum(1 for k in results if k not in ("detected_language",))
