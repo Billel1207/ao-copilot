@@ -121,7 +121,7 @@ function StatCounter({
         {icon}
         {label}
       </span>
-      <span className="text-sm font-bold text-slate-700">{count}</span>
+      <span className="text-sm font-bold text-slate-700 dark:text-slate-300">{count}</span>
     </div>
   );
 }
@@ -136,7 +136,7 @@ function AlertCard({ line }: { line: PricingLine }) {
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-2 min-w-0">
           {cfg.icon}
-          <p className="text-sm font-semibold text-slate-800 leading-snug truncate">
+          <p className="text-sm font-semibold text-slate-800 dark:text-slate-100 leading-snug truncate">
             {line.designation}
           </p>
         </div>
@@ -145,13 +145,13 @@ function AlertCard({ line }: { line: PricingLine }) {
         </div>
       </div>
 
-      <p className="text-xs text-slate-600 leading-relaxed">
+      <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
         {getMessage(line)}
       </p>
 
-      <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-500">
+      <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-500 dark:text-slate-400">
         <span>
-          Prix unitaire : <strong className="text-slate-700">{fmtEur(line.prix_unitaire)} &euro;</strong>
+          Prix unitaire : <strong className="text-slate-700 dark:text-slate-300">{fmtEur(line.prix_unitaire)} &euro;</strong>
         </span>
         <span>
           Ref. marche : {fmtEur(getRefPrixBas(line))} &ndash; {fmtEur(getRefPrixHaut(line))} &euro;
@@ -244,10 +244,10 @@ export function DpgfPricingTab({ projectId }: Props) {
     return (
       <div className="card p-8 flex flex-col items-center gap-3 text-center animate-fade-in">
         <AlertTriangle className="w-10 h-10 text-amber-400" />
-        <p className="text-slate-600 font-medium">
+        <p className="text-slate-600 dark:text-slate-400 font-medium">
           Impossible de charger l&apos;analyse tarifaire DPGF.
         </p>
-        <p className="text-slate-400 text-sm">
+        <p className="text-slate-400 dark:text-slate-500 text-sm">
           Vérifiez que l&apos;analyse du projet a bien été lancée.
         </p>
       </div>
@@ -258,7 +258,7 @@ export function DpgfPricingTab({ projectId }: Props) {
     return (
       <div className="card p-8 flex flex-col items-center gap-3 text-center animate-fade-in">
         <FileX className="w-10 h-10 text-slate-300" />
-        <p className="text-slate-500">Aucune donnée disponible.</p>
+        <p className="text-slate-500 dark:text-slate-400">Aucune donnée disponible.</p>
       </div>
     );
   }
@@ -269,14 +269,14 @@ export function DpgfPricingTab({ projectId }: Props) {
   if ((!pricing.pricing_analysis || pricing.pricing_analysis.length === 0) && pricing.message) {
     return (
       <div className="card p-10 flex flex-col items-center gap-4 text-center animate-fade-in">
-        <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center">
-          <FileX className="w-7 h-7 text-slate-400" />
+        <div className="w-14 h-14 rounded-2xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center">
+          <FileX className="w-7 h-7 text-slate-400 dark:text-slate-500" />
         </div>
         <div className="space-y-1">
-          <p className="font-semibold text-slate-700">
+          <p className="font-semibold text-slate-700 dark:text-slate-300">
             Aucun document DPGF disponible
           </p>
-          <p className="text-slate-400 text-sm max-w-sm">
+          <p className="text-slate-400 dark:text-slate-500 text-sm max-w-sm">
             {pricing.message}
           </p>
         </div>
@@ -288,14 +288,14 @@ export function DpgfPricingTab({ projectId }: Props) {
   if (!pricing.pricing_analysis || pricing.pricing_analysis.length === 0) {
     return (
       <div className="card p-10 flex flex-col items-center gap-4 text-center animate-fade-in">
-        <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center">
-          <BarChart3 className="w-7 h-7 text-slate-400" />
+        <div className="w-14 h-14 rounded-2xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center">
+          <BarChart3 className="w-7 h-7 text-slate-400 dark:text-slate-500" />
         </div>
         <div className="space-y-1">
-          <p className="font-semibold text-slate-700">
+          <p className="font-semibold text-slate-700 dark:text-slate-300">
             Aucune analyse tarifaire
           </p>
-          <p className="text-slate-400 text-sm max-w-sm">
+          <p className="text-slate-400 dark:text-slate-500 text-sm max-w-sm">
             Uploadez un DPGF ou BPU pour activer l&apos;intelligence tarifaire.
           </p>
         </div>
@@ -323,10 +323,10 @@ export function DpgfPricingTab({ projectId }: Props) {
             <div className="w-16 h-16 rounded-2xl bg-blue-100 flex items-center justify-center">
               <BarChart3 className="w-8 h-8 text-blue-700" />
             </div>
-            <p className="text-xl font-bold text-slate-800 mt-2">
+            <p className="text-xl font-bold text-slate-800 dark:text-white mt-2">
               {pricing.total_lines ?? lines.length}
             </p>
-            <p className="text-[11px] text-slate-500 font-medium">
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
               postes analysés
             </p>
           </div>
@@ -378,7 +378,7 @@ export function DpgfPricingTab({ projectId }: Props) {
       {/* -- Alerts section -- */}
       {alerts.length > 0 && (
         <div>
-          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3 px-1">
+          <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-3 px-1">
             Alertes tarifaires ({alerts.length})
           </p>
           <div className="space-y-3">
@@ -396,52 +396,52 @@ export function DpgfPricingTab({ projectId }: Props) {
 
       {/* -- Full pricing table -- */}
       <div>
-        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3 px-1">
+        <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-3 px-1">
           Détail des postes ({lines.length})
         </p>
         <div className="card overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="bg-slate-50 border-b border-slate-200">
-                  <th className="text-left px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                <tr className="bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700">
+                  <th className="text-left px-4 py-2.5 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
                     Désignation
                   </th>
-                  <th className="text-right px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">
+                  <th className="text-right px-4 py-2.5 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide whitespace-nowrap">
                     Prix unitaire
                   </th>
-                  <th className="text-right px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">
+                  <th className="text-right px-4 py-2.5 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide whitespace-nowrap">
                     Réf. marché (bas - haut)
                   </th>
-                  <th className="text-right px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                  <th className="text-right px-4 py-2.5 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
                     Ratio
                   </th>
-                  <th className="text-center px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                  <th className="text-center px-4 py-2.5 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
                     Statut
                   </th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="dark:bg-slate-900">
                 {lines.map((line, i) => {
                   const cfg = STATUS_CONFIG[line.status] ?? STATUS_CONFIG.INCONNU;
                   return (
                     <tr
                       key={i}
                       className={cn(
-                        "border-b border-slate-100 last:border-b-0 transition-colors",
+                        "border-b border-slate-100 dark:border-slate-700 last:border-b-0 transition-colors",
                         cfg.rowCls,
                       )}
                     >
-                      <td className="px-4 py-2.5 text-sm text-slate-800 font-medium max-w-xs">
+                      <td className="px-4 py-2.5 text-sm text-slate-800 dark:text-slate-100 font-medium max-w-xs">
                         <span className="line-clamp-2">{line.designation}</span>
                       </td>
-                      <td className="px-4 py-2.5 text-sm text-slate-700 text-right whitespace-nowrap font-mono">
+                      <td className="px-4 py-2.5 text-sm text-slate-700 dark:text-slate-300 text-right whitespace-nowrap font-mono">
                         {fmtEur(line.prix_unitaire)} &euro;
                       </td>
-                      <td className="px-4 py-2.5 text-xs text-slate-500 text-right whitespace-nowrap">
+                      <td className="px-4 py-2.5 text-xs text-slate-500 dark:text-slate-400 text-right whitespace-nowrap">
                         {fmtEur(getRefPrixBas(line))} &ndash; {fmtEur(getRefPrixHaut(line))} &euro;
                         {line.reference_unite && (
-                          <span className="text-slate-400 ml-0.5">/ {line.reference_unite}</span>
+                          <span className="text-slate-400 dark:text-slate-500 ml-0.5">/ {line.reference_unite}</span>
                         )}
                       </td>
                       <td className="px-4 py-2.5 text-right whitespace-nowrap">

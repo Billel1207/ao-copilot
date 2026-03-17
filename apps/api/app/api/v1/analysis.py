@@ -2,6 +2,7 @@ import uuid
 import json
 import logging
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -365,6 +366,81 @@ async def chat_with_dce(
     return {"answer": answer, "citations": citations, "chunks_used": len(chunks)}
 
 
+@router.post("/{project_id}/chat/stream")
+@limiter.limit("20/hour")
+async def chat_with_dce_stream(
+    request: Request,
+    project_id: uuid.UUID,
+    body: ChatRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    org: Organization = Depends(get_current_org),
+):
+    """Chat RAG en streaming SSE — affichage progressif token par token."""
+    project = await _get_project_or_404(project_id, org.id, db)
+    if project.status not in ("ready", "analyzing"):
+        raise HTTPException(status_code=400, detail="L'analyse doit être terminée pour utiliser le chat")
+
+    from app.services.retriever import retrieve_relevant_chunks, format_context
+    from app.services.llm import llm_service
+    from app.services.prompts import build_chat_prompt
+    import asyncio
+
+    question = body.question.strip()
+    if not question:
+        raise HTTPException(status_code=400, detail="La question ne peut pas être vide")
+    if len(question) > 500:
+        raise HTTPException(status_code=400, detail="Question trop longue (max 500 caractères)")
+
+    # RAG : récupérer les chunks pertinents (sync dans thread)
+    from app.worker.tasks import SyncSession
+    loop = asyncio.get_running_loop()
+
+    def _retrieve():
+        sync_db = SyncSession()
+        try:
+            return retrieve_relevant_chunks(sync_db, str(project_id), question, top_k=6)
+        finally:
+            sync_db.close()
+
+    chunks = await loop.run_in_executor(None, _retrieve)
+    context = format_context(chunks)
+    sys_p, usr_p = build_chat_prompt(question, context)
+
+    citations = [
+        {
+            "doc_name": c.get("doc_name", ""),
+            "page_start": c.get("page_start", 1),
+            "page_end": c.get("page_end", 1),
+            "doc_type": c.get("doc_type", ""),
+        }
+        for c in chunks[:4]
+    ]
+
+    async def event_generator():
+        import json as _json
+        # Envoyer les citations d'abord
+        yield f"data: {_json.dumps({'type': 'citations', 'citations': citations})}\n\n"
+        # Streamer les tokens via run_in_executor (stream_chat_text est synchrone)
+        try:
+            tokens = await loop.run_in_executor(
+                None,
+                lambda: list(llm_service.stream_chat_text(sys_p, usr_p))
+            )
+            for token in tokens:
+                yield f"data: {_json.dumps({'type': 'token', 'text': token})}\n\n"
+        except Exception as e:
+            yield f"data: {_json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+        yield "data: [DONE]\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 # ── Writing assistant ────────────────────────────────────────────────────────
@@ -1207,6 +1283,47 @@ async def get_dpgf_pricing(
         "pricing_analysis": all_pricing,
         "total_lines": len(all_pricing),
         "alerts": [p for p in all_pricing if p.get("status") in ("SOUS_EVALUE", "SUR_EVALUE")],
+    }
+
+
+# ── Usage LLM (coûts tokens par projet) ─────────────────────────────────
+@router.get("/{project_id}/llm-usage")
+@limiter.limit("30/hour")
+async def get_llm_usage(
+    request: Request,
+    project_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    org: Organization = Depends(get_current_org),
+):
+    """Retourne le résumé des tokens et coûts LLM pour la dernière analyse du projet."""
+    await _get_project_or_404(project_id, org.id, db)
+
+    result = await db.execute(
+        select(ExtractionResult).where(
+            ExtractionResult.project_id == project_id,
+            ExtractionResult.result_type == "llm_usage",
+        ).order_by(ExtractionResult.version.desc()).limit(1)
+    )
+    er = result.scalar_one_or_none()
+    if not er or not er.payload:
+        return {
+            "total_input_tokens": 0,
+            "total_output_tokens": 0,
+            "total_cached_tokens": 0,
+            "estimated_cost_eur": 0.0,
+            "steps": [],
+            "message": "Aucune analyse effectuée ou données de coût non disponibles.",
+        }
+
+    payload = er.payload if isinstance(er.payload, dict) else {}
+    return {
+        "total_input_tokens": payload.get("total_input", 0),
+        "total_output_tokens": payload.get("total_output", 0),
+        "total_cached_tokens": payload.get("total_cached", 0),
+        "estimated_cost_eur": payload.get("estimated_cost_eur", 0.0),
+        "steps": payload.get("details", []),
+        "analysis_date": er.created_at.isoformat() if er.created_at else None,
     }
 
 

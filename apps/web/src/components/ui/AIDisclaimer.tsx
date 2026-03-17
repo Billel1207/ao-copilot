@@ -25,7 +25,7 @@ export default function AIDisclaimer({
 }: AIDisclaimerProps) {
   if (compact) {
     return (
-      <p className={cn("text-[11px] text-slate-400 text-center pb-2", className)}>
+      <p className={cn("text-[11px] text-slate-400 dark:text-slate-500 text-center pb-2", className)}>
         {text}
       </p>
     );
@@ -34,16 +34,16 @@ export default function AIDisclaimer({
   return (
     <div
       className={cn(
-        "flex items-start gap-2.5 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3",
+        "flex items-start gap-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3",
         className
       )}
     >
       <Scale className="w-4 h-4 text-slate-400 flex-shrink-0 mt-0.5" />
       <div>
-        <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-0.5">
+        <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-0.5">
           Avertissement
         </p>
-        <p className="text-xs text-slate-500 leading-relaxed">
+        <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
           {text}
         </p>
       </div>

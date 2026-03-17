@@ -15,15 +15,21 @@ LEGAL_TOOLS = [
     {
         "name": "check_ccag_article",
         "description": (
-            "Vérifie le contenu exact d'un article du CCAG-Travaux 2021. "
-            "Utile pour confirmer un numéro d'article, sa valeur standard et ses conditions."
+            "Vérifie le contenu exact d'un article de CCAG (Travaux, PI, FCS ou TIC). "
+            "Utile pour confirmer un numéro d'article, sa valeur standard et ses conditions. "
+            "Si ccag_type absent, Travaux est utilisé par défaut."
         ),
         "input_schema": {
             "type": "object",
             "properties": {
                 "article_number": {
                     "type": "string",
-                    "description": "Numéro de l'article CCAG (ex: '14.1', '20.1', '41.3')",
+                    "description": "Numéro de l'article CCAG (ex: '14.1', '20.1', '25.1')",
+                },
+                "ccag_type": {
+                    "type": "string",
+                    "description": "Type de CCAG : travaux | pi | fcs | tic (défaut: travaux)",
+                    "enum": ["travaux", "pi", "fcs", "tic"],
                 },
             },
             "required": ["article_number"],
@@ -155,7 +161,10 @@ def handle_legal_tool(tool_name: str, tool_input: dict) -> str:
     """Handle a tool call from Claude during analysis."""
 
     if tool_name == "check_ccag_article":
-        return _check_ccag_article(tool_input.get("article_number", ""))
+        return _check_ccag_article(
+            tool_input.get("article_number", ""),
+            ccag_type=tool_input.get("ccag_type", "travaux"),
+        )
 
     elif tool_name == "check_legal_threshold":
         threshold_type = tool_input.get("threshold_type", "")
@@ -175,34 +184,68 @@ def handle_legal_tool(tool_name: str, tool_input: dict) -> str:
     return f"Outil '{tool_name}' inconnu."
 
 
-def _check_ccag_article(article_number: str) -> str:
-    """Look up a CCAG-Travaux 2021 article by number."""
-    try:
-        from app.services.ccag_travaux_2021 import CCAG_ARTICLES
+_CCAG_REGISTRY: dict[str, str] = {
+    "travaux": "app.services.ccag_travaux_2021",
+    "pi": "app.services.ccag_pi_2021",
+    "fcs": "app.services.ccag_fcs_2021",
+    "tic": "app.services.ccag_tic_2021",
+}
 
-        # Normalize: "14.1" or "article 14.1"
+_CCAG_ATTR: dict[str, str] = {
+    "travaux": "CCAG_ARTICLES",
+    "pi": "CCAG_PI_ARTICLES",
+    "fcs": "CCAG_FCS_ARTICLES",
+    "tic": "CCAG_TIC_ARTICLES",
+}
+
+_CCAG_LABELS: dict[str, str] = {
+    "travaux": "CCAG-Travaux 2021",
+    "pi": "CCAG-PI 2021",
+    "fcs": "CCAG-FCS 2021",
+    "tic": "CCAG-TIC 2021",
+}
+
+
+def _check_ccag_article(article_number: str, ccag_type: str = "travaux") -> str:
+    """Look up an article in the requested CCAG (travaux | pi | fcs | tic)."""
+    ccag_type = ccag_type.lower().strip()
+    if ccag_type not in _CCAG_REGISTRY:
+        ccag_type = "travaux"
+
+    module_path = _CCAG_REGISTRY[ccag_type]
+    attr_name = _CCAG_ATTR[ccag_type]
+    label = _CCAG_LABELS[ccag_type]
+
+    try:
+        import importlib
+        mod = importlib.import_module(module_path)
+        articles = getattr(mod, attr_name)
+
         num = article_number.lower().replace("article", "").strip()
 
-        for a in CCAG_ARTICLES:
+        for a in articles:
             if a.article == num:
                 return (
-                    f"Article {a.article} — {a.title}\n"
+                    f"[{label}] Article {a.article} — {a.title}\n"
                     f"Valeur standard : {a.standard_value}\n"
                     f"Catégorie : {a.category}\n"
                     f"Source légale : {a.legal_source}\n"
                     f"Alerte dérogation : {'Oui' if a.alert_if_derogation else 'Non'}"
                 )
 
-        # Try partial match
-        matches = [a for a in CCAG_ARTICLES if a.article.startswith(num.split(".")[0])]
+        # Partial match
+        matches = [a for a in articles if a.article.startswith(num.split(".")[0])]
         if matches:
             listing = "\n".join(f"  - Art. {a.article}: {a.title}" for a in matches[:5])
-            return f"Article '{num}' exact non trouvé. Articles proches :\n{listing}"
+            return f"[{label}] Article '{num}' exact non trouvé. Articles proches :\n{listing}"
 
-        return f"Article '{num}' non trouvé dans les {len(CCAG_ARTICLES)} articles CCAG-Travaux 2021."
+        return (
+            f"[{label}] Article '{num}' non trouvé dans les {len(articles)} articles. "
+            f"Types disponibles : travaux, pi, fcs, tic"
+        )
 
-    except ImportError:
-        return "Module CCAG non disponible."
+    except (ImportError, AttributeError) as e:
+        return f"Module CCAG '{ccag_type}' non disponible : {e}"
 
 
 def _compute_penalty(montant_ht: float, nb_jours: int, taux: float, plafond_pct: float) -> str:

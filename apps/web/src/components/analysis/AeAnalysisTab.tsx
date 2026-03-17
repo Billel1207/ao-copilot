@@ -196,7 +196,7 @@ function ScoreCircle({ score }: { score: number }) {
           </span>
         </div>
       </div>
-      <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
         {scoreLabel}
       </span>
     </div>
@@ -217,14 +217,14 @@ function MetricCard({
   sublabel?: string;
 }) {
   return (
-    <div className="card p-4 flex items-center gap-3 bg-white">
+    <div className="card p-4 flex items-center gap-3 bg-white dark:bg-slate-800">
       <div className="w-9 h-9 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
         {icon}
       </div>
       <div className="min-w-0">
-        <p className="text-xs text-slate-500 font-medium truncate">{label}</p>
-        <p className="text-sm font-bold text-slate-800">{value}</p>
-        {sublabel && <p className="text-xs text-slate-400">{sublabel}</p>}
+        <p className="text-xs text-slate-500 dark:text-slate-400 font-medium truncate">{label}</p>
+        <p className="text-sm font-bold text-slate-800 dark:text-slate-100">{value}</p>
+        {sublabel && <p className="text-xs text-slate-400 dark:text-slate-500">{sublabel}</p>}
       </div>
     </div>
   );
@@ -236,12 +236,12 @@ function AeClauseCard({ clause, index }: { clause: ClauseRisquee; index: number 
   const cfg = SEVERITY_CONFIG[clause.severity] ?? SEVERITY_CONFIG.MOYEN;
 
   return (
-    <div className={cn("card border-l-4 p-4 space-y-2 animate-fade-in", cfg.cardBorderCls, "bg-white")}>
+    <div className={cn("card border-l-4 p-4 space-y-2 animate-fade-in", cfg.cardBorderCls, "bg-white dark:bg-slate-800")}>
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-2 min-w-0">
-          <span className="text-xs text-slate-400 font-mono w-5 shrink-0">{index + 1}</span>
+          <span className="text-xs text-slate-400 dark:text-slate-500 font-mono w-5 shrink-0">{index + 1}</span>
           <div className="min-w-0">
-            <p className="text-sm font-medium text-slate-800 leading-snug">
+            <p className="text-sm font-medium text-slate-800 dark:text-slate-100 leading-snug">
               {clause.clause}
             </p>
           </div>
@@ -259,7 +259,7 @@ function AeClauseCard({ clause, index }: { clause: ClauseRisquee; index: number 
 
       {/* Risque */}
       {clause.risque && (
-        <p className="text-xs text-slate-500 leading-relaxed bg-slate-50 rounded-lg px-3 py-2 border-l-2 border-slate-200">
+        <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed bg-slate-50 dark:bg-slate-800 rounded-lg px-3 py-2 border-l-2 border-slate-200 dark:border-slate-700">
           {clause.risque}
         </p>
       )}
@@ -328,8 +328,8 @@ export function AeAnalysisTab({ projectId }: Props) {
     return (
       <div className="card p-8 flex flex-col items-center gap-3 text-center animate-fade-in">
         <AlertTriangle className="w-10 h-10 text-amber-400" />
-        <p className="text-slate-600 font-medium">Impossible de charger l&apos;analyse de l&apos;Acte d&apos;Engagement.</p>
-        <p className="text-slate-400 text-sm">V&eacute;rifiez que l&apos;analyse du projet a bien &eacute;t&eacute; lanc&eacute;e.</p>
+        <p className="text-slate-600 dark:text-slate-400 font-medium">Impossible de charger l&apos;analyse de l&apos;Acte d&apos;Engagement.</p>
+        <p className="text-slate-400 dark:text-slate-500 text-sm">V&eacute;rifiez que l&apos;analyse du projet a bien &eacute;t&eacute; lanc&eacute;e.</p>
       </div>
     );
   }
@@ -338,7 +338,7 @@ export function AeAnalysisTab({ projectId }: Props) {
     return (
       <div className="card p-8 flex flex-col items-center gap-3 text-center animate-fade-in">
         <FileX className="w-10 h-10 text-slate-300" />
-        <p className="text-slate-500">Aucune donn&eacute;e disponible.</p>
+        <p className="text-slate-500 dark:text-slate-400">Aucune donn&eacute;e disponible.</p>
       </div>
     );
   }
@@ -349,12 +349,12 @@ export function AeAnalysisTab({ projectId }: Props) {
   if (aeData.no_ae_document) {
     return (
       <div className="card p-10 flex flex-col items-center gap-4 text-center animate-fade-in">
-        <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center">
-          <FileX className="w-7 h-7 text-slate-400" />
+        <div className="w-14 h-14 rounded-2xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center">
+          <FileX className="w-7 h-7 text-slate-400 dark:text-slate-500" />
         </div>
         <div className="space-y-1">
-          <p className="font-semibold text-slate-700">Aucun Acte d&apos;Engagement disponible</p>
-          <p className="text-slate-400 text-sm max-w-sm">
+          <p className="font-semibold text-slate-700 dark:text-slate-300">Aucun Acte d&apos;Engagement disponible</p>
+          <p className="text-slate-400 dark:text-slate-500 text-sm max-w-sm">
             {aeData.message ?? "Uploadez un AE pour activer l\u2019analyse automatique des conditions financi\u00e8res et clauses risqu\u00e9es."}
           </p>
         </div>
@@ -377,10 +377,10 @@ export function AeAnalysisTab({ projectId }: Props) {
             <ScoreCircle score={aeData.score_risque} />
           </div>
           <div className="flex-1 space-y-1">
-            <p className="font-semibold text-slate-800 text-base">
+            <p className="font-semibold text-slate-800 dark:text-slate-100 text-base">
               Analyse de l&apos;Acte d&apos;Engagement
             </p>
-            <p className="text-xs text-slate-400">
+            <p className="text-xs text-slate-400 dark:text-slate-500">
               Score de risque financier et contractuel
             </p>
           </div>
@@ -388,11 +388,11 @@ export function AeAnalysisTab({ projectId }: Props) {
 
         {/* Resume */}
         {aeData.resume && (
-          <div className="mt-4 pt-4 border-t border-slate-100">
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">
+          <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-700">
+            <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">
               Synth&egrave;se
             </p>
-            <p className="text-sm text-slate-700 leading-relaxed">
+            <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
               {aeData.resume}
             </p>
           </div>
@@ -426,7 +426,7 @@ export function AeAnalysisTab({ projectId }: Props) {
       {/* ── Penalites ── */}
       {aeData.penalites && aeData.penalites.length > 0 && (
         <div className="space-y-3">
-          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide px-1">
+          <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide px-1">
             P&eacute;nalit&eacute;s ({aeData.penalites.length})
           </p>
           {aeData.penalites.map((pen, i) => {
@@ -437,11 +437,11 @@ export function AeAnalysisTab({ projectId }: Props) {
               : "border-l-green-400";
 
             return (
-              <div key={i} className={cn("card border-l-4 p-4 space-y-1 animate-fade-in bg-white", borderColor)}>
+              <div key={i} className={cn("card border-l-4 p-4 space-y-1 animate-fade-in bg-white dark:bg-slate-800", borderColor)}>
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="text-sm font-medium text-slate-800">{pen.type}</p>
-                    <p className="text-xs text-slate-500 mt-0.5">{pen.montant_ou_taux}</p>
+                    <p className="text-sm font-medium text-slate-800 dark:text-slate-100">{pen.type}</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{pen.montant_ou_taux}</p>
                   </div>
                   <div className="shrink-0">
                     <span
@@ -454,7 +454,7 @@ export function AeAnalysisTab({ projectId }: Props) {
                   </div>
                 </div>
                 {pen.reference && (
-                  <p className="text-xs text-slate-400">{pen.reference}</p>
+                  <p className="text-xs text-slate-400 dark:text-slate-500">{pen.reference}</p>
                 )}
               </div>
             );
@@ -464,40 +464,40 @@ export function AeAnalysisTab({ projectId }: Props) {
 
       {/* ── Garanties ── */}
       {aeData.garanties && aeData.garanties.length > 0 && (
-        <div className="card p-4 space-y-3">
+        <div className="card p-4 space-y-3 dark:bg-slate-900">
           <div className="flex items-center gap-2">
             <Shield className="w-4 h-4 text-blue-600" />
-            <p className="text-sm font-semibold text-slate-700">
+            <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">
               Garanties ({aeData.garanties.length})
             </p>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-slate-100">
-                  <th className="text-left py-2 px-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                <tr className="border-b border-slate-100 dark:border-slate-700">
+                  <th className="text-left py-2 px-3 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
                     Type
                   </th>
-                  <th className="text-right py-2 px-3 text-xs font-semibold text-slate-500 uppercase tracking-wide w-24">
+                  <th className="text-right py-2 px-3 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide w-24">
                     Montant
                   </th>
-                  <th className="text-left py-2 px-3 text-xs font-semibold text-slate-500 uppercase tracking-wide w-32">
+                  <th className="text-left py-2 px-3 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide w-32">
                     Dur&eacute;e
                   </th>
-                  <th className="text-left py-2 px-3 text-xs font-semibold text-slate-500 uppercase tracking-wide w-32">
+                  <th className="text-left py-2 px-3 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide w-32">
                     R&eacute;f&eacute;rence
                   </th>
                 </tr>
               </thead>
               <tbody>
                 {aeData.garanties.map((gar, i) => (
-                  <tr key={i} className="border-b border-slate-50 last:border-b-0 hover:bg-slate-50 transition-colors">
-                    <td className="py-2 px-3 text-slate-700">{gar.type}</td>
-                    <td className="py-2 px-3 text-right text-slate-600 font-medium">
+                  <tr key={i} className="border-b border-slate-50 dark:border-slate-700 last:border-b-0 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+                    <td className="py-2 px-3 text-slate-700 dark:text-slate-300">{gar.type}</td>
+                    <td className="py-2 px-3 text-right text-slate-600 dark:text-slate-400 font-medium">
                       {gar.montant_pct !== null && gar.montant_pct !== undefined ? `${gar.montant_pct} %` : "\u2014"}
                     </td>
-                    <td className="py-2 px-3 text-slate-600">{gar.duree || "\u2014"}</td>
-                    <td className="py-2 px-3 text-slate-400 text-xs">{gar.reference || "\u2014"}</td>
+                    <td className="py-2 px-3 text-slate-600 dark:text-slate-400">{gar.duree || "\u2014"}</td>
+                    <td className="py-2 px-3 text-slate-400 dark:text-slate-500 text-xs">{gar.reference || "\u2014"}</td>
                   </tr>
                 ))}
               </tbody>
@@ -509,7 +509,7 @@ export function AeAnalysisTab({ projectId }: Props) {
       {/* ── Clauses risquees ── */}
       {sortedClauses.length > 0 && (
         <div className="space-y-3">
-          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide px-1">
+          <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide px-1">
             Clauses risqu&eacute;es ({sortedClauses.length})
           </p>
           {sortedClauses.map((clause, i) => (
@@ -520,12 +520,12 @@ export function AeAnalysisTab({ projectId }: Props) {
 
       {/* ── Revision des prix ── */}
       {aeData.revision_prix && (
-        <div className="card p-4 space-y-2 bg-white">
+        <div className="card p-4 space-y-2 bg-white dark:bg-slate-900">
           <div className="flex items-center gap-2">
             <Scale className="w-4 h-4 text-blue-600" />
-            <p className="text-sm font-semibold text-slate-700">R&eacute;vision des prix</p>
+            <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">R&eacute;vision des prix</p>
           </div>
-          <div className="space-y-2 text-sm text-slate-600">
+          <div className="space-y-2 text-sm text-slate-600 dark:text-slate-400">
             <div className="flex items-center gap-2">
               {aeData.revision_prix.applicable ? (
                 <span
@@ -545,12 +545,12 @@ export function AeAnalysisTab({ projectId }: Props) {
             </div>
             {aeData.revision_prix.indice && (
               <p>
-                <span className="font-medium text-slate-700">Indice :</span> {aeData.revision_prix.indice}
+                <span className="font-medium text-slate-700 dark:text-slate-300">Indice :</span> {aeData.revision_prix.indice}
               </p>
             )}
             {aeData.revision_prix.formule && (
               <p>
-                <span className="font-medium text-slate-700">Formule :</span> {aeData.revision_prix.formule}
+                <span className="font-medium text-slate-700 dark:text-slate-300">Formule :</span> {aeData.revision_prix.formule}
               </p>
             )}
           </div>

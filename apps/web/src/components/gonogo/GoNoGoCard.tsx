@@ -53,7 +53,17 @@ function ScoreCircle({ score, color }: { score: number; color: string }) {
   const dash = (score / 100) * circ;
 
   return (
-    <svg width="140" height="140" viewBox="0 0 140 140" className="block">
+    <svg
+      width="140"
+      height="140"
+      viewBox="0 0 140 140"
+      className="block"
+      role="meter"
+      aria-valuenow={score}
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-label={`Score Go/No-Go : ${score} sur 100`}
+    >
       {/* Background circle */}
       <circle cx="70" cy="70" r={r} fill="none" stroke="#e2e8f0" strokeWidth="10" />
       {/* Progress arc */}
@@ -79,6 +89,7 @@ function ScoreCircle({ score, color }: { score: number; color: string }) {
         fontWeight="800"
         fill={color}
         fontFamily="inherit"
+        aria-hidden="true"
       >
         {score}
       </text>
@@ -89,6 +100,7 @@ function ScoreCircle({ score, color }: { score: number; color: string }) {
         fontSize="11"
         fill="#94a3b8"
         fontFamily="inherit"
+        aria-hidden="true"
       >
         / 100
       </text>
@@ -114,9 +126,16 @@ function DimensionBar({
     <div className="space-y-1">
       <div className="flex justify-between text-xs">
         <span className="text-slate-600 font-medium">{label}</span>
-        <span className="font-bold" style={{ color: barColor }}>{pct}</span>
+        <span className="font-bold" style={{ color: barColor }} aria-hidden="true">{pct}</span>
       </div>
-      <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+      <div
+        className="h-1.5 bg-slate-100 rounded-full overflow-hidden"
+        role="progressbar"
+        aria-valuenow={pct}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-label={`${label} : ${pct} sur 100`}
+      >
         <div
           className="h-full rounded-full transition-all duration-700"
           style={{ width: `${pct}%`, backgroundColor: barColor }}
@@ -163,10 +182,13 @@ export function GoNoGoCard({ projectId }: Props) {
           {/* Score cercle */}
           <div className="flex flex-col items-center gap-2 flex-shrink-0">
             <ScoreCircle score={score} color={cfg.color} />
-            <span className={cn(
-              "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-bold",
-              cfg.bg, cfg.textColor
-            )}>
+            <span
+              className={cn(
+                "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-bold",
+                cfg.bg, cfg.textColor
+              )}
+              aria-label={`Recommandation : ${cfg.label}`}
+            >
               {cfg.icon}
               {cfg.label}
             </span>

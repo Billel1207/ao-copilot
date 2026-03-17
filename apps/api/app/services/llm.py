@@ -9,7 +9,7 @@ Features:
 """
 import json
 import structlog
-from typing import Any
+from typing import Any, Generator
 
 import anthropic as anthropic_sdk
 import pybreaker
@@ -225,6 +225,26 @@ class LLMService:
         )
         self._track_usage(response, step="chat_text")
         return response.content[0].text
+
+    def stream_chat_text(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        max_tokens: int = 2048,
+    ) -> Generator[str, None, None]:
+        """Streaming SSE : yield les tokens texte au fil de la génération."""
+        try:
+            with self._anthropic.messages.stream(
+                model=self.model,
+                max_tokens=max_tokens,
+                system=_build_system_blocks(system_prompt),
+                messages=[{"role": "user", "content": user_prompt}],
+            ) as stream:
+                for text in stream.text_stream:
+                    yield text
+        except Exception as e:
+            logger.error("stream_chat_text_error", error=str(e))
+            yield f"[Erreur de streaming : {str(e)}]"
 
     # ── Extended Thinking ────────────────────────────────────────────────
     def complete_json_with_thinking(

@@ -13,7 +13,7 @@ const RISK_BADGE: Record<string, { bg: string; text: string }> = {
   "MODÉRÉ": { bg: "bg-amber-100", text: "text-amber-800" },
   "ÉLEVÉ": { bg: "bg-orange-100", text: "text-orange-800" },
   CRITIQUE: { bg: "bg-red-100", text: "text-red-800" },
-  INCONNU: { bg: "bg-slate-100", text: "text-slate-600" },
+  INCONNU: { bg: "bg-slate-100", text: "text-slate-600 dark:text-slate-400" },
 };
 
 function KpiCard({ label, value, unit, icon, color }: {
@@ -21,13 +21,13 @@ function KpiCard({ label, value, unit, icon, color }: {
   icon: React.ReactNode; color: string;
 }) {
   return (
-    <div className="bg-white rounded-xl border p-4 flex items-start gap-3">
+    <div className="bg-white dark:bg-slate-800 rounded-xl border dark:border-slate-700 p-4 flex items-start gap-3">
       <div className={`p-2 rounded-lg ${color}`}>{icon}</div>
       <div>
-        <p className="text-xs text-slate-500 mb-0.5">{label}</p>
-        <p className="text-lg font-bold text-slate-800">
+        <p className="text-xs text-slate-500 dark:text-slate-400 mb-0.5">{label}</p>
+        <p className="text-lg font-bold text-slate-800 dark:text-slate-100">
           {typeof value === "number" ? value.toLocaleString("fr-FR") : value}
-          {unit && <span className="text-sm font-normal text-slate-500 ml-1">{unit}</span>}
+          {unit && <span className="text-sm font-normal text-slate-500 dark:text-slate-400 ml-1">{unit}</span>}
         </p>
       </div>
     </div>
@@ -43,9 +43,9 @@ function CashFlowChart({ data }: { data: any[] }) {
   );
 
   return (
-    <div className="bg-white rounded-xl border overflow-hidden">
-      <div className="px-4 py-3 border-b bg-slate-50">
-        <h4 className="text-sm font-semibold text-slate-700">Courbe de trésorerie cumulée</h4>
+    <div className="bg-white dark:bg-slate-900 rounded-xl border dark:border-slate-700 overflow-hidden">
+      <div className="px-4 py-3 border-b dark:border-slate-700 bg-slate-50 dark:bg-slate-800">
+        <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300">Courbe de trésorerie cumulée</h4>
       </div>
       <div className="p-4">
         <div className="flex items-end gap-1 h-48 overflow-x-auto">
@@ -72,7 +72,7 @@ function CashFlowChart({ data }: { data: any[] }) {
                     )}
                   </div>
                   {/* Zero line */}
-                  <div className="h-px bg-slate-300 w-full" />
+                  <div className="h-px bg-slate-300 dark:bg-slate-600 w-full" />
                   {/* Negative bars grow down from center */}
                   <div className="h-1/2 flex items-start justify-center">
                     {isNeg && (
@@ -84,14 +84,14 @@ function CashFlowChart({ data }: { data: any[] }) {
                     )}
                   </div>
                 </div>
-                <span className="text-[9px] text-slate-400 mt-1">
+                <span className="text-[9px] text-slate-400 dark:text-slate-500 mt-1">
                   {m.mois === 0 ? "Av" : m.mois}
                 </span>
               </div>
             );
           })}
         </div>
-        <div className="flex items-center gap-4 mt-3 text-[10px] text-slate-500">
+        <div className="flex items-center gap-4 mt-3 text-[10px] text-slate-500 dark:text-slate-400">
           <span className="flex items-center gap-1">
             <span className="w-3 h-3 rounded bg-emerald-400" /> Positif
           </span>
@@ -108,30 +108,30 @@ function MonthlyTable({ data }: { data: any[] }) {
   if (!data || data.length === 0) return null;
 
   return (
-    <div className="bg-white rounded-xl border overflow-hidden">
-      <div className="px-4 py-3 border-b bg-slate-50">
-        <h4 className="text-sm font-semibold text-slate-700">Détail mensuel</h4>
+    <div className="bg-white dark:bg-slate-900 rounded-xl border dark:border-slate-700 overflow-hidden">
+      <div className="px-4 py-3 border-b dark:border-slate-700 bg-slate-50 dark:bg-slate-800">
+        <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300">Détail mensuel</h4>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-xs">
-          <thead className="bg-slate-50">
+          <thead className="bg-slate-50 dark:bg-slate-800">
             <tr>
-              <th className="text-left px-3 py-2 text-slate-500">Mois</th>
-              <th className="text-right px-3 py-2 text-slate-500">Travaux HT</th>
-              <th className="text-right px-3 py-2 text-slate-500">Dépenses</th>
-              <th className="text-right px-3 py-2 text-slate-500">Encaissements</th>
-              <th className="text-right px-3 py-2 text-slate-500">Solde mensuel</th>
-              <th className="text-right px-3 py-2 text-slate-500">Cumulé</th>
+              <th className="text-left px-3 py-2 text-slate-500 dark:text-slate-400">Mois</th>
+              <th className="text-right px-3 py-2 text-slate-500 dark:text-slate-400">Travaux HT</th>
+              <th className="text-right px-3 py-2 text-slate-500 dark:text-slate-400">Dépenses</th>
+              <th className="text-right px-3 py-2 text-slate-500 dark:text-slate-400">Encaissements</th>
+              <th className="text-right px-3 py-2 text-slate-500 dark:text-slate-400">Solde mensuel</th>
+              <th className="text-right px-3 py-2 text-slate-500 dark:text-slate-400">Cumulé</th>
             </tr>
           </thead>
-          <tbody className="divide-y">
+          <tbody className="divide-y dark:divide-slate-700">
             {data.map((m, i) => (
               <tr
                 key={i}
-                className={m.solde_cumule < 0 ? "bg-red-50" : ""}
+                className={m.solde_cumule < 0 ? "bg-red-50 dark:bg-red-900/20" : ""}
               >
-                <td className="px-3 py-2 text-slate-700 font-medium">{m.label}</td>
-                <td className="px-3 py-2 text-right text-slate-600">
+                <td className="px-3 py-2 text-slate-700 dark:text-slate-300 font-medium">{m.label}</td>
+                <td className="px-3 py-2 text-right text-slate-600 dark:text-slate-400">
                   {(m.travaux_realises_ht || 0).toLocaleString("fr-FR")}
                 </td>
                 <td className="px-3 py-2 text-right text-red-600">
@@ -162,15 +162,15 @@ export default function CashFlowTab({ projectId }: Props) {
     return (
       <div className="flex items-center justify-center py-16">
         <Loader2 className="w-6 h-6 animate-spin text-blue-500 mr-2" />
-        <span className="text-sm text-slate-500">Simulation trésorerie en cours...</span>
+        <span className="text-sm text-slate-500 dark:text-slate-400">Simulation trésorerie en cours...</span>
       </div>
     );
   }
 
   if (error || !data) {
     return (
-      <div className="text-center py-12 text-slate-500">
-        <FileWarning className="w-10 h-10 mx-auto mb-2 text-slate-400" />
+      <div className="text-center py-12 text-slate-500 dark:text-slate-400">
+        <FileWarning className="w-10 h-10 mx-auto mb-2 text-slate-400 dark:text-slate-500" />
         <p className="text-sm">Erreur lors de la simulation de trésorerie.</p>
       </div>
     );
@@ -181,11 +181,11 @@ export default function CashFlowTab({ projectId }: Props) {
   return (
     <div className="space-y-6">
       {/* Header avec risk level */}
-      <div className="bg-white rounded-xl border p-6">
+      <div className="bg-white dark:bg-slate-900 rounded-xl border dark:border-slate-700 p-6">
         <div className="flex items-start justify-between">
           <div className="flex-1">
-            <h3 className="text-lg font-semibold text-slate-800 mb-2">Simulation Trésorerie</h3>
-            <p className="text-sm text-slate-600 leading-relaxed">{data.resume}</p>
+            <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-2">Simulation Trésorerie</h3>
+            <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">{data.resume}</p>
             {!data.source_ae && (
               <div className="mt-3 flex items-center gap-2 text-xs text-amber-600 bg-amber-50 px-3 py-2 rounded-lg">
                 <AlertTriangle className="w-4 h-4 shrink-0" />
@@ -236,26 +236,26 @@ export default function CashFlowTab({ projectId }: Props) {
 
       {/* Impacts financiers */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-white rounded-xl border p-4">
-          <p className="text-xs text-slate-500 mb-1">Impact avance forfaitaire</p>
+        <div className="bg-white dark:bg-slate-800 rounded-xl border dark:border-slate-700 p-4">
+          <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Impact avance forfaitaire</p>
           <p className="text-lg font-bold text-emerald-700">
             +{(data.avance_impact_eur || 0).toLocaleString("fr-FR")} EUR
           </p>
-          <p className="text-[10px] text-slate-400 mt-1">CCAG Art. 14.1 — améliore la trésorerie</p>
+          <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">CCAG Art. 14.1 — améliore la trésorerie</p>
         </div>
-        <div className="bg-white rounded-xl border p-4">
-          <p className="text-xs text-slate-500 mb-1">Impact retenue garantie</p>
+        <div className="bg-white dark:bg-slate-800 rounded-xl border dark:border-slate-700 p-4">
+          <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Impact retenue garantie</p>
           <p className="text-lg font-bold text-red-700">
             -{(data.retenue_impact_eur || 0).toLocaleString("fr-FR")} EUR
           </p>
-          <p className="text-[10px] text-slate-400 mt-1">CCAG Art. 14.3 — libérée après GPA (12 mois)</p>
+          <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">CCAG Art. 14.3 — libérée après GPA (12 mois)</p>
         </div>
-        <div className="bg-white rounded-xl border p-4">
-          <p className="text-xs text-slate-500 mb-1">Pénalités potentielles (30j retard)</p>
+        <div className="bg-white dark:bg-slate-800 rounded-xl border dark:border-slate-700 p-4">
+          <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Pénalités potentielles (30j retard)</p>
           <p className="text-lg font-bold text-orange-700">
             -{(data.penalite_impact_30j_eur || 0).toLocaleString("fr-FR")} EUR
           </p>
-          <p className="text-[10px] text-slate-400 mt-1">CCAG Art. 19.1 — 1/3000e par jour</p>
+          <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">CCAG Art. 19.1 — 1/3000e par jour</p>
         </div>
       </div>
 

@@ -104,13 +104,13 @@ function StatCard({
   color: string;
 }) {
   return (
-    <div className="card p-4 flex items-center gap-3 bg-white">
+    <div className="card p-4 flex items-center gap-3 bg-white dark:bg-slate-800">
       <div className={cn("w-10 h-10 rounded-lg flex items-center justify-center shrink-0", color)}>
         {icon}
       </div>
       <div>
-        <p className="text-2xl font-bold text-slate-800">{value}</p>
-        <p className="text-xs text-slate-500 font-medium">{label}</p>
+        <p className="text-2xl font-bold text-slate-800 dark:text-slate-100">{value}</p>
+        <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">{label}</p>
       </div>
     </div>
   );
@@ -122,16 +122,16 @@ function DocumentCard({ doc, index }: { doc: DocumentRequis; index: number }) {
   const cfg = STATUS_CONFIG[doc.status] ?? STATUS_CONFIG.REQUIS;
 
   return (
-    <div className={cn("card border-l-4 p-4 space-y-1 animate-fade-in bg-white", cfg.borderCls)}>
+    <div className={cn("card border-l-4 p-4 space-y-1 animate-fade-in bg-white dark:bg-slate-800", cfg.borderCls)}>
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-2 min-w-0">
-          <span className="text-xs text-slate-400 font-mono w-5 shrink-0">{index + 1}</span>
+          <span className="text-xs text-slate-400 dark:text-slate-500 font-mono w-5 shrink-0">{index + 1}</span>
           <div className="min-w-0">
-            <p className="text-sm font-medium text-slate-800 leading-snug">
+            <p className="text-sm font-medium text-slate-800 dark:text-slate-100 leading-snug">
               {doc.document}
             </p>
             {doc.reference_article && (
-              <p className="text-xs text-slate-400 mt-0.5">{doc.reference_article}</p>
+              <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">{doc.reference_article}</p>
             )}
           </div>
         </div>
@@ -146,8 +146,8 @@ function DocumentCard({ doc, index }: { doc: DocumentRequis; index: number }) {
         </div>
       </div>
       {doc.format_exige && (
-        <p className="text-xs text-slate-500 ml-7">
-          <span className="font-medium text-slate-600">Format exig&eacute; :</span> {doc.format_exige}
+        <p className="text-xs text-slate-500 dark:text-slate-400 ml-7">
+          <span className="font-medium text-slate-600 dark:text-slate-300">Format exig&eacute; :</span> {doc.format_exige}
         </p>
       )}
     </div>
@@ -199,8 +199,8 @@ export function DcCheckTab({ projectId }: Props) {
     return (
       <div className="card p-8 flex flex-col items-center gap-3 text-center animate-fade-in">
         <AlertTriangle className="w-10 h-10 text-amber-400" />
-        <p className="text-slate-600 font-medium">Impossible de charger la v&eacute;rification des documents administratifs.</p>
-        <p className="text-slate-400 text-sm">V&eacute;rifiez que l&apos;analyse du projet a bien &eacute;t&eacute; lanc&eacute;e.</p>
+        <p className="text-slate-600 dark:text-slate-400 font-medium">Impossible de charger la v&eacute;rification des documents administratifs.</p>
+        <p className="text-slate-400 dark:text-slate-500 text-sm">V&eacute;rifiez que l&apos;analyse du projet a bien &eacute;t&eacute; lanc&eacute;e.</p>
       </div>
     );
   }
@@ -209,7 +209,7 @@ export function DcCheckTab({ projectId }: Props) {
     return (
       <div className="card p-8 flex flex-col items-center gap-3 text-center animate-fade-in">
         <FileX className="w-10 h-10 text-slate-300" />
-        <p className="text-slate-500">Aucune donn&eacute;e disponible.</p>
+        <p className="text-slate-500 dark:text-slate-400">Aucune donn&eacute;e disponible.</p>
       </div>
     );
   }
@@ -220,12 +220,12 @@ export function DcCheckTab({ projectId }: Props) {
   if (dcData.no_dc_context) {
     return (
       <div className="card p-10 flex flex-col items-center gap-4 text-center animate-fade-in">
-        <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center">
-          <FileX className="w-7 h-7 text-slate-400" />
+        <div className="w-14 h-14 rounded-2xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center">
+          <FileX className="w-7 h-7 text-slate-400 dark:text-slate-500" />
         </div>
         <div className="space-y-1">
-          <p className="font-semibold text-slate-700">Aucun contexte de documents administratifs</p>
-          <p className="text-slate-400 text-sm max-w-sm">
+          <p className="font-semibold text-slate-700 dark:text-slate-300">Aucun contexte de documents administratifs</p>
+          <p className="text-slate-400 dark:text-slate-500 text-sm max-w-sm">
             {dcData.message ?? "Uploadez les pi\u00e8ces du DCE pour activer la v\u00e9rification automatique des documents administratifs requis."}
           </p>
         </div>
@@ -252,21 +252,21 @@ export function DcCheckTab({ projectId }: Props) {
       {/* ── Header card ── */}
       <div className="card p-5">
         <div className="flex-1 space-y-1">
-          <p className="font-semibold text-slate-800 text-base">
+          <p className="font-semibold text-slate-800 dark:text-white text-base">
             V&eacute;rification des documents administratifs
           </p>
-          <p className="text-xs text-slate-400">
+          <p className="text-xs text-slate-400 dark:text-slate-500">
             Liste des pi&egrave;ces, certifications et attestations demand&eacute;es par le pouvoir adjudicateur
           </p>
         </div>
 
         {/* Resume */}
         {dcData.resume && (
-          <div className="mt-4 pt-4 border-t border-slate-100">
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">
+          <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-700">
+            <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">
               Synth&egrave;se
             </p>
-            <p className="text-sm text-slate-700 leading-relaxed">
+            <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
               {dcData.resume}
             </p>
           </div>
@@ -299,8 +299,8 @@ export function DcCheckTab({ projectId }: Props) {
       {sortedDocs.length > 0 && (
         <div className="space-y-3">
           <div className="flex items-center gap-2 px-1">
-            <ListChecks className="w-4 h-4 text-slate-500" />
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+            <ListChecks className="w-4 h-4 text-slate-500 dark:text-slate-400" />
+            <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
               Documents requis ({sortedDocs.length})
             </p>
           </div>
@@ -315,7 +315,7 @@ export function DcCheckTab({ projectId }: Props) {
         <div className="card p-4 space-y-3">
           <div className="flex items-center gap-2">
             <Award className="w-4 h-4 text-emerald-600" />
-            <p className="text-sm font-semibold text-slate-700">
+            <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">
               Certifications requises ({certifications.length})
             </p>
           </div>
@@ -327,7 +327,7 @@ export function DcCheckTab({ projectId }: Props) {
                   "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border",
                   cert.obligatoire
                     ? "bg-red-50 text-red-800 border-red-200"
-                    : "bg-slate-50 text-slate-700 border-slate-200"
+                    : "bg-slate-50 dark:bg-slate-700 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-600"
                 )}
               >
                 {cert.obligatoire ? (
@@ -337,7 +337,7 @@ export function DcCheckTab({ projectId }: Props) {
                 )}
                 <span>{cert.certification}</span>
                 {cert.reference && (
-                  <span className="text-[10px] text-slate-400 ml-1">({cert.reference})</span>
+                  <span className="text-[10px] text-slate-400 dark:text-slate-500 ml-1">({cert.reference})</span>
                 )}
               </span>
             ))}
@@ -349,8 +349,8 @@ export function DcCheckTab({ projectId }: Props) {
       {attestations.length > 0 && (
         <div className="space-y-3">
           <div className="flex items-center gap-2 px-1">
-            <ClipboardCheck className="w-4 h-4 text-slate-500" />
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+            <ClipboardCheck className="w-4 h-4 text-slate-500 dark:text-slate-400" />
+            <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
               Attestations ({attestations.length})
             </p>
           </div>
@@ -358,16 +358,16 @@ export function DcCheckTab({ projectId }: Props) {
             <div
               key={i}
               className={cn(
-                "card border-l-4 p-4 space-y-1 animate-fade-in bg-white",
+                "card border-l-4 p-4 space-y-1 animate-fade-in bg-white dark:bg-slate-800",
                 att.obligatoire ? "border-l-red-500" : "border-l-slate-300"
               )}
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="text-sm font-medium text-slate-800">{att.attestation}</p>
+                  <p className="text-sm font-medium text-slate-800 dark:text-slate-100">{att.attestation}</p>
                   {att.validite && (
-                    <p className="text-xs text-slate-500 mt-0.5">
-                      <span className="font-medium text-slate-600">Validit&eacute; :</span> {att.validite}
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                      <span className="font-medium text-slate-600 dark:text-slate-300">Validit&eacute; :</span> {att.validite}
                     </p>
                   )}
                 </div>
@@ -382,7 +382,7 @@ export function DcCheckTab({ projectId }: Props) {
                     </span>
                   ) : (
                     <span
-                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-600 border border-slate-200"
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-600"
                       aria-label="Attestation : Recommandee"
                     >
                       Recommand&eacute;e
@@ -400,31 +400,31 @@ export function DcCheckTab({ projectId }: Props) {
         <div className="card p-4 space-y-3">
           <div className="flex items-center gap-2">
             <FileText className="w-4 h-4 text-blue-600" />
-            <p className="text-sm font-semibold text-slate-700">
+            <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">
               Formulaires ({formulaires.length})
             </p>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-slate-100">
-                  <th className="text-left py-2 px-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                <tr className="border-b border-slate-100 dark:border-slate-700 dark:bg-slate-900">
+                  <th className="text-left py-2 px-3 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
                     Formulaire
                   </th>
-                  <th className="text-left py-2 px-3 text-xs font-semibold text-slate-500 uppercase tracking-wide w-28">
+                  <th className="text-left py-2 px-3 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide w-28">
                     Version
                   </th>
-                  <th className="text-left py-2 px-3 text-xs font-semibold text-slate-500 uppercase tracking-wide w-32">
+                  <th className="text-left py-2 px-3 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide w-32">
                     R&eacute;f&eacute;rence
                   </th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="dark:bg-slate-900">
                 {formulaires.map((form, i) => (
-                  <tr key={i} className="border-b border-slate-50 last:border-b-0 hover:bg-slate-50 transition-colors">
-                    <td className="py-2 px-3 text-slate-700">{form.formulaire}</td>
-                    <td className="py-2 px-3 text-slate-600">{form.version || "\u2014"}</td>
-                    <td className="py-2 px-3 text-slate-400 text-xs">{form.reference || "\u2014"}</td>
+                  <tr key={i} className="border-b border-slate-50 dark:border-slate-700 last:border-b-0 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+                    <td className="py-2 px-3 text-slate-700 dark:text-slate-300">{form.formulaire}</td>
+                    <td className="py-2 px-3 text-slate-600 dark:text-slate-400">{form.version || "\u2014"}</td>
+                    <td className="py-2 px-3 text-slate-400 dark:text-slate-500 text-xs">{form.reference || "\u2014"}</td>
                   </tr>
                 ))}
               </tbody>

@@ -117,7 +117,7 @@ function CopyButton({ text }: { text: string }) {
         "inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-colors",
         copied
           ? "bg-green-100 text-green-700"
-          : "bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-700"
+          : "bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-600 hover:text-slate-700 dark:hover:text-slate-300"
       )}
       title="Copier la question"
     >
@@ -152,25 +152,25 @@ function QuestionCard({
       className={cn(
         "card border-l-4 p-4 space-y-2.5 animate-fade-in",
         cfg.cardBorderCls,
-        "bg-white"
+        "bg-white dark:bg-slate-800"
       )}
     >
       {/* Header row */}
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-2 min-w-0">
-          <span className="text-xs text-slate-400 font-mono w-5 shrink-0">
+          <span className="text-xs text-slate-400 dark:text-slate-500 font-mono w-5 shrink-0">
             {index + 1}
           </span>
           <PriorityBadge priority={question.priority} />
           {/* Document & article chips */}
           {question.related_doc && (
-            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-slate-100 text-[10px] font-medium text-slate-500">
+            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-700 text-[10px] font-medium text-slate-500 dark:text-slate-400">
               <FileText className="w-3 h-3" />
               {question.related_doc}
             </span>
           )}
           {question.related_article && (
-            <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-slate-100 text-[10px] font-mono text-slate-600">
+            <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-700 text-[10px] font-mono text-slate-600 dark:text-slate-400">
               {question.related_article}
             </span>
           )}
@@ -181,22 +181,22 @@ function QuestionCard({
       </div>
 
       {/* Question text */}
-      <p className="text-sm font-medium text-slate-800 leading-snug">
+      <p className="text-sm font-medium text-slate-800 dark:text-slate-100 leading-snug">
         {question.question}
       </p>
 
       {/* Context explanation */}
       {question.context && (
-        <p className="text-xs text-slate-500 leading-relaxed">
+        <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
           {question.context}
         </p>
       )}
 
       {/* Justification — matching PDF/DOCX report */}
       {question.justification && (
-        <div className="mt-1 pt-1.5 border-t border-slate-100">
-          <p className="text-xs text-slate-500 leading-relaxed">
-            <span className="font-semibold text-slate-600">Justification :</span>{" "}
+        <div className="mt-1 pt-1.5 border-t border-slate-100 dark:border-slate-700">
+          <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+            <span className="font-semibold text-slate-600 dark:text-slate-300">Justification :</span>{" "}
             {question.justification}
           </p>
         </div>
@@ -225,14 +225,14 @@ function FilterPill({
         "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-colors",
         active
           ? "bg-blue-600 text-white shadow-sm"
-          : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+          : "bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-600"
       )}
     >
       {label}
       <span
         className={cn(
           "inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold",
-          active ? "bg-white/20 text-white" : "bg-slate-200 text-slate-500"
+          active ? "bg-white/20 text-white" : "bg-slate-200 dark:bg-slate-600 text-slate-500 dark:text-slate-400"
         )}
       >
         {count}
@@ -289,10 +289,10 @@ export function QuestionsTab({ projectId }: Props) {
     return (
       <div className="card p-8 flex flex-col items-center gap-3 text-center animate-fade-in">
         <AlertTriangle className="w-10 h-10 text-amber-400" />
-        <p className="text-slate-600 font-medium">
+        <p className="text-slate-600 dark:text-slate-400 font-medium">
           Impossible de charger les questions à poser.
         </p>
-        <p className="text-slate-400 text-sm">
+        <p className="text-slate-400 dark:text-slate-500 text-sm">
           Vérifiez que l&apos;analyse du projet a bien été lancée.
         </p>
       </div>
@@ -303,7 +303,7 @@ export function QuestionsTab({ projectId }: Props) {
     return (
       <div className="card p-8 flex flex-col items-center gap-3 text-center animate-fade-in">
         <FileX className="w-10 h-10 text-slate-300" />
-        <p className="text-slate-500">Aucune donnée disponible.</p>
+        <p className="text-slate-500 dark:text-slate-400">Aucune donnée disponible.</p>
       </div>
     );
   }
@@ -319,23 +319,23 @@ export function QuestionsTab({ projectId }: Props) {
             <HelpCircle className="w-6 h-6 text-blue-600" />
           </div>
           <div>
-            <p className="font-semibold text-slate-800">
+            <p className="font-semibold text-slate-800 dark:text-white">
               Questions à poser à l&apos;acheteur
             </p>
-            <p className="text-xs text-slate-400 mt-0.5">
+            <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
               Analyse basée sur les documents du DCE
             </p>
           </div>
         </div>
         <div className="card p-10 flex flex-col items-center gap-4 text-center">
-          <div className="w-14 h-14 rounded-2xl bg-green-50 flex items-center justify-center">
+          <div className="w-14 h-14 rounded-2xl bg-green-50 dark:bg-green-900/30 flex items-center justify-center">
             <HelpCircle className="w-7 h-7 text-green-500" />
           </div>
           <div className="space-y-1">
-            <p className="font-semibold text-slate-700">
+            <p className="font-semibold text-slate-700 dark:text-slate-300">
               Aucune question identifiée
             </p>
-            <p className="text-slate-400 text-sm max-w-sm">
+            <p className="text-slate-400 dark:text-slate-500 text-sm max-w-sm">
               Le DCE analysé ne présente pas de zones d&apos;ombre nécessitant des
               clarifications auprès de l&apos;acheteur.
             </p>
@@ -373,7 +373,7 @@ export function QuestionsTab({ projectId }: Props) {
           </div>
           <div className="flex-1 space-y-1">
             <div className="flex items-center gap-3">
-              <p className="font-semibold text-slate-800 text-base">
+              <p className="font-semibold text-slate-800 dark:text-white text-base">
                 Questions à poser à l&apos;acheteur
               </p>
               <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-100 text-blue-800 border border-blue-200">
@@ -385,11 +385,11 @@ export function QuestionsTab({ projectId }: Props) {
 
         {/* Resume */}
         {questionsData.resume && (
-          <div className="mt-4 pt-4 border-t border-slate-100">
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">
+          <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-700">
+            <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">
               Synthèse
             </p>
-            <p className="text-sm text-slate-700 leading-relaxed">
+            <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
               {questionsData.resume}
             </p>
           </div>
@@ -429,8 +429,8 @@ export function QuestionsTab({ projectId }: Props) {
       </div>
 
       {/* ── Platform tip ── */}
-      <div className="card p-3 bg-blue-50 border border-blue-100">
-        <p className="text-xs text-blue-800 text-center leading-relaxed">
+      <div className="card p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800">
+        <p className="text-xs text-blue-800 dark:text-blue-300 text-center leading-relaxed">
           <span className="font-semibold">Astuce :</span> Copiez les questions
           et posez-les sur la plateforme de dématérialisation (PLACE, AWS,
           eMarchés, Maximilien, etc.)

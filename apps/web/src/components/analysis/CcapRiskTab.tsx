@@ -49,7 +49,7 @@ const RISK_CONFIG: Record<RiskLevel, {
     label: "Critique",
     badgeCls: "bg-red-100 text-red-800 border border-red-200",
     cardBorderCls: "border-l-red-500",
-    cardBgCls: "bg-white",
+    cardBgCls: "bg-white dark:bg-slate-800",
     conseilBgCls: "bg-red-50 border border-red-100",
     conseilTextCls: "text-red-900",
     icon: <AlertOctagon className="w-4 h-4 text-red-600" />,
@@ -58,7 +58,7 @@ const RISK_CONFIG: Record<RiskLevel, {
     label: "Haut",
     badgeCls: "bg-orange-100 text-orange-800 border border-orange-200",
     cardBorderCls: "border-l-orange-400",
-    cardBgCls: "bg-white",
+    cardBgCls: "bg-white dark:bg-slate-800",
     conseilBgCls: "bg-orange-50 border border-orange-100",
     conseilTextCls: "text-orange-900",
     icon: <AlertTriangle className="w-4 h-4 text-orange-500" />,
@@ -67,7 +67,7 @@ const RISK_CONFIG: Record<RiskLevel, {
     label: "Moyen",
     badgeCls: "bg-amber-100 text-amber-800 border border-amber-200",
     cardBorderCls: "border-l-amber-400",
-    cardBgCls: "bg-white",
+    cardBgCls: "bg-white dark:bg-slate-800",
     conseilBgCls: "bg-amber-50 border border-amber-100",
     conseilTextCls: "text-amber-900",
     icon: <ShieldAlert className="w-4 h-4 text-amber-500" />,
@@ -76,7 +76,7 @@ const RISK_CONFIG: Record<RiskLevel, {
     label: "Bas",
     badgeCls: "bg-green-100 text-green-800 border border-green-200",
     cardBorderCls: "border-l-green-400",
-    cardBgCls: "bg-white",
+    cardBgCls: "bg-white dark:bg-slate-800",
     conseilBgCls: "bg-green-50 border border-green-100",
     conseilTextCls: "text-green-900",
     icon: <Info className="w-4 h-4 text-green-600" />,
@@ -145,7 +145,7 @@ function ScoreCircle({ score }: { score: number }) {
           </span>
         </div>
       </div>
-      <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
         {scoreLabel}
       </span>
     </div>
@@ -181,12 +181,12 @@ function ClauseCard({ clause, index }: { clause: CcapClause; index: number }) {
       {/* Header row */}
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-2 min-w-0">
-          <span className="text-xs text-slate-400 font-mono w-5 shrink-0">{index + 1}</span>
+          <span className="text-xs text-slate-400 dark:text-slate-500 font-mono w-5 shrink-0">{index + 1}</span>
           <div className="min-w-0">
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide truncate">
+            <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide truncate">
               {clause.article_reference || "Article non précisé"}
             </p>
-            <p className="text-sm font-medium text-slate-800 leading-snug mt-0.5">
+            <p className="text-sm font-medium text-slate-800 dark:text-slate-100 leading-snug mt-0.5">
               {clause.risk_type}
             </p>
           </div>
@@ -198,7 +198,7 @@ function ClauseCard({ clause, index }: { clause: CcapClause; index: number }) {
 
       {/* Clause excerpt */}
       {clause.citation && (
-        <blockquote className="text-xs text-slate-500 italic leading-relaxed bg-slate-50 rounded-lg px-3 py-2 border-l-2 border-slate-200">
+        <blockquote className="text-xs text-slate-500 dark:text-slate-400 italic leading-relaxed bg-slate-50 dark:bg-slate-700 rounded-lg px-3 py-2 border-l-2 border-slate-200 dark:border-slate-600">
           &ldquo;{clause.citation}&rdquo;
         </blockquote>
       )}
@@ -232,12 +232,18 @@ function LevelCounter({
 }) {
   const cfg = RISK_CONFIG[level];
   return (
-    <div className="flex items-center gap-2">
-      <span className={cn("inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold", cfg.badgeCls)}>
+    <div
+      className="flex items-center gap-2"
+      aria-label={`${cfg.label} : ${count} clause${count > 1 ? "s" : ""}`}
+    >
+      <span
+        className={cn("inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold", cfg.badgeCls)}
+        aria-hidden="true"
+      >
         {cfg.icon}
         {cfg.label}
       </span>
-      <span className="text-sm font-bold text-slate-700">{count}</span>
+      <span className="text-sm font-bold text-slate-700 dark:text-slate-300" aria-hidden="true">{count}</span>
     </div>
   );
 }
@@ -284,7 +290,7 @@ export function CcapRiskTab({ projectId }: Props) {
       <div className="card p-8 flex flex-col items-center gap-3 text-center animate-fade-in">
         <AlertTriangle className="w-10 h-10 text-amber-400" />
         <p className="text-slate-600 font-medium">Impossible de charger l&apos;analyse des risques CCAP.</p>
-        <p className="text-slate-400 text-sm">Vérifiez que l&apos;analyse du projet a bien été lancée.</p>
+        <p className="text-slate-400 dark:text-slate-500 text-sm">Vérifiez que l&apos;analyse du projet a bien été lancée.</p>
       </div>
     );
   }
@@ -293,7 +299,7 @@ export function CcapRiskTab({ projectId }: Props) {
     return (
       <div className="card p-8 flex flex-col items-center gap-3 text-center animate-fade-in">
         <FileX className="w-10 h-10 text-slate-300" />
-        <p className="text-slate-500">Aucune donnée disponible.</p>
+        <p className="text-slate-500 dark:text-slate-400">Aucune donnée disponible.</p>
       </div>
     );
   }
@@ -304,12 +310,12 @@ export function CcapRiskTab({ projectId }: Props) {
   if (ccapData.no_ccap_document || ccapData.no_ccap_text) {
     return (
       <div className="card p-10 flex flex-col items-center gap-4 text-center animate-fade-in">
-        <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center">
-          <FileX className="w-7 h-7 text-slate-400" />
+        <div className="w-14 h-14 rounded-2xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center">
+          <FileX className="w-7 h-7 text-slate-400 dark:text-slate-500" />
         </div>
         <div className="space-y-1">
-          <p className="font-semibold text-slate-700">Aucun document CCAP disponible</p>
-          <p className="text-slate-400 text-sm max-w-sm">
+          <p className="font-semibold text-slate-700 dark:text-slate-300">Aucun document CCAP disponible</p>
+          <p className="text-slate-400 dark:text-slate-500 text-sm max-w-sm">
             {ccapData.message ?? "Uploadez un CCAP pour activer l'analyse automatique des clauses risquées."}
           </p>
         </div>
@@ -324,8 +330,8 @@ export function CcapRiskTab({ projectId }: Props) {
         <div className="card p-6 flex items-center gap-5">
           <ScoreCircle score={0} />
           <div>
-            <p className="font-semibold text-slate-800">Analyse des risques CCAP</p>
-            <p className="text-slate-400 text-sm mt-0.5">
+            <p className="font-semibold text-slate-800 dark:text-slate-100">Analyse des risques CCAP</p>
+            <p className="text-slate-400 dark:text-slate-500 text-sm mt-0.5">
               {ccapData.ccap_docs_analyzed?.join(", ") ?? "Document analysé"}
             </p>
           </div>
@@ -333,8 +339,8 @@ export function CcapRiskTab({ projectId }: Props) {
         <div className="card p-10 flex flex-col items-center gap-4 text-center">
           <CheckCircle className="w-12 h-12 text-green-500" />
           <div className="space-y-1">
-            <p className="font-semibold text-slate-700">Aucune clause risquée détectée</p>
-            <p className="text-slate-400 text-sm max-w-sm">
+            <p className="font-semibold text-slate-700 dark:text-slate-300">Aucune clause risquée détectée</p>
+            <p className="text-slate-400 dark:text-slate-500 text-sm max-w-sm">
               Le CCAP analysé ne présente pas de clauses problématiques selon les critères BTP français.
             </p>
           </div>
@@ -367,11 +373,11 @@ export function CcapRiskTab({ projectId }: Props) {
           {/* Info + counters */}
           <div className="flex-1 space-y-3">
             <div>
-              <p className="font-semibold text-slate-800 text-base">
+              <p className="font-semibold text-slate-800 dark:text-slate-100 text-base">
                 Analyse des risques CCAP
               </p>
               {ccapData.ccap_docs_analyzed && ccapData.ccap_docs_analyzed.length > 0 && (
-                <p className="text-xs text-slate-400 mt-0.5">
+                <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
                   {ccapData.ccap_docs_analyzed.join(", ")}
                 </p>
               )}
@@ -388,11 +394,11 @@ export function CcapRiskTab({ projectId }: Props) {
 
         {/* Resume */}
         {ccapData.resume_risques && (
-          <div className="mt-4 pt-4 border-t border-slate-100">
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">
+          <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-700">
+            <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">
               Synthese
             </p>
-            <p className="text-sm text-slate-700 leading-relaxed">
+            <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
               {ccapData.resume_risques}
             </p>
           </div>

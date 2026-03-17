@@ -38,16 +38,16 @@ export default function OcrQualityBanner({
     return (
       <div
         className={cn(
-          "flex items-start gap-2.5 bg-red-50 border border-red-200 rounded-xl px-4 py-2.5",
+          "flex items-start gap-2.5 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl px-4 py-2.5",
           className
         )}
       >
         <XCircle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
         <div>
-          <p className="text-xs font-semibold text-red-800">
+          <p className="text-xs font-semibold text-red-800 dark:text-red-300">
             Document source très dégradé{docLabel} — Qualité OCR : {quality}%
           </p>
-          <p className="text-[11px] text-red-700 mt-0.5">
+          <p className="text-[11px] text-red-700 dark:text-red-400 mt-0.5">
             Le texte extrait contient probablement de nombreuses erreurs. Les résultats d&apos;analyse
             peuvent être significativement impactés. Privilégiez un scan de meilleure qualité.
           </p>
@@ -61,16 +61,16 @@ export default function OcrQualityBanner({
     return (
       <div
         className={cn(
-          "flex items-start gap-2.5 bg-orange-50 border border-orange-200 rounded-xl px-4 py-2.5",
+          "flex items-start gap-2.5 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-xl px-4 py-2.5",
           className
         )}
       >
         <AlertTriangle className="w-4 h-4 text-orange-600 flex-shrink-0 mt-0.5" />
         <div>
-          <p className="text-xs font-semibold text-orange-800">
+          <p className="text-xs font-semibold text-orange-800 dark:text-orange-300">
             Document source de mauvaise qualité{docLabel} — Qualité OCR : {quality}%
           </p>
-          <p className="text-[11px] text-orange-700 mt-0.5">
+          <p className="text-[11px] text-orange-700 dark:text-orange-400 mt-0.5">
             Certaines parties du texte ont pu être mal interprétées. Vérifiez les données critiques
             (montants, dates, noms) directement dans le document original.
           </p>
@@ -83,12 +83,12 @@ export default function OcrQualityBanner({
   return (
     <div
       className={cn(
-        "flex items-center gap-2.5 bg-amber-50 border border-amber-200 rounded-xl px-4 py-2.5",
+        "flex items-center gap-2.5 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-xl px-4 py-2.5",
         className
       )}
     >
       <ScanSearch className="w-4 h-4 text-amber-600 flex-shrink-0" />
-      <p className="text-xs text-amber-800">
+      <p className="text-xs text-amber-800 dark:text-amber-300">
         <span className="font-semibold">Qualité OCR moyenne{docLabel} : {quality}%</span>
         {" — "}Certaines données pourraient nécessiter une vérification.
       </p>

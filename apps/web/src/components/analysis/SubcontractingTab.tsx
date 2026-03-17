@@ -53,28 +53,28 @@ export function SubcontractingTab({ projectId }: { projectId: string }) {
       {/* Header + Score */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
+          <h2 className="text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2">
             <Users className="w-5 h-5 text-primary-600" />
             Analyse Sous-traitance
           </h2>
-          <p className="text-sm text-slate-500 mt-1">{data.resume}</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">{data.resume}</p>
         </div>
         <div className="text-center">
           <div className={`text-3xl font-bold ${scoreColor}`} role="meter" aria-valuenow={score} aria-valuemin={0} aria-valuemax={100} aria-label="Score de risque sous-traitance">
             {score}
           </div>
-          <p className="text-xs text-slate-400">Risque /100</p>
+          <p className="text-xs text-slate-400 dark:text-slate-500">Risque /100</p>
         </div>
       </div>
 
       {/* Sous-traitance autorisée */}
-      <div className="flex items-center gap-2 p-3 rounded-lg border border-slate-200 bg-slate-50">
+      <div className="flex items-center gap-2 p-3 rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-800">
         {data.sous_traitance_autorisee ? (
           <CheckCircle2 className="w-5 h-5 text-green-600 flex-shrink-0" />
         ) : (
           <XCircle className="w-5 h-5 text-red-600 flex-shrink-0" />
         )}
-        <span className="text-sm font-medium text-slate-700">
+        <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
           Sous-traitance {data.sous_traitance_autorisee ? "autorisée" : "interdite ou non mentionnée"}
         </span>
         {data.paiement_direct_applicable && (
@@ -86,15 +86,15 @@ export function SubcontractingTab({ projectId }: { projectId: string }) {
 
       {/* Restrictions RC */}
       {data.restrictions_rc && (
-        <div className="p-3 rounded-lg border border-amber-200 bg-amber-50">
-          <p className="text-sm text-amber-800"><span className="font-medium">Restrictions RC :</span> {data.restrictions_rc}</p>
+        <div className="p-3 rounded-lg border border-amber-200 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20">
+          <p className="text-sm text-amber-800 dark:text-amber-300"><span className="font-medium">Restrictions RC :</span> {data.restrictions_rc}</p>
         </div>
       )}
 
       {/* Conflits */}
       {data.conflits && data.conflits.length > 0 && (
         <div className="space-y-2">
-          <h3 className="text-sm font-semibold text-red-800 flex items-center gap-1.5">
+          <h3 className="text-sm font-semibold text-red-800 dark:text-red-400 flex items-center gap-1.5">
             <ShieldAlert className="w-4 h-4" />
             Conflits détectés ({data.conflits.length})
           </h3>
@@ -102,7 +102,7 @@ export function SubcontractingTab({ projectId }: { projectId: string }) {
             <div key={i} className={`p-3 rounded-lg border ${SEVERITY_COLORS[c.severity] || SEVERITY_COLORS.medium}`}>
               <div className="flex items-center gap-2 mb-1">
                 <span className="text-xs font-bold uppercase" aria-label={`Severite du conflit : ${c.severity}`}>{c.severity}</span>
-                <span className="text-xs text-slate-500">{c.source_a} vs {c.source_b}</span>
+                <span className="text-xs text-slate-500 dark:text-slate-400">{c.source_a} vs {c.source_b}</span>
               </div>
               <p className="text-sm">{c.description}</p>
             </div>
@@ -113,12 +113,12 @@ export function SubcontractingTab({ projectId }: { projectId: string }) {
       {/* Lots analysis */}
       {data.lots_analysis && data.lots_analysis.length > 0 && (
         <div>
-          <h3 className="text-sm font-semibold text-slate-800 mb-3">Analyse par lot</h3>
+          <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100 mb-3">Analyse par lot</h3>
           <div className="space-y-2">
             {data.lots_analysis.map((lot: LotAnalysis, i: number) => (
-              <div key={i} className="p-4 border border-slate-200 rounded-lg">
+              <div key={i} className="p-4 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="font-medium text-sm text-slate-900">{lot.lot}</span>
+                  <span className="font-medium text-sm text-slate-900 dark:text-white">{lot.lot}</span>
                   <div className="flex items-center gap-2">
                     {lot.sous_traitance_recommandee && (
                       <span className="text-xs bg-primary-100 text-primary-700 px-2 py-0.5 rounded-full">Sous-traiter</span>
@@ -131,10 +131,10 @@ export function SubcontractingTab({ projectId }: { projectId: string }) {
                     </span>
                   </div>
                 </div>
-                <p className="text-xs text-slate-600 mb-1">
+                <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">
                   <span className="font-medium">Compétence requise :</span> {lot.competence_requise}
                 </p>
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-slate-500 dark:text-slate-400">
                   {lot.competence_interne ? "Compétence interne disponible" : "Compétence interne manquante"} — {lot.justification}
                 </p>
               </div>
@@ -145,15 +145,15 @@ export function SubcontractingTab({ projectId }: { projectId: string }) {
 
       {/* Legal obligations — matching PDF/DOCX report */}
       {data.legal_obligations && data.legal_obligations.length > 0 && (
-        <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg">
-          <h3 className="text-sm font-semibold text-slate-800 mb-2 flex items-center gap-1.5">
+        <div className="p-4 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg">
+          <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100 mb-2 flex items-center gap-1.5">
             <ShieldAlert className="w-4 h-4 text-slate-600" />
             Obligations légales
           </h3>
           <ul className="space-y-1">
             {data.legal_obligations.map((o: string, i: number) => (
-              <li key={i} className="text-sm text-slate-700 flex items-start gap-2">
-                <span className="text-slate-400 mt-1">&#8226;</span>
+              <li key={i} className="text-sm text-slate-700 dark:text-slate-300 flex items-start gap-2">
+                <span className="text-slate-400 dark:text-slate-500 mt-1">&#8226;</span>
                 {o}
               </li>
             ))}
@@ -163,12 +163,12 @@ export function SubcontractingTab({ projectId }: { projectId: string }) {
 
       {/* Recommandations */}
       {data.recommandations && data.recommandations.length > 0 && (
-        <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-          <h3 className="text-sm font-semibold text-blue-800 mb-2">Recommandations</h3>
+        <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+          <h3 className="text-sm font-semibold text-blue-800 dark:text-blue-300 mb-2">Recommandations</h3>
           <ul className="space-y-1">
             {data.recommandations.map((r: string, i: number) => (
-              <li key={i} className="text-sm text-blue-700 flex items-start gap-2">
-                <span className="text-blue-400 mt-1">&#8226;</span>
+              <li key={i} className="text-sm text-blue-700 dark:text-blue-300 flex items-start gap-2">
+                <span className="text-blue-400 dark:text-blue-500 mt-1">&#8226;</span>
                 {r}
               </li>
             ))}

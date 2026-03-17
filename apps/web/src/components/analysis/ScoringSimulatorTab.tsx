@@ -145,11 +145,11 @@ function ScoreCircle20({ score: rawScore, label }: { score: number; label?: stri
           <span className="text-2xl font-bold" style={{ color }}>
             {score.toFixed(1)}
           </span>
-          <span className="text-[10px] text-slate-400 font-medium">/20</span>
+          <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">/20</span>
         </div>
       </div>
       {label && (
-        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+        <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
           {label}
         </span>
       )}
@@ -180,9 +180,9 @@ function StatCard({
       </div>
       <div>
         <p className="text-lg font-bold" style={{ color }}>
-          {value.toFixed(1)}<span className="text-xs text-slate-400 font-medium ml-0.5">/20</span>
+          {value.toFixed(1)}<span className="text-xs text-slate-400 dark:text-slate-500 font-medium ml-0.5">/20</span>
         </p>
-        <p className="text-[11px] text-slate-500 font-medium">{label}</p>
+        <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">{label}</p>
       </div>
     </div>
   );
@@ -205,10 +205,10 @@ function DimensionCard({ dim, index }: { dim: ScoringDimension; index: number })
       {/* Header */}
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-2 min-w-0">
-          <span className="text-xs text-slate-400 font-mono w-5 shrink-0">
+          <span className="text-xs text-slate-400 dark:text-slate-500 font-mono w-5 shrink-0">
             {index + 1}
           </span>
-          <p className="text-sm font-semibold text-slate-800 leading-snug">
+          <p className="text-sm font-semibold text-slate-800 dark:text-slate-100 leading-snug">
             {dim.criterion}
           </p>
         </div>
@@ -223,7 +223,7 @@ function DimensionCard({ dim, index }: { dim: ScoringDimension; index: number })
           <span className={cn("font-semibold", colors.text)}>
             {dim.estimated_score} / {dim.max_score}
           </span>
-          <span className="text-slate-400">
+          <span className="text-slate-400 dark:text-slate-500">
             {(ratio * 100).toFixed(0)}%
           </span>
         </div>
@@ -244,22 +244,22 @@ function DimensionCard({ dim, index }: { dim: ScoringDimension; index: number })
 
       {/* Justification */}
       {dim.justification && (
-        <p className="text-xs text-slate-600 leading-relaxed">
+        <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
           {dim.justification}
         </p>
       )}
 
       {/* Tips */}
       {dim.tips_to_improve.length > 0 && (
-        <div className="rounded-lg px-3 py-2 bg-blue-50 border border-blue-100">
-          <p className="text-xs font-semibold text-blue-800 mb-1 inline-flex items-center gap-1">
+        <div className="rounded-lg px-3 py-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800">
+          <p className="text-xs font-semibold text-blue-800 dark:text-blue-300 mb-1 inline-flex items-center gap-1">
             <Lightbulb className="w-3.5 h-3.5" />
             Pistes d&apos;amélioration
           </p>
           <ul className="space-y-0.5">
             {dim.tips_to_improve.map((tip, i) => (
-              <li key={i} className="text-xs text-blue-700 leading-relaxed flex items-start gap-1.5">
-                <span className="text-blue-400 mt-0.5 shrink-0">&bull;</span>
+              <li key={i} className="text-xs text-blue-700 dark:text-blue-300 leading-relaxed flex items-start gap-1.5">
+                <span className="text-blue-400 dark:text-blue-500 mt-0.5 shrink-0">&bull;</span>
                 <span>{tip}</span>
               </li>
             ))}
@@ -311,10 +311,10 @@ export function ScoringSimulatorTab({ projectId }: Props) {
     return (
       <div className="card p-8 flex flex-col items-center gap-3 text-center animate-fade-in">
         <AlertTriangle className="w-10 h-10 text-amber-400" />
-        <p className="text-slate-600 font-medium">
+        <p className="text-slate-600 dark:text-slate-400 font-medium">
           Impossible de charger la simulation de notation.
         </p>
-        <p className="text-slate-400 text-sm">
+        <p className="text-slate-400 dark:text-slate-500 text-sm">
           Vérifiez que l&apos;analyse du projet a bien été lancée.
         </p>
       </div>
@@ -325,7 +325,7 @@ export function ScoringSimulatorTab({ projectId }: Props) {
     return (
       <div className="card p-8 flex flex-col items-center gap-3 text-center animate-fade-in">
         <FileX className="w-10 h-10 text-slate-300" />
-        <p className="text-slate-500">Aucune donnée disponible.</p>
+        <p className="text-slate-500 dark:text-slate-400">Aucune donnée disponible.</p>
       </div>
     );
   }
@@ -336,14 +336,14 @@ export function ScoringSimulatorTab({ projectId }: Props) {
   if (!scoring.dimensions || scoring.dimensions.length === 0) {
     return (
       <div className="card p-10 flex flex-col items-center gap-4 text-center animate-fade-in">
-        <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center">
-          <Target className="w-7 h-7 text-slate-400" />
+        <div className="w-14 h-14 rounded-2xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center">
+          <Target className="w-7 h-7 text-slate-400 dark:text-slate-500" />
         </div>
         <div className="space-y-1">
-          <p className="font-semibold text-slate-700">
+          <p className="font-semibold text-slate-700 dark:text-slate-300">
             Aucune simulation disponible
           </p>
-          <p className="text-slate-400 text-sm max-w-sm">
+          <p className="text-slate-400 dark:text-slate-500 text-sm max-w-sm">
             Uploadez un RC ou CCTP pour activer la simulation de notation acheteur.
           </p>
         </div>
@@ -357,9 +357,9 @@ export function ScoringSimulatorTab({ projectId }: Props) {
     <div className="space-y-4 animate-fade-in">
       {/* -- Company profile banner -- */}
       {!scoring.has_company_profile && (
-        <div className="card p-3 flex items-center gap-3 bg-blue-50 border border-blue-100">
+        <div className="card p-3 flex items-center gap-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800">
           <Info className="w-5 h-5 text-blue-500 shrink-0" />
-          <p className="text-xs text-blue-700 leading-relaxed">
+          <p className="text-xs text-blue-700 dark:text-blue-300 leading-relaxed">
             Configurez votre profil entreprise pour une simulation plus précise.
           </p>
         </div>
@@ -395,7 +395,7 @@ export function ScoringSimulatorTab({ projectId }: Props) {
 
             {/* Classement badge */}
             <div className="flex items-center gap-2">
-              <span className="text-xs text-slate-500 font-medium">
+              <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">
                 Classement probable :
               </span>
               <span
@@ -414,11 +414,11 @@ export function ScoringSimulatorTab({ projectId }: Props) {
 
         {/* Resume */}
         {scoring.resume && (
-          <div className="mt-4 pt-4 border-t border-slate-100">
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">
+          <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-700">
+            <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">
               Synthèse
             </p>
-            <p className="text-sm text-slate-700 leading-relaxed">
+            <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
               {scoring.resume}
             </p>
           </div>
@@ -427,7 +427,7 @@ export function ScoringSimulatorTab({ projectId }: Props) {
 
       {/* -- Dimensions section -- */}
       <div>
-        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3 px-1">
+        <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-3 px-1">
           Détail des critères ({scoring.dimensions.length})
         </p>
         <div className="space-y-3">
@@ -439,8 +439,8 @@ export function ScoringSimulatorTab({ projectId }: Props) {
 
       {/* -- Axes d'amelioration -- */}
       {scoring.axes_amelioration && scoring.axes_amelioration.length > 0 && (
-        <div className="card p-5 bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100">
-          <p className="text-xs font-semibold text-blue-800 uppercase tracking-wide mb-3 inline-flex items-center gap-1.5">
+        <div className="card p-5 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border border-blue-100 dark:border-blue-800">
+          <p className="text-xs font-semibold text-blue-800 dark:text-blue-300 uppercase tracking-wide mb-3 inline-flex items-center gap-1.5">
             <Target className="w-4 h-4" />
             Axes d&apos;amélioration prioritaires
           </p>
@@ -448,9 +448,9 @@ export function ScoringSimulatorTab({ projectId }: Props) {
             {scoring.axes_amelioration.map((axe, i) => (
               <li
                 key={i}
-                className="flex items-start gap-2 text-sm text-blue-900 leading-relaxed"
+                className="flex items-start gap-2 text-sm text-blue-900 dark:text-blue-200 leading-relaxed"
               >
-                <span className="shrink-0 w-5 h-5 rounded-full bg-blue-200 text-blue-800 text-xs font-bold flex items-center justify-center mt-0.5">
+                <span className="shrink-0 w-5 h-5 rounded-full bg-blue-200 dark:bg-blue-800 text-blue-800 dark:text-blue-200 text-xs font-bold flex items-center justify-center mt-0.5">
                   {i + 1}
                 </span>
                 <span>{axe}</span>

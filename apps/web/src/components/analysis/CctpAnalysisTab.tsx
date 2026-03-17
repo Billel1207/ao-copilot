@@ -25,7 +25,7 @@ const RISK_COLORS: Record<string, string> = {
   HAUT: "bg-orange-100 text-orange-800 border-orange-200",
   MOYEN: "bg-amber-100 text-amber-800 border-amber-200",
   BAS: "bg-green-100 text-green-800 border-green-200",
-  INFO: "bg-slate-100 text-slate-700 border-slate-200",
+  INFO: "bg-slate-100 text-slate-700 dark:text-slate-300 border-slate-200",
 };
 
 const SEVERITY_COLORS: Record<string, string> = {
@@ -61,7 +61,7 @@ function ComplexityGauge({ score }: { score: number }) {
           {score}
         </span>
       </div>
-      <span className="text-xs text-slate-500 font-medium">{label}</span>
+      <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">{label}</span>
     </div>
   );
 }
@@ -73,15 +73,15 @@ export default function CctpAnalysisTab({ projectId }: Props) {
     return (
       <div className="flex items-center justify-center py-16">
         <Loader2 className="w-6 h-6 animate-spin text-blue-500 mr-2" />
-        <span className="text-sm text-slate-500">Analyse CCTP en cours...</span>
+        <span className="text-sm text-slate-500 dark:text-slate-400">Analyse CCTP en cours...</span>
       </div>
     );
   }
 
   if (error || !data) {
     return (
-      <div className="text-center py-12 text-slate-500">
-        <FileWarning className="w-10 h-10 mx-auto mb-2 text-slate-400" />
+      <div className="text-center py-12 text-slate-500 dark:text-slate-400">
+        <FileWarning className="w-10 h-10 mx-auto mb-2 text-slate-400 dark:text-slate-500" />
         <p className="text-sm">
           {data?.no_cctp_document
             ? "Aucun document CCTP trouvé. Uploadez un Cahier des Clauses Techniques."
@@ -109,11 +109,11 @@ export default function CctpAnalysisTab({ projectId }: Props) {
   return (
     <div className="space-y-6">
       {/* Header avec score complexité */}
-      <div className="bg-white rounded-xl border p-6 flex items-start justify-between">
+      <div className="bg-white dark:bg-slate-900 rounded-xl border dark:border-slate-700 p-6 flex items-start justify-between">
         <div className="flex-1">
-          <h3 className="text-lg font-semibold text-slate-800 mb-2">Analyse CCTP</h3>
-          <p className="text-sm text-slate-600 leading-relaxed">{data.resume || "Aucun résumé disponible."}</p>
-          <div className="flex gap-4 mt-4 text-xs text-slate-500">
+          <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-2">Analyse CCTP</h3>
+          <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">{data.resume || "Aucun résumé disponible."}</p>
+          <div className="flex gap-4 mt-4 text-xs text-slate-500 dark:text-slate-400">
             <span>{data.nb_exigences || 0} exigences</span>
             <span>{data.nb_normes || 0} normes/DTU</span>
             <span>{data.nb_materiaux_imposes || 0} matériaux imposés</span>
@@ -126,7 +126,7 @@ export default function CctpAnalysisTab({ projectId }: Props) {
 
       {/* Alertes anticoncurrentielles */}
       {data.nb_anticoncurrentiel > 0 && (
-        <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 flex items-start gap-3">
+        <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg p-4 flex items-start gap-3">
           <Ban className="w-5 h-5 text-orange-500 shrink-0 mt-0.5" />
           <div>
             <p className="text-sm font-medium text-orange-800">
@@ -141,7 +141,7 @@ export default function CctpAnalysisTab({ projectId }: Props) {
 
       {/* Risques critiques */}
       {data.nb_risques_critiques > 0 && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 flex items-start gap-3">
           <AlertTriangle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
           <div>
             <p className="text-sm font-medium text-red-800">
@@ -159,25 +159,25 @@ export default function CctpAnalysisTab({ projectId }: Props) {
         const config = CATEGORY_CONFIG[cat] || { label: cat, icon: Info, color: "slate" };
         const Icon = config.icon;
         return (
-          <div key={cat} className="bg-white rounded-xl border overflow-hidden">
-            <div className={`px-4 py-3 border-b bg-${config.color}-50 flex items-center gap-2`}>
+          <div key={cat} className="bg-white dark:bg-slate-900 rounded-xl border dark:border-slate-700 overflow-hidden">
+            <div className={`px-4 py-3 border-b dark:border-slate-700 bg-${config.color}-50 dark:bg-slate-800 flex items-center gap-2`}>
               <Icon className={`w-4 h-4 text-${config.color}-600`} />
-              <h4 className="text-sm font-semibold text-slate-700">{config.label}</h4>
-              <span className="ml-auto text-xs text-slate-400">{(items as any[]).length} exigence(s)</span>
+              <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300">{config.label}</h4>
+              <span className="ml-auto text-xs text-slate-400 dark:text-slate-500">{(items as any[]).length} exigence(s)</span>
             </div>
-            <div className="divide-y">
+            <div className="divide-y dark:divide-slate-700">
               {(items as any[]).map((ex: any, i: number) => (
                 <div key={i} className="px-4 py-3">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1">
-                      <p className="text-sm text-slate-800">{ex.description}</p>
+                      <p className="text-sm text-slate-800 dark:text-slate-100">{ex.description}</p>
                       {ex.norme_ref && (
                         <span className="inline-block mt-1 text-xs bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded">
                           {ex.norme_ref}
                         </span>
                       )}
                       {ex.conseil && (
-                        <p className="text-xs text-slate-500 mt-1 italic">💡 {ex.conseil}</p>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 italic">💡 {ex.conseil}</p>
                       )}
                     </div>
                     <span
@@ -196,18 +196,18 @@ export default function CctpAnalysisTab({ projectId }: Props) {
 
       {/* Normes DTU */}
       {normes.length > 0 && (
-        <div className="bg-white rounded-xl border overflow-hidden">
-          <div className="px-4 py-3 border-b bg-indigo-50">
-            <h4 className="text-sm font-semibold text-slate-700">Normes & DTU applicables</h4>
+        <div className="bg-white dark:bg-slate-900 rounded-xl border dark:border-slate-700 overflow-hidden">
+          <div className="px-4 py-3 border-b dark:border-slate-700 bg-indigo-50 dark:bg-indigo-900/20">
+            <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300">Normes & DTU applicables</h4>
           </div>
           <div className="p-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {normes.map((n: any, i: number) => (
-                <div key={i} className="flex items-start gap-2 p-2 bg-slate-50 rounded-lg">
+                <div key={i} className="flex items-start gap-2 p-2 bg-slate-50 dark:bg-slate-800 rounded-lg">
                   <CheckCircle2 className="w-4 h-4 text-indigo-500 shrink-0 mt-0.5" />
                   <div>
-                    <p className="text-xs font-medium text-slate-800">{n.code}</p>
-                    <p className="text-[11px] text-slate-500">{n.titre}</p>
+                    <p className="text-xs font-medium text-slate-800 dark:text-slate-100">{n.code}</p>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400">{n.titre}</p>
                   </div>
                 </div>
               ))}
@@ -218,11 +218,11 @@ export default function CctpAnalysisTab({ projectId }: Props) {
 
       {/* Risques techniques */}
       {risques.length > 0 && (
-        <div className="bg-white rounded-xl border overflow-hidden">
-          <div className="px-4 py-3 border-b bg-red-50">
-            <h4 className="text-sm font-semibold text-slate-700">Risques techniques</h4>
+        <div className="bg-white dark:bg-slate-900 rounded-xl border dark:border-slate-700 overflow-hidden">
+          <div className="px-4 py-3 border-b dark:border-slate-700 bg-red-50 dark:bg-red-900/20">
+            <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300">Risques techniques</h4>
           </div>
-          <div className="divide-y">
+          <div className="divide-y dark:divide-slate-700">
             {risques.map((r: any, i: number) => (
               <div key={i} className={`px-4 py-3 border-l-4 ${SEVERITY_COLORS[r.severity] || ""}`}>
                 <div className="flex items-center gap-2 mb-1">
@@ -232,11 +232,11 @@ export default function CctpAnalysisTab({ projectId }: Props) {
                   >
                     {r.severity}
                   </span>
-                  <span className="text-xs text-slate-500 uppercase">{r.type}</span>
+                  <span className="text-xs text-slate-500 dark:text-slate-400 uppercase">{r.type}</span>
                 </div>
-                <p className="text-sm text-slate-800">{r.description}</p>
+                <p className="text-sm text-slate-800 dark:text-slate-100">{r.description}</p>
                 {r.mitigation && (
-                  <p className="text-xs text-slate-500 mt-1">🛡️ {r.mitigation}</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">🛡️ {r.mitigation}</p>
                 )}
               </div>
             ))}
@@ -246,26 +246,26 @@ export default function CctpAnalysisTab({ projectId }: Props) {
 
       {/* Matériaux imposés */}
       {materiaux.length > 0 && (
-        <div className="bg-white rounded-xl border overflow-hidden">
-          <div className="px-4 py-3 border-b bg-blue-50">
-            <h4 className="text-sm font-semibold text-slate-700">Matériaux imposés</h4>
+        <div className="bg-white dark:bg-slate-900 rounded-xl border dark:border-slate-700 overflow-hidden">
+          <div className="px-4 py-3 border-b dark:border-slate-700 bg-blue-50 dark:bg-blue-900/20">
+            <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300">Matériaux imposés</h4>
           </div>
           <table className="w-full text-xs">
-            <thead className="bg-slate-50">
+            <thead className="bg-slate-50 dark:bg-slate-800">
               <tr>
-                <th className="text-left px-4 py-2 text-slate-500">Désignation</th>
-                <th className="text-center px-2 py-2 text-slate-500">Marque</th>
-                <th className="text-center px-2 py-2 text-slate-500">Anticoncurrentiel</th>
-                <th className="text-left px-4 py-2 text-slate-500">Alternative</th>
+                <th className="text-left px-4 py-2 text-slate-500 dark:text-slate-400">Désignation</th>
+                <th className="text-center px-2 py-2 text-slate-500 dark:text-slate-400">Marque</th>
+                <th className="text-center px-2 py-2 text-slate-500 dark:text-slate-400">Anticoncurrentiel</th>
+                <th className="text-left px-4 py-2 text-slate-500 dark:text-slate-400">Alternative</th>
               </tr>
             </thead>
-            <tbody className="divide-y">
+            <tbody className="divide-y dark:divide-slate-700">
               {materiaux.map((m: any, i: number) => (
-                <tr key={i} className={m.anticoncurrentiel ? "bg-orange-50" : ""}>
-                  <td className="px-4 py-2 text-slate-800">{m.designation}</td>
+                <tr key={i} className={m.anticoncurrentiel ? "bg-orange-50 dark:bg-orange-900/20" : ""}>
+                  <td className="px-4 py-2 text-slate-800 dark:text-slate-100">{m.designation}</td>
                   <td className="px-2 py-2 text-center">{m.marque_imposee ? "⚠️ Oui" : "Non"}</td>
                   <td className="px-2 py-2 text-center">{m.anticoncurrentiel ? "🚫 Oui" : "✅ Non"}</td>
-                  <td className="px-4 py-2 text-slate-500">{m.alternative || "—"}</td>
+                  <td className="px-4 py-2 text-slate-500 dark:text-slate-400">{m.alternative || "—"}</td>
                 </tr>
               ))}
             </tbody>

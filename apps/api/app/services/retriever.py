@@ -128,7 +128,11 @@ def _fallback_text_chunks(db: Session, project_id: str, top_k: int = 15) -> list
         db.rollback()
         return []
 
-    logger.info(f"RAG fallback: {len(rows)} chunks retournés (sans vector ranking)")
+    logger.error(
+        "pgvector_fallback_activated",
+        project_id=project_id,
+        chunks_returned=len(rows),
+    )
     return [
         {
             "id": str(row.id),
@@ -137,7 +141,7 @@ def _fallback_text_chunks(db: Session, project_id: str, top_k: int = 15) -> list
             "page_end": row.page_end,
             "doc_name": row.doc_name,
             "doc_type": row.doc_type,
-            "similarity": 0.75,  # Score fictif pour le fallback
+            "similarity": 0.35,  # Score conservateur — fallback sans pgvector
         }
         for row in rows
     ]

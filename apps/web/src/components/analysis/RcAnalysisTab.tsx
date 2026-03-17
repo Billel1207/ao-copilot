@@ -100,17 +100,17 @@ function ConditionCard({ condition, index }: { condition: ConditionAcces; index:
   const cfg = CONDITION_CONFIG[condition.type] ?? CONDITION_CONFIG.recommandé;
 
   return (
-    <div className={cn("card border-l-4 p-4 space-y-1 animate-fade-in", cfg.borderCls, "bg-white")}>
+    <div className={cn("card border-l-4 p-4 space-y-1 animate-fade-in", cfg.borderCls, "bg-white dark:bg-slate-800")}>
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-2 min-w-0">
-          <span className="text-xs text-slate-400 font-mono w-5 shrink-0">{index + 1}</span>
+          <span className="text-xs text-slate-400 dark:text-slate-500 font-mono w-5 shrink-0">{index + 1}</span>
           <div className="min-w-0">
             {condition.reference_article && (
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide truncate">
+              <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide truncate">
                 {condition.reference_article}
               </p>
             )}
-            <p className="text-sm font-medium text-slate-800 leading-snug mt-0.5">
+            <p className="text-sm font-medium text-slate-800 dark:text-slate-100 leading-snug mt-0.5">
               {condition.condition}
             </p>
           </div>
@@ -141,12 +141,12 @@ function InfoCard({
   children: React.ReactNode;
 }) {
   return (
-    <div className="card p-4 space-y-2 bg-white">
+    <div className="card p-4 space-y-2 bg-white dark:bg-slate-800">
       <div className="flex items-center gap-2">
         {icon}
-        <p className="text-sm font-semibold text-slate-700">{title}</p>
+        <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">{title}</p>
       </div>
-      <div className="text-sm text-slate-600 leading-relaxed">{children}</div>
+      <div className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">{children}</div>
     </div>
   );
 }
@@ -203,8 +203,8 @@ export function RcAnalysisTab({ projectId }: Props) {
     return (
       <div className="card p-8 flex flex-col items-center gap-3 text-center animate-fade-in">
         <AlertTriangle className="w-10 h-10 text-amber-400" />
-        <p className="text-slate-600 font-medium">Impossible de charger l&apos;analyse du R&egrave;glement de Consultation.</p>
-        <p className="text-slate-400 text-sm">V&eacute;rifiez que l&apos;analyse du projet a bien &eacute;t&eacute; lanc&eacute;e.</p>
+        <p className="text-slate-600 dark:text-slate-400 font-medium">Impossible de charger l&apos;analyse du R&egrave;glement de Consultation.</p>
+        <p className="text-slate-400 dark:text-slate-500 text-sm">V&eacute;rifiez que l&apos;analyse du projet a bien &eacute;t&eacute; lanc&eacute;e.</p>
       </div>
     );
   }
@@ -213,7 +213,7 @@ export function RcAnalysisTab({ projectId }: Props) {
     return (
       <div className="card p-8 flex flex-col items-center gap-3 text-center animate-fade-in">
         <FileX className="w-10 h-10 text-slate-300" />
-        <p className="text-slate-500">Aucune donn&eacute;e disponible.</p>
+        <p className="text-slate-500 dark:text-slate-400">Aucune donn&eacute;e disponible.</p>
       </div>
     );
   }
@@ -224,12 +224,12 @@ export function RcAnalysisTab({ projectId }: Props) {
   if (rcData.no_rc_document) {
     return (
       <div className="card p-10 flex flex-col items-center gap-4 text-center animate-fade-in">
-        <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center">
-          <FileX className="w-7 h-7 text-slate-400" />
+        <div className="w-14 h-14 rounded-2xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center">
+          <FileX className="w-7 h-7 text-slate-400 dark:text-slate-500" />
         </div>
         <div className="space-y-1">
-          <p className="font-semibold text-slate-700">Aucun R&egrave;glement de Consultation disponible</p>
-          <p className="text-slate-400 text-sm max-w-sm">
+          <p className="font-semibold text-slate-700 dark:text-slate-300">Aucun R&egrave;glement de Consultation disponible</p>
+          <p className="text-slate-400 dark:text-slate-500 text-sm max-w-sm">
             {rcData.message ?? "Uploadez un RC pour activer l\u2019analyse automatique des conditions de consultation."}
           </p>
         </div>
@@ -248,7 +248,7 @@ export function RcAnalysisTab({ projectId }: Props) {
         <div className="flex flex-col sm:flex-row sm:items-center gap-4">
           <div className="flex-1 space-y-2">
             <div className="flex items-center gap-3 flex-wrap">
-              <p className="font-semibold text-slate-800 text-base">
+              <p className="font-semibold text-slate-800 dark:text-white text-base">
                 Analyse du R&egrave;glement de Consultation
               </p>
               {rcData.procedure_type && <ProcedureBadge type={rcData.procedure_type} />}
@@ -258,11 +258,11 @@ export function RcAnalysisTab({ projectId }: Props) {
 
         {/* Resume */}
         {rcData.resume && (
-          <div className="mt-4 pt-4 border-t border-slate-100">
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">
+          <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-700">
+            <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">
               Synth&egrave;se
             </p>
-            <p className="text-sm text-slate-700 leading-relaxed">
+            <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
               {rcData.resume}
             </p>
           </div>
@@ -294,35 +294,35 @@ export function RcAnalysisTab({ projectId }: Props) {
         <div className="card p-4 space-y-3">
           <div className="flex items-center gap-2">
             <Layers className="w-4 h-4 text-blue-600" />
-            <p className="text-sm font-semibold text-slate-700">
+            <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">
               Lots ({rcData.lots.length})
             </p>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-slate-100">
-                  <th className="text-left py-2 px-3 text-xs font-semibold text-slate-500 uppercase tracking-wide w-20">
+                <tr className="border-b border-slate-100 dark:border-slate-700 dark:bg-slate-900">
+                  <th className="text-left py-2 px-3 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide w-20">
                     N&deg;
                   </th>
-                  <th className="text-left py-2 px-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                  <th className="text-left py-2 px-3 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
                     Intitul&eacute;
                   </th>
-                  <th className="text-right py-2 px-3 text-xs font-semibold text-slate-500 uppercase tracking-wide w-40">
+                  <th className="text-right py-2 px-3 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide w-40">
                     Montant estim&eacute;
                   </th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="dark:bg-slate-900">
                 {rcData.lots.map((lot, i) => (
-                  <tr key={i} className="border-b border-slate-50 last:border-b-0 hover:bg-slate-50 transition-colors">
-                    <td className="py-2 px-3 text-slate-600 font-mono text-xs">
+                  <tr key={i} className="border-b border-slate-50 dark:border-slate-700 last:border-b-0 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+                    <td className="py-2 px-3 text-slate-600 dark:text-slate-400 font-mono text-xs">
                       {lot.numero}
                     </td>
-                    <td className="py-2 px-3 text-slate-700">
+                    <td className="py-2 px-3 text-slate-700 dark:text-slate-300">
                       {lot.intitule}
                     </td>
-                    <td className="py-2 px-3 text-right text-slate-600 font-medium">
+                    <td className="py-2 px-3 text-right text-slate-600 dark:text-slate-400 font-medium">
                       {formatMontant(lot.montant_estime)}
                     </td>
                   </tr>
@@ -336,7 +336,7 @@ export function RcAnalysisTab({ projectId }: Props) {
       {/* ── Conditions d'acces ── */}
       {sortedConditions.length > 0 && (
         <div className="space-y-3">
-          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide px-1">
+          <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide px-1">
             Conditions d&apos;acc&egrave;s ({sortedConditions.length})
           </p>
           {sortedConditions.map((cond, i) => (
@@ -372,18 +372,18 @@ export function RcAnalysisTab({ projectId }: Props) {
               )}
             </div>
             {rcData.groupement.forme && (
-              <p className="text-sm text-slate-600">
-                <span className="font-medium text-slate-700">Forme :</span> {rcData.groupement.forme}
+              <p className="text-sm text-slate-600 dark:text-slate-400">
+                <span className="font-medium text-slate-700 dark:text-slate-300">Forme :</span> {rcData.groupement.forme}
               </p>
             )}
             {rcData.groupement.mandataire_solidaire && (
-              <p className="text-xs text-amber-700 bg-amber-50 rounded px-2 py-1 border border-amber-100">
+              <p className="text-xs text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/20 rounded px-2 py-1 border border-amber-100 dark:border-amber-800">
                 Mandataire solidaire exig&eacute;
               </p>
             )}
             {rcData.groupement.restrictions && (
-              <p className="text-sm text-slate-600">
-                <span className="font-medium text-slate-700">Restrictions :</span> {rcData.groupement.restrictions}
+              <p className="text-sm text-slate-600 dark:text-slate-400">
+                <span className="font-medium text-slate-700 dark:text-slate-300">Restrictions :</span> {rcData.groupement.restrictions}
               </p>
             )}
           </div>
@@ -416,13 +416,13 @@ export function RcAnalysisTab({ projectId }: Props) {
                 </span>
               )}
               {rcData.sous_traitance.plafond_pct !== null && rcData.sous_traitance.plafond_pct !== undefined && (
-                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-600">
                   Plafond : {rcData.sous_traitance.plafond_pct} %
                 </span>
               )}
             </div>
             {rcData.sous_traitance.conditions && (
-              <p className="text-sm text-slate-600">{rcData.sous_traitance.conditions}</p>
+              <p className="text-sm text-slate-600 dark:text-slate-400">{rcData.sous_traitance.conditions}</p>
             )}
           </div>
         </InfoCard>
@@ -455,7 +455,7 @@ export function RcAnalysisTab({ projectId }: Props) {
               )}
             </div>
             {rcData.variantes.conditions && (
-              <p className="text-sm text-slate-600">{rcData.variantes.conditions}</p>
+              <p className="text-sm text-slate-600 dark:text-slate-400">{rcData.variantes.conditions}</p>
             )}
           </div>
         </InfoCard>

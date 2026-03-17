@@ -150,7 +150,7 @@ const CATEGORY_COLORS: Record<Categorie, string> = {
   "Montants": "bg-purple-100 text-purple-800 border border-purple-200",
   "Exigences": "bg-indigo-100 text-indigo-800 border border-indigo-200",
   "Clauses illégales": "bg-rose-100 text-rose-800 border border-rose-200",
-  "Références": "bg-slate-100 text-slate-700 border border-slate-200",
+  "Références": "bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-600",
   "Dérogation CCAG": "bg-amber-100 text-amber-800 border border-amber-200",
   "CCTP ↔ DPGF": "bg-teal-100 text-teal-800 border border-teal-200",
 };
@@ -200,13 +200,13 @@ function ConflictCard({ conflit, index }: { conflit: Conflit; index: number }) {
       className={cn(
         "card border-l-4 p-4 space-y-3 animate-fade-in",
         cfg.cardBorderCls,
-        "bg-white"
+        "bg-white dark:bg-slate-800"
       )}
     >
       {/* Header row */}
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-2 min-w-0">
-          <span className="text-xs text-slate-400 font-mono w-5 shrink-0">
+          <span className="text-xs text-slate-400 dark:text-slate-500 font-mono w-5 shrink-0">
             {index + 1}
           </span>
           <div className="flex flex-wrap items-center gap-2">
@@ -220,28 +220,28 @@ function ConflictCard({ conflit, index }: { conflit: Conflit; index: number }) {
       <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
         <div className="flex items-center gap-1.5 min-w-0">
           <FileText className="w-3.5 h-3.5 text-blue-500 shrink-0" />
-          <span className="text-xs font-medium text-slate-700 truncate">
+          <span className="text-xs font-medium text-slate-700 dark:text-slate-300 truncate">
             {conflit.document_1}
           </span>
           {conflit.article_1 && (
-            <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-slate-100 text-[10px] font-mono text-slate-600 shrink-0">
+            <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-700 text-[10px] font-mono text-slate-600 dark:text-slate-400 shrink-0">
               {conflit.article_1}
             </span>
           )}
         </div>
         <div className="hidden sm:block shrink-0">
-          <GitCompareArrows className="w-4 h-4 text-slate-400" />
+          <GitCompareArrows className="w-4 h-4 text-slate-400 dark:text-slate-500" />
         </div>
-        <span className="sm:hidden text-xs text-slate-400 font-medium pl-5">
+        <span className="sm:hidden text-xs text-slate-400 dark:text-slate-500 font-medium pl-5">
           vs.
         </span>
         <div className="flex items-center gap-1.5 min-w-0">
           <FileText className="w-3.5 h-3.5 text-blue-500 shrink-0" />
-          <span className="text-xs font-medium text-slate-700 truncate">
+          <span className="text-xs font-medium text-slate-700 dark:text-slate-300 truncate">
             {conflit.document_2}
           </span>
           {conflit.article_2 && (
-            <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-slate-100 text-[10px] font-mono text-slate-600 shrink-0">
+            <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-700 text-[10px] font-mono text-slate-600 dark:text-slate-400 shrink-0">
               {conflit.article_2}
             </span>
           )}
@@ -249,7 +249,7 @@ function ConflictCard({ conflit, index }: { conflit: Conflit; index: number }) {
       </div>
 
       {/* Description */}
-      <p className="text-sm text-slate-700 leading-relaxed">
+      <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
         {conflit.description}
       </p>
 
@@ -293,14 +293,14 @@ function CategoryFilterPill({
         "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-colors",
         active
           ? "bg-blue-600 text-white shadow-sm"
-          : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+          : "bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-600"
       )}
     >
       {label}
       <span
         className={cn(
           "inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold",
-          active ? "bg-white/20 text-white" : "bg-slate-200 text-slate-500"
+          active ? "bg-white/20 text-white" : "bg-slate-200 dark:bg-slate-600 text-slate-500 dark:text-slate-400"
         )}
       >
         {count}
@@ -362,10 +362,10 @@ export function ConflictsTab({ projectId }: Props) {
     return (
       <div className="card p-8 flex flex-col items-center gap-3 text-center animate-fade-in">
         <AlertTriangle className="w-10 h-10 text-amber-400" />
-        <p className="text-slate-600 font-medium">
+        <p className="text-slate-600 dark:text-slate-400 font-medium">
           Impossible de charger la détection des conflits.
         </p>
-        <p className="text-slate-400 text-sm">
+        <p className="text-slate-400 dark:text-slate-500 text-sm">
           Vérifiez que l&apos;analyse du projet a bien été lancée.
         </p>
       </div>
@@ -376,7 +376,7 @@ export function ConflictsTab({ projectId }: Props) {
     return (
       <div className="card p-8 flex flex-col items-center gap-3 text-center animate-fade-in">
         <FileX className="w-10 h-10 text-slate-300" />
-        <p className="text-slate-500">Aucune donnée disponible.</p>
+        <p className="text-slate-500 dark:text-slate-400">Aucune donnée disponible.</p>
       </div>
     );
   }
@@ -387,14 +387,14 @@ export function ConflictsTab({ projectId }: Props) {
   if (conflictsData.no_conflicts_possible) {
     return (
       <div className="card p-10 flex flex-col items-center gap-4 text-center animate-fade-in">
-        <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center">
-          <FileX className="w-7 h-7 text-slate-400" />
+        <div className="w-14 h-14 rounded-2xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center">
+          <FileX className="w-7 h-7 text-slate-400 dark:text-slate-500" />
         </div>
         <div className="space-y-1">
-          <p className="font-semibold text-slate-700">
+          <p className="font-semibold text-slate-700 dark:text-slate-300">
             Analyse des conflits non disponible
           </p>
-          <p className="text-slate-400 text-sm max-w-sm">
+          <p className="text-slate-400 dark:text-slate-500 text-sm max-w-sm">
             {conflictsData.message ??
               "Uploadez plusieurs documents du DCE pour détecter les contradictions entre pièces."}
           </p>
@@ -413,10 +413,10 @@ export function ConflictsTab({ projectId }: Props) {
             <GitCompareArrows className="w-6 h-6 text-green-600" />
           </div>
           <div>
-            <p className="font-semibold text-slate-800">
+            <p className="font-semibold text-slate-800 dark:text-slate-100">
               Détection des conflits intra-DCE
             </p>
-            <p className="text-xs text-slate-400 mt-0.5">
+            <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
               {conflictsData.documents_analyzed?.join(", ") ?? "Documents analysés"}
             </p>
           </div>
@@ -424,10 +424,10 @@ export function ConflictsTab({ projectId }: Props) {
         <div className="card p-10 flex flex-col items-center gap-4 text-center">
           <CheckCircle className="w-12 h-12 text-green-500" />
           <div className="space-y-1">
-            <p className="font-semibold text-slate-700">
+            <p className="font-semibold text-slate-700 dark:text-slate-300">
               Aucun conflit détecté
             </p>
-            <p className="text-slate-400 text-sm max-w-sm">
+            <p className="text-slate-400 dark:text-slate-500 text-sm max-w-sm">
               Les documents du DCE analysés ne présentent pas de contradictions entre eux.
             </p>
           </div>
@@ -467,7 +467,7 @@ export function ConflictsTab({ projectId }: Props) {
           </div>
           <div className="flex-1 space-y-2">
             <div className="flex items-center gap-3">
-              <p className="font-semibold text-slate-800 text-base">
+              <p className="font-semibold text-slate-800 dark:text-slate-100 text-base">
                 Détection des conflits intra-DCE
               </p>
               <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-100 text-blue-800 border border-blue-200">
@@ -486,7 +486,7 @@ export function ConflictsTab({ projectId }: Props) {
                 {conflictsData.documents_analyzed.map((doc, i) => (
                   <span
                     key={i}
-                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-slate-100 text-[10px] font-medium text-slate-500"
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-700 text-[10px] font-medium text-slate-500 dark:text-slate-400"
                   >
                     <FileText className="w-3 h-3" />
                     {doc}
@@ -499,11 +499,11 @@ export function ConflictsTab({ projectId }: Props) {
 
         {/* Resume */}
         {conflictsData.resume && (
-          <div className="mt-4 pt-4 border-t border-slate-100">
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">
+          <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-700">
+            <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">
               Synthèse
             </p>
-            <p className="text-sm text-slate-700 leading-relaxed">
+            <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
               {conflictsData.resume}
             </p>
           </div>

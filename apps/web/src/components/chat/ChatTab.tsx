@@ -1,9 +1,9 @@
 "use client";
 import { useState, useRef, useEffect } from "react";
 import { Send, Loader2, MessageSquare, BookOpen, Sparkles } from "lucide-react";
-import { useChatDCE } from "@/hooks/useAnalysis";
 import { cn } from "@/lib/utils";
 import ReactMarkdown from "react-markdown";
+import { apiClient } from "@/lib/api";
 
 interface Props {
   projectId: string;
@@ -23,6 +23,7 @@ interface Message {
   content: string;
   citations?: Citation[];
   timestamp: Date;
+  streaming?: boolean;
 }
 
 const SUGGESTED_QUESTIONS = [
@@ -57,19 +58,22 @@ function MessageBubble({ message }: { message: Message }) {
             : "bg-white border border-slate-200 text-slate-800 rounded-tl-sm shadow-sm prose prose-sm prose-slate max-w-none"
         )}>
           {isUser ? message.content : (
-            <ReactMarkdown
-              components={{
-                p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
-                ul: ({ children }) => <ul className="list-disc pl-4 mb-2 space-y-0.5">{children}</ul>,
-                ol: ({ children }) => <ol className="list-decimal pl-4 mb-2 space-y-0.5">{children}</ol>,
-                li: ({ children }) => <li className="text-sm">{children}</li>,
-                strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
-                h3: ({ children }) => <h3 className="font-semibold text-sm mt-2 mb-1">{children}</h3>,
-                code: ({ children }) => <code className="bg-slate-100 px-1 rounded text-xs font-mono">{children}</code>,
-              }}
-            >
-              {message.content}
-            </ReactMarkdown>
+            <>
+              <ReactMarkdown
+                components={{
+                  p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+                  ul: ({ children }) => <ul className="list-disc pl-4 mb-2 space-y-0.5">{children}</ul>,
+                  ol: ({ children }) => <ol className="list-decimal pl-4 mb-2 space-y-0.5">{children}</ol>,
+                  li: ({ children }) => <li className="text-sm">{children}</li>,
+                  strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+                  h3: ({ children }) => <h3 className="font-semibold text-sm mt-2 mb-1">{children}</h3>,
+                  code: ({ children }) => <code className="bg-slate-100 px-1 rounded text-xs font-mono">{children}</code>,
+                }}
+              >
+                {message.content}
+              </ReactMarkdown>
+              {message.streaming && <span className="animate-pulse">▌</span>}
+            </>
           )}
         </div>
 
@@ -141,17 +145,17 @@ export function ChatTab({ projectId }: Props) {
     },
   ]);
   const [input, setInput] = useState("");
+  const [isSending, setIsSending] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  const { mutateAsync: sendChat, isPending } = useChatDCE(projectId);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, isPending]);
+  }, [messages, isSending]);
 
   const sendMessage = async (question?: string) => {
     const q = (question ?? input).trim();
-    if (!q || isPending) return;
+    if (!q || isSending) return;
 
     const userMsg: Message = {
       id: Date.now().toString(),
@@ -161,27 +165,103 @@ export function ChatTab({ projectId }: Props) {
     };
     setMessages((prev) => [...prev, userMsg]);
     setInput("");
+    setIsSending(true);
+
+    const assistantMsgId = (Date.now() + 1).toString();
 
     try {
-      const result = await sendChat(q);
-      const assistantMsg: Message = {
-        id: (Date.now() + 1).toString(),
-        role: "assistant",
-        content: result.answer,
-        citations: result.citations,
-        timestamp: new Date(),
-      };
-      setMessages((prev) => [...prev, assistantMsg]);
-    } catch {
+      const response = await apiClient.post(
+        `/api/v1/projects/${projectId}/chat/stream`,
+        { question: q }
+      );
+
+      if (!response.ok) throw new Error("Erreur serveur");
+      if (!response.body) throw new Error("Pas de streaming");
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let accumulatedText = "";
+
+      // Ajouter le message assistant vide avec indicateur de streaming
       setMessages((prev) => [
         ...prev,
-        {
-          id: (Date.now() + 1).toString(),
-          role: "assistant",
-          content: "Désolé, une erreur est survenue. Veuillez réessayer.",
-          timestamp: new Date(),
-        },
+        { id: assistantMsgId, role: "assistant", content: "", streaming: true, citations: [], timestamp: new Date() },
       ]);
+
+      let done = false;
+      while (!done) {
+        const { done: streamDone, value } = await reader.read();
+        done = streamDone;
+        if (!value) continue;
+
+        const chunk = decoder.decode(value, { stream: true });
+        const lines = chunk.split("\n");
+
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          const data = line.slice(6);
+          if (data === "[DONE]") {
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === assistantMsgId ? { ...m, streaming: false } : m
+              )
+            );
+            done = true;
+            break;
+          }
+          try {
+            const parsed = JSON.parse(data);
+            if (parsed.type === "token") {
+              accumulatedText += parsed.text;
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === assistantMsgId ? { ...m, content: accumulatedText } : m
+                )
+              );
+            } else if (parsed.type === "citations") {
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === assistantMsgId ? { ...m, citations: parsed.citations } : m
+                )
+              );
+            } else if (parsed.type === "error") {
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === assistantMsgId
+                    ? { ...m, content: `Désolé, une erreur est survenue : ${parsed.message}`, streaming: false }
+                    : m
+                )
+              );
+              done = true;
+              break;
+            }
+          } catch {
+            // ligne SSE non-JSON — ignorer
+          }
+        }
+      }
+    } catch {
+      setMessages((prev) => {
+        const existing = prev.find((m) => m.id === assistantMsgId);
+        if (existing) {
+          return prev.map((m) =>
+            m.id === assistantMsgId
+              ? { ...m, content: "Désolé, une erreur est survenue. Veuillez réessayer.", streaming: false }
+              : m
+          );
+        }
+        return [
+          ...prev,
+          {
+            id: assistantMsgId,
+            role: "assistant" as const,
+            content: "Désolé, une erreur est survenue. Veuillez réessayer.",
+            timestamp: new Date(),
+          },
+        ];
+      });
+    } finally {
+      setIsSending(false);
     }
   };
 
@@ -224,7 +304,7 @@ export function ChatTab({ projectId }: Props) {
           <MessageBubble key={msg.id} message={msg} />
         ))}
 
-        {isPending && <TypingIndicator />}
+        {isSending && !messages.some((m) => m.streaming) && <TypingIndicator />}
         <div ref={bottomRef} />
       </div>
 
@@ -242,19 +322,19 @@ export function ChatTab({ projectId }: Props) {
             className="flex-1 resize-none text-sm text-slate-800 placeholder:text-slate-400 bg-transparent
                        outline-none py-1.5 px-2 max-h-28 overflow-y-auto"
             style={{ lineHeight: "1.5" }}
-            disabled={isPending}
+            disabled={isSending}
           />
           <button
             onClick={() => sendMessage()}
-            disabled={!input.trim() || isPending}
+            disabled={!input.trim() || isSending}
             className={cn(
               "flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center transition-all",
-              input.trim() && !isPending
+              input.trim() && !isSending
                 ? "bg-primary-700 text-white hover:bg-primary-800 shadow-sm"
                 : "bg-slate-100 text-slate-300 cursor-not-allowed"
             )}
           >
-            {isPending
+            {isSending
               ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
               : <Send className="w-3.5 h-3.5" />
             }

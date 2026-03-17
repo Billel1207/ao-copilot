@@ -59,3 +59,13 @@ def require_admin(current_user: User = Depends(get_current_user)) -> User:
     if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Droits admin requis")
     return current_user
+
+
+def get_llm_service():
+    """Dependency injection pour le service LLM.
+
+    Retourne le singleton LLMService. L'injection via Depends() permet
+    de mocker facilement dans les tests : app.dependency_overrides[get_llm_service] = lambda: MockLLM()
+    """
+    from app.services.llm import llm_service
+    return llm_service

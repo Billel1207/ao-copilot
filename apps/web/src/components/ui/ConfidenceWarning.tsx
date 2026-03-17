@@ -35,12 +35,12 @@ export default function ConfidenceWarning({
     return (
       <div
         className={cn(
-          "flex items-center gap-2.5 bg-green-50 border border-green-200 rounded-xl px-4 py-2.5",
+          "flex items-center gap-2.5 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl px-4 py-2.5",
           className
         )}
       >
         <ShieldCheck className="w-4 h-4 text-green-600 flex-shrink-0" />
-        <p className="text-xs text-green-800">
+        <p className="text-xs text-green-800 dark:text-green-300">
           <span className="font-semibold">Confiance {pct}%</span>
           {" — "}Analyse fiable, données cohérentes avec les documents sources.
         </p>
@@ -53,12 +53,12 @@ export default function ConfidenceWarning({
     return (
       <div
         className={cn(
-          "flex items-center gap-2.5 bg-blue-50 border border-blue-200 rounded-xl px-4 py-2.5",
+          "flex items-center gap-2.5 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl px-4 py-2.5",
           className
         )}
       >
         <ShieldAlert className="w-4 h-4 text-blue-600 flex-shrink-0" />
-        <p className="text-xs text-blue-800">
+        <p className="text-xs text-blue-800 dark:text-blue-300">
           <span className="font-semibold">Confiance modérée ({pct}%)</span>
           {" — "}Certains éléments peuvent nécessiter une vérification manuelle.
         </p>
@@ -70,12 +70,12 @@ export default function ConfidenceWarning({
   return (
     <div
       className={cn(
-        "flex items-center gap-2.5 bg-amber-50 border border-amber-200 rounded-xl px-4 py-2.5",
+        "flex items-center gap-2.5 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-xl px-4 py-2.5",
         className
       )}
     >
       <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0" />
-      <p className="text-xs text-amber-800">
+      <p className="text-xs text-amber-800 dark:text-amber-300">
         <span className="font-semibold">Confiance faible ({pct}%)</span>
         {" — "}Les résultats de cette analyse sont incertains. Vérifiez manuellement avec les documents originaux.
       </p>
