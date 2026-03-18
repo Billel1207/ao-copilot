@@ -71,6 +71,10 @@ resend>=2.0.0
 # Word export
 python-docx==1.1.0
 
+# Charts & Visualisations
+matplotlib>=3.8.0
+docxtpl>=0.16.0
+
 # Tests
 pytest==8.3.4
 pytest-asyncio==0.24.0

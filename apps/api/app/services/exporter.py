@@ -6,6 +6,8 @@ from io import BytesIO
 from jinja2 import Environment, BaseLoader
 from sqlalchemy.orm import Session
 
+from app.core.report_theme import get_theme
+
 logger = structlog.get_logger(__name__)
 
 from app.models.project import AoProject
@@ -19,7 +21,30 @@ EXPORT_TEMPLATE = """
 <meta charset="UTF-8">
 <style>
   /* ══════════════ TYPOGRAPHIE & BASE ══════════════ */
-  @page { margin: 12mm 14mm 16mm 14mm; size: A4; }
+  @page {
+    margin: 12mm 14mm 20mm 14mm;
+    size: A4;
+    @bottom-left {
+      content: "AO Copilot — Confidentiel";
+      font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+      font-size: 7.5px; color: #94A3B8;
+    }
+    @bottom-center {
+      content: counter(page) " / " counter(pages);
+      font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+      font-size: 7.5px; color: #64748B; font-weight: 600;
+    }
+    @bottom-right {
+      content: "Généré le {{ generation_date }}";
+      font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+      font-size: 7.5px; color: #94A3B8;
+    }
+  }
+  @page :first {
+    @bottom-left { content: ""; }
+    @bottom-center { content: ""; }
+    @bottom-right { content: ""; }
+  }
   body {
     font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
     font-size: 11px; color: #1a1a2e; line-height: 1.55;
@@ -428,6 +453,14 @@ EXPORT_TEMPLATE = """
       <h3 style="color: #DC2626;">Points de vigilance</h3>
       {% for r in (gonogo.risks or [])[:3] %}<div style="margin: 4px 0; font-size: 10px;">- {{ r }}</div>{% endfor %}
     </div>
+  </div>
+  {% endif %}
+
+  <!-- Radar chart Go/No-Go -->
+  {% if radar_chart_b64 %}
+  <div style="text-align:center; margin: 14px 0;">
+    <img src="data:image/png;base64,{{ radar_chart_b64 }}"
+         style="width:100%; max-width:460px; display:inline-block;" alt="Radar Go/No-Go"/>
   </div>
   {% endif %}
 
@@ -978,6 +1011,13 @@ EXPORT_TEMPLATE = """
   <h1><span class="section-num">10</span> Benchmark tarifaire DPGF</h1>
   <p style="color: #64748b; font-size: 10px; margin-top: -8px;">Comparaison des prix unitaires DPGF avec le referentiel marche BTP France 2026</p>
 
+  {% if pricing_chart_b64 %}
+  <div style="text-align:center; margin: 10px 0 14px 0;">
+    <img src="data:image/png;base64,{{ pricing_chart_b64 }}"
+         style="width:100%; max-width:520px; display:inline-block;" alt="Benchmark prix DPGF"/>
+  </div>
+  {% endif %}
+
   {% set nb_sous = [] %}{% set nb_sur = [] %}{% set nb_normal = [] %}{% set nb_inconnu = [] %}
   {% for line in dpgf_pricing %}
     {% if line.status == 'SOUS_EVALUE' %}{% if nb_sous.append(1) %}{% endif %}
@@ -1055,6 +1095,12 @@ EXPORT_TEMPLATE = """
 
   {% if cashflow_data.monthly_cashflow %}
   <h3>Trésorerie mensuelle prévisionnelle</h3>
+  {% if cashflow_chart_b64 %}
+  <div style="text-align:center; margin: 10px 0 14px 0;">
+    <img src="data:image/png;base64,{{ cashflow_chart_b64 }}"
+         style="width:100%; max-width:520px; display:inline-block;" alt="Courbe trésorerie"/>
+  </div>
+  {% endif %}
   <table>
     <tr><th style="width:15%">Mois</th><th style="width:22%">Depenses HT</th><th style="width:22%">Encaissements HT</th><th style="width:23%">Solde cumule</th></tr>
     {% for m in (cashflow_data.monthly_cashflow or [])[:15] %}
@@ -1209,6 +1255,13 @@ EXPORT_TEMPLATE = """
 
   {% if conflicts.resume %}
   <div class="summary-box">{{ conflicts.resume }}</div>
+  {% endif %}
+
+  {% if heatmap_chart_b64 %}
+  <div style="text-align:center; margin: 10px 0 14px 0;">
+    <img src="data:image/png;base64,{{ heatmap_chart_b64 }}"
+         style="width:100%; max-width:500px; display:inline-block;" alt="Heatmap conflits DCE"/>
+  </div>
   {% endif %}
 
   {% if conflicts.conflicts %}
@@ -1971,6 +2024,42 @@ def generate_export_pdf(db: Session, project_id: str) -> bytes:
 
     template = env.from_string(EXPORT_TEMPLATE)
 
+    # ── Génération des graphiques (graceful degradation si matplotlib absent) ──
+    radar_chart_b64: str | None = None
+    cashflow_chart_b64: str | None = None
+    heatmap_chart_b64: str | None = None
+    pricing_chart_b64: str | None = None
+    try:
+        from app.services.chart_generator import (
+            generate_gonogo_radar,
+            generate_cashflow_chart,
+            generate_risk_heatmap,
+            generate_pricing_benchmark_bars,
+            chart_to_base64,
+        )
+        if gonogo:
+            _dims = gonogo.get("dimension_scores") or gonogo.get("breakdown") or {}
+            _score = gonogo.get("score")
+            _title = project.title or "AO"
+            radar_chart_b64 = chart_to_base64(
+                generate_gonogo_radar(_dims if isinstance(_dims, dict) else {}, _score, _title)
+            )
+        if cashflow_data:
+            cashflow_chart_b64 = chart_to_base64(
+                generate_cashflow_chart(cashflow_data, project.title or "AO")
+            )
+        if conflicts:
+            _conflict_list = conflicts.get("conflicts") or conflicts.get("items") or []
+            heatmap_chart_b64 = chart_to_base64(
+                generate_risk_heatmap(_conflict_list, project.title or "AO")
+            )
+        if dpgf_pricing:
+            pricing_chart_b64 = chart_to_base64(
+                generate_pricing_benchmark_bars(dpgf_pricing, project.title or "AO")
+            )
+    except Exception as _chart_err:
+        logger.warning("chart_generation_skipped", error=str(_chart_err))
+
     try:
         html_content = template.render(
             project=project,
@@ -1997,6 +2086,12 @@ def generate_export_pdf(db: Session, project_id: str) -> bytes:
             dpgf_pricing=[_DictObj(line) for line in dpgf_pricing] if dpgf_pricing else None,
             glossaire_btp=glossaire_btp,
             generated_at=datetime.now().strftime("%d/%m/%Y %H:%M"),
+            generation_date=datetime.now().strftime("%d/%m/%Y"),
+            theme=get_theme(),
+            radar_chart_b64=radar_chart_b64,
+            cashflow_chart_b64=cashflow_chart_b64,
+            heatmap_chart_b64=heatmap_chart_b64,
+            pricing_chart_b64=pricing_chart_b64,
         )
     except Exception as exc:
         logger.error(f"Erreur rendu template Jinja2 pour project {project_id}: {exc}")
@@ -3828,12 +3923,88 @@ def generate_memo_technique(db: Session, project_id: str) -> bytes:
     scoring = _get("scoring")
     rc = _get("rc")
     subcontracting = _get("subcontracting")
+    gonogo = _get("gonogo")
 
     po = summary.get("project_overview", {})
     key_points = summary.get("key_points", [])
     risks = summary.get("risks", [])
     evaluation = criteria.get("evaluation", {})
     scoring_criteria = evaluation.get("scoring_criteria", [])
+
+    # ── Génération des narratifs LLM (graceful degradation) ──────────────
+    _memo_intro_text: str | None = None
+    _memo_positioning_text: str | None = None
+    _memo_action_plan_text: str | None = None
+    try:
+        from app.services.llm import llm_service
+        from app.services.prompts import (
+            build_memo_intro_prompt,
+            build_memo_positioning_prompt,
+            build_memo_action_plan_prompt,
+        )
+        _company_dict = {}
+        if company:
+            _company_dict = {
+                "name": org_name,
+                "activity_sector": getattr(company, "activity_sector", None),
+                "annual_revenue_eur": getattr(company, "revenue_eur", None),
+                "certifications": getattr(company, "certifications", None),
+                "regions": getattr(company, "regions", None),
+                "staff_count": getattr(company, "employee_count", None),
+                "main_clients": getattr(company, "main_clients", None),
+                "references_btp": getattr(company, "references_btp", None),
+            }
+        _gonogo_score = gonogo.get("score") or 0
+        _gonogo_dims = gonogo.get("dimension_scores") or gonogo.get("breakdown") or {}
+        _deadline_str = (
+            project.submission_deadline.strftime("%d/%m/%Y")
+            if project.submission_deadline else "—"
+        )
+
+        sys_p, usr_p = build_memo_intro_prompt(
+            project_title=project.title or "AO",
+            buyer=project.buyer or "Acheteur public",
+            scope=po.get("scope") or po.get("object") or "Prestations à définir",
+            go_nogo_score=_gonogo_score,
+            top_risks=risks[:3],
+            company_profile=_company_dict,
+        )
+        _memo_intro_text = llm_service.chat_text(sys_p, usr_p, max_tokens=400)
+
+        sys_p, usr_p = build_memo_positioning_prompt(
+            company_profile=_company_dict,
+            gonogo_dimensions=_gonogo_dims if isinstance(_gonogo_dims, dict) else {},
+            eligibility_gaps=gonogo.get("profile_gaps") or [],
+        )
+        _memo_positioning_text = llm_service.chat_text(sys_p, usr_p, max_tokens=400)
+
+        _actions = summary.get("actions_next_48h") or []
+        sys_p, usr_p = build_memo_action_plan_prompt(
+            actions_48h=_actions,
+            risks=risks,
+            deadline_submission=_deadline_str,
+        )
+        _memo_action_plan_text = llm_service.chat_text(sys_p, usr_p, max_tokens=500)
+    except Exception as _llm_err:
+        logger.warning("memo_llm_generation_skipped", error=str(_llm_err))
+
+    # ── Génération des graphiques (graceful degradation) ──────────────────
+    _radar_buf = None
+    _cashflow_buf = None
+    try:
+        from app.services.chart_generator import generate_gonogo_radar, generate_cashflow_chart
+        if gonogo:
+            _dims = gonogo.get("dimension_scores") or gonogo.get("breakdown") or {}
+            _radar_buf = generate_gonogo_radar(
+                _dims if isinstance(_dims, dict) else {},
+                gonogo.get("score"),
+                project.title or "AO",
+            )
+        cashflow_raw = _get("cashflow")
+        if cashflow_raw:
+            _cashflow_buf = generate_cashflow_chart(cashflow_raw, project.title or "AO")
+    except Exception as _chart_err:
+        logger.warning("memo_chart_generation_skipped", error=str(_chart_err))
 
     checklist_items = db.query(ChecklistItem).filter_by(
         project_id=pid
@@ -4168,10 +4339,27 @@ def generate_memo_technique(db: Session, project_id: str) -> bytes:
 
     doc.add_page_break()
 
+    # ── Radar chart Go/No-Go (si disponible) ──────────────────────────────
+    if _radar_buf:
+        try:
+            _radar_buf.seek(0)
+            doc.add_heading("Synthèse Go/No-Go — 9 dimensions", 2)
+            doc.add_picture(_radar_buf, width=Inches(5.5))
+            # doc.add_picture() adds the picture to the last paragraph
+            doc.paragraphs[-1].alignment = WD_ALIGN_PARAGRAPH.CENTER
+            doc.add_paragraph()
+        except Exception as _e:
+            logger.warning("memo_radar_insert_failed", error=str(_e))
+
     # ══════════════════════════════════════════════════════════════════════
     #  1. PRÉSENTATION DE L'ENTREPRISE
     # ══════════════════════════════════════════════════════════════════════
     doc.add_heading("1. Présentation de l'entreprise", 1)
+
+    # LLM positionnement stratégique
+    if _memo_positioning_text:
+        _ia_text(_memo_positioning_text)
+        doc.add_paragraph()
 
     doc.add_heading("1.1 Identité", 2)
     id_table = _styled_table(["Rubrique", "Proposition IA", "À compléter / vérifier"])
@@ -4266,12 +4454,16 @@ def generate_memo_technique(db: Session, project_id: str) -> bytes:
     scope_text = po.get("scope") or po.get("object") or "Le présent marché porte sur des prestations à définir."
     market_type = po.get("market_type") or "non précisé"
 
-    _ia_text(
-        f"Dans le cadre de la consultation lancée par {project.buyer or 'l acheteur public'}, "
-        f"portant sur un marché de {market_type}, notre société {org_name} "
-        f"a analysé en détail les documents du Dossier de Consultation des Entreprises "
-        f"afin de formuler une réponse parfaitement adaptée aux besoins exprimés."
-    )
+    # Utiliser le narratif LLM si disponible, sinon fallback template
+    if _memo_intro_text:
+        _ia_text(_memo_intro_text)
+    else:
+        _ia_text(
+            f"Dans le cadre de la consultation lancée par {project.buyer or 'l acheteur public'}, "
+            f"portant sur un marché de {market_type}, notre société {org_name} "
+            f"a analysé en détail les documents du Dossier de Consultation des Entreprises "
+            f"afin de formuler une réponse parfaitement adaptée aux besoins exprimés."
+        )
 
     doc.add_heading("2.1 Objet et périmètre", 2)
     _ia_text(scope_text)
@@ -4754,6 +4946,22 @@ def generate_memo_technique(db: Session, project_id: str) -> bytes:
     # ══════════════════════════════════════════════════════════════════════
     if risks:
         doc.add_heading("Annexe B — Analyse des risques et mesures de mitigation", 1)
+
+        # LLM plan d'action narratif
+        if _memo_action_plan_text:
+            _ia_text(_memo_action_plan_text)
+            doc.add_paragraph()
+
+        # Cashflow chart (si disponible)
+        if _cashflow_buf:
+            try:
+                _cashflow_buf.seek(0)
+                doc.add_picture(_cashflow_buf, width=Inches(5.5))
+                doc.paragraphs[-1].alignment = WD_ALIGN_PARAGRAPH.CENTER
+                doc.add_paragraph()
+            except Exception as _e:
+                logger.warning("memo_cashflow_insert_failed", error=str(_e))
+
         _add_encadre(
             "Les risques suivants ont été identifiés par l'IA lors de l'analyse du DCE. "
             "La colonne 'Proposition IA' contient une suggestion de mitigation. "

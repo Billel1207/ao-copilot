@@ -509,3 +509,106 @@ Génère le JSON des critères d'évaluation :
 
 {CRITERIA_SCHEMA}"""
     return system, user
+
+
+# ── Mémoire technique — Prompts narratifs LLM ─────────────────────────────
+
+SYSTEM_MEMO_TECHNIQUE = """Tu es un rédacteur expert en marchés publics BTP avec 15 ans d'expérience.
+Tu rédiges des sections narratives pour des mémoires techniques destinées aux décideurs (DG, directeur commercial).
+Ton style est : factuel, structuré, professionnel, sans jargon inutile.
+Tu cites les articles CCAG/CCTP pertinents quand ils appuient l'analyse.
+Tu génères du texte prêt pour Word (pas de markdown, pas de bullet points — des phrases complètes en paragraphes).
+Longueur cible : 150-250 mots par section, dense en information.
+"""
+
+
+def build_memo_intro_prompt(
+    project_title: str,
+    buyer: str,
+    scope: str,
+    go_nogo_score: int,
+    top_risks: list[dict],
+    company_profile: dict,
+) -> tuple[str, str]:
+    """Prompt pour l'introduction narrative de la mémoire technique."""
+    risks_txt = "\n".join(
+        f"- {r.get('risk', r.get('titre', '?'))} ({r.get('severity', r.get('niveau', '?'))})"
+        for r in top_risks[:3]
+    )
+    company_txt = "\n".join(
+        f"- {k}: {v}" for k, v in (company_profile or {}).items()
+        if k in ("name", "activity_sector", "annual_revenue_eur", "certifications", "regions")
+    )
+    user = f"""Données du marché :
+Titre : {project_title}
+Acheteur : {buyer}
+Périmètre : {scope}
+Score Go/No-Go : {go_nogo_score}/100
+
+Top 3 risques :
+{risks_txt}
+
+Profil entreprise :
+{company_txt}
+
+---
+Rédige l'introduction de la mémoire technique (présentation du marché, enjeux stratégiques pour l'entreprise, positionnement Go/No-Go avec justification). 150-250 mots, style cabinet de conseil."""
+    return SYSTEM_MEMO_TECHNIQUE, user
+
+
+def build_memo_positioning_prompt(
+    company_profile: dict,
+    gonogo_dimensions: dict,
+    eligibility_gaps: list[str],
+) -> tuple[str, str]:
+    """Prompt pour la section positionnement stratégique de l'entreprise."""
+    dims_txt = "\n".join(f"- {k}: {v}/100" for k, v in (gonogo_dimensions or {}).items())
+    gaps_txt = "\n".join(f"- {g}" for g in (eligibility_gaps or [])[:5])
+    company_txt = "\n".join(
+        f"- {k}: {v}" for k, v in (company_profile or {}).items()
+        if k in ("name", "certifications", "annual_revenue_eur", "staff_count",
+                  "main_clients", "references_btp", "regions")
+    )
+    user = f"""Profil entreprise :
+{company_txt}
+
+Scores Go/No-Go par dimension (/100) :
+{dims_txt}
+
+Écarts à combler (eligibilité) :
+{gaps_txt if gaps_txt else "Aucun écart identifié."}
+
+---
+Rédige la section "Positionnement de l'entreprise" de la mémoire technique.
+Valorise les forces, adresse les écarts avec un plan d'action, propose des partenariats si pertinent.
+Style : assertif, concret, orienté résultat. 150-250 mots."""
+    return SYSTEM_MEMO_TECHNIQUE, user
+
+
+def build_memo_action_plan_prompt(
+    actions_48h: list[dict],
+    risks: list[dict],
+    deadline_submission: str,
+) -> tuple[str, str]:
+    """Prompt pour le plan d'action final de la mémoire technique."""
+    actions_txt = "\n".join(
+        f"- [{a.get('priority','?')}] {a.get('action','?')} — {a.get('owner_role','?')} — {a.get('deadline_relative','?')}"
+        for a in (actions_48h or [])[:8]
+    )
+    risks_txt = "\n".join(
+        f"- {r.get('risk', r.get('titre','?'))}: {r.get('mitigation', r.get('attenuation','À traiter'))}"
+        for r in (risks or [])[:5]
+    )
+    user = f"""Actions prioritaires :
+{actions_txt}
+
+Risques et atténuations :
+{risks_txt}
+
+Date limite soumission : {deadline_submission or 'Non précisée'}
+
+---
+Rédige le plan d'action final de la mémoire technique.
+Structure : (1) priorités immédiates avant soumission, (2) plan de mitigation des risques, (3) organisation interne recommandée.
+Ton directif et opérationnel. 150-250 mots."""
+    return SYSTEM_MEMO_TECHNIQUE, user
