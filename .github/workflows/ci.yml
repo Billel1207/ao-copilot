@@ -228,7 +228,7 @@ jobs:
 
     environment:
       name: production
-      url: https://api.ao-copilot.fr/health
+      url: https://api.ao-copilot.fr/api/health
 
     steps:
       - name: Deploy via SSH
