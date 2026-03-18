@@ -55,7 +55,7 @@ async def _create_org_user_project(db: AsyncSession, plan: str = "starter", quot
 
     return org, user, project
 # ── Fixtures ───────────────────────────────────────────────────────────────
-@pytest_asyncio.fixture
+@pytest_asyncio.fixture(loop_scope="session")
 async def client_with_db(db_session):
     """Client HTTP avec override DB + mocks storage/celery."""
     async def override_get_db():

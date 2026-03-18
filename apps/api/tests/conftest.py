@@ -6,8 +6,8 @@ from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 import os
 
-from app.main import app
-from app.database import Base, get_db
+import app.database as app_db
+from app.database import Base
 
 
 # ── Base de données de test (PostgreSQL du CI ou SQLite fallback) ──────────
@@ -20,14 +20,39 @@ TEST_DATABASE_URL = os.getenv(
 
 @pytest_asyncio.fixture(loop_scope="session", scope="session")
 async def engine():
-    """Moteur DB pour les tests — PostgreSQL en CI, SQLite en local."""
-    engine = create_async_engine(TEST_DATABASE_URL, echo=False)
-    async with engine.begin() as conn:
+    """Moteur DB pour les tests — PostgreSQL en CI, SQLite en local.
+
+    Remplace aussi le moteur global dans app.database pour éviter
+    les conflits d'event loop (l'engine module-level est créé à l'import
+    dans un loop différent du loop de test session).
+    """
+    test_engine = create_async_engine(TEST_DATABASE_URL, echo=False)
+
+    # Créer les tables
+    async with test_engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-    yield engine
-    async with engine.begin() as conn:
+
+    # Monkey-patch l'engine et la session factory globales
+    original_engine = app_db.engine
+    original_session = app_db.AsyncSessionLocal
+
+    test_session_factory = async_sessionmaker(
+        test_engine, class_=AsyncSession, expire_on_commit=False
+    )
+
+    app_db.engine = test_engine
+    app_db.AsyncSessionLocal = test_session_factory
+
+    yield test_engine
+
+    # Restaurer
+    app_db.engine = original_engine
+    app_db.AsyncSessionLocal = original_session
+
+    # Nettoyage
+    async with test_engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
-    await engine.dispose()
+    await test_engine.dispose()
 
 
 @pytest_asyncio.fixture(loop_scope="session")
@@ -44,6 +69,9 @@ async def db_session(engine):
 @pytest_asyncio.fixture(loop_scope="session")
 async def client(db_session):
     """Client HTTP de test avec override de la dépendance DB."""
+    from app.main import app
+    from app.database import get_db
+
     async def override_get_db():
         yield db_session
 
