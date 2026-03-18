@@ -1,6 +1,8 @@
 """Tests pour le pipeline d'analyse IA (avec LLM et embedder mockés)."""
 import pytest
+import uuid
 from unittest.mock import patch, MagicMock
+from app.models.document import AoDocument
 # ── Helpers ────────────────────────────────────────────────────────────────
 
 async def register_and_login(client, email="analyst@test.fr", org="Org Analyst"):
@@ -23,22 +25,43 @@ async def create_project(client, token, title="Projet Test Analyse"):
         headers=auth(token),
     )
     return resp.json()["id"]
+
+async def _seed_done_document(db_session, project_id):
+    """Insert a done document so trigger_analysis passes pre-validation."""
+    doc = AoDocument(
+        id=uuid.uuid4(),
+        project_id=uuid.UUID(project_id),
+        original_name="test.pdf",
+        s3_key="test/test.pdf",
+        doc_type="RC",
+        status="done",
+    )
+    db_session.add(doc)
+    await db_session.flush()
+    return doc
+
 # ── Tests ──────────────────────────────────────────────────────────────────
-async def test_trigger_analysis_returns_task_id(client, mock_celery):
+async def test_trigger_analysis_returns_task_id(client, db_session, mock_celery):
     """POST /analyze → 202 + task_id."""
     token = await register_and_login(client)
     project_id = await create_project(client, token)
 
-    resp = await client.post(
-        f"/api/v1/projects/{project_id}/analyze",
-        headers=auth(token),
-    )
+    # Need at least 1 done document for analysis to proceed
+    await _seed_done_document(db_session, project_id)
+
+    # Mock Redis to avoid connection errors
+    mock_redis = MagicMock()
+    with patch("app.api.v1.analysis.get_redis", return_value=mock_redis):
+        resp = await client.post(
+            f"/api/v1/projects/{project_id}/analyze",
+            headers=auth(token),
+        )
     assert resp.status_code == 202, resp.text
     data = resp.json()
     assert "task_id" in data
     assert data["project_id"] == project_id
 
-async def test_get_status_returns_progress(client, mock_celery):
+async def test_get_status_returns_progress(client, db_session, mock_celery):
     """
     GET /analyze/status renvoie progress_pct réel depuis Redis.
     Valide le fix C1 : lecture Redis au lieu de hardcoded 50.
@@ -46,11 +69,16 @@ async def test_get_status_returns_progress(client, mock_celery):
     token = await register_and_login(client, email="status@test.fr", org="Org Status")
     project_id = await create_project(client, token)
 
+    # Need at least 1 done document
+    await _seed_done_document(db_session, project_id)
+
     # Lancer l'analyse
-    await client.post(
-        f"/api/v1/projects/{project_id}/analyze",
-        headers=auth(token),
-    )
+    mock_redis_trigger = MagicMock()
+    with patch("app.api.v1.analysis.get_redis", return_value=mock_redis_trigger):
+        await client.post(
+            f"/api/v1/projects/{project_id}/analyze",
+            headers=auth(token),
+        )
 
     # Mock Redis get pour simuler une progression réelle
     mock_redis = MagicMock()
@@ -77,7 +105,6 @@ async def test_get_checklist_with_filters(client, db_session):
     from app.models.project import AoProject
     from app.models.organization import Organization
     from app.models.user import User
-    import uuid
 
     token = await register_and_login(client, email="checklist@test.fr", org="Org Checklist")
     project_id = await create_project(client, token)
@@ -118,10 +145,21 @@ async def test_get_checklist_with_filters(client, db_session):
     assert len(data["checklist"]) == 1  # filtré
     assert data["checklist"][0]["criticality"] == "Éliminatoire"
 
-    # Filtrer par status
+    # Filtrer par status — endpoint uses 'status_filter' not 'status' as query param
+    # But FastAPI uses the parameter name directly, so we must pass status_filter
+    # unless there's a Query alias. The endpoint parameter is 'status_filter: str | None = None'
+    # with no Query alias, so the query param name IS 'status_filter'.
+    # However, the endpoint also has 'status_filter: str | None = Query(None, alias="status")'
+    # Let's check — actually the code shows no alias, param name is status_filter.
+    # But we also see in projects.py it uses Query(None, alias="status").
+    # The analysis.py endpoint doesn't use Query at all, just plain param.
+    # So we need to pass 'status_filter' as the query parameter name.
+    # But wait — looking again at the code, the parameter is just:
+    #   status_filter: str | None = None
+    # Without Query(), FastAPI treats it as a query param with name 'status_filter'.
     resp2 = await client.get(
         f"/api/v1/projects/{project_id}/checklist",
-        params={"status": "OK"},
+        params={"status_filter": "OK"},
         headers=auth(token),
     )
     assert resp2.status_code == 200

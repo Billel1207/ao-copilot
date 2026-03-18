@@ -4,22 +4,63 @@ Stratégie : tout en function-scope (default) pour éviter les conflits
 d'event loop avec pytest-asyncio 0.24. Chaque test a son propre loop,
 son propre client, sa propre session DB.
 """
+import copy
 import pytest
 import pytest_asyncio
 from unittest.mock import MagicMock, patch
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+from sqlalchemy import MetaData
 import os
 
 from app.database import Base
+import app.models  # noqa: F401 — register all models with Base.metadata
 
 
 # ── Base de données de test ──────────────────────────────────────────────────
 
 TEST_DATABASE_URL = os.getenv(
-    "DATABASE_URL",
+    "TEST_DATABASE_URL",
     "sqlite+aiosqlite:///:memory:"
 )
+
+_IS_SQLITE = "sqlite" in TEST_DATABASE_URL
+
+
+def _sqlite_compatible_metadata():
+    """Build a MetaData copy with PostgreSQL-specific features replaced for SQLite."""
+    from sqlalchemy import JSON, String, text
+    from sqlalchemy.schema import DefaultClause
+    from sqlalchemy.dialects.postgresql import ARRAY
+
+    meta = MetaData()
+    for table in Base.metadata.sorted_tables:
+        table.to_metadata(meta)
+    for table in meta.sorted_tables:
+        for col in table.columns:
+            if col.server_default is not None:
+                sd_text = str(col.server_default.arg) if hasattr(col.server_default, 'arg') else ""
+                if "gen_random_uuid" in sd_text:
+                    # Python default=uuid.uuid4 handles this; remove server_default
+                    col.server_default = None
+                elif "NOW()" in sd_text.upper():
+                    # Replace NOW() with SQLite-compatible CURRENT_TIMESTAMP
+                    col.server_default = DefaultClause(text("CURRENT_TIMESTAMP"))
+                # Keep other server_defaults as-is (e.g., '[]', 'false')
+            # Replace ARRAY(String) → JSON for SQLite
+            if isinstance(col.type, ARRAY):
+                col.type = JSON()
+    return meta
+
+
+def _create_tables_sqlite(conn):
+    """Create tables on SQLite with PostgreSQL features stripped."""
+    _sqlite_compatible_metadata().create_all(conn)
+
+
+def _drop_tables_sqlite(conn):
+    """Drop all tables (SQLite-compatible)."""
+    _sqlite_compatible_metadata().drop_all(conn)
 
 
 @pytest_asyncio.fixture
@@ -28,7 +69,10 @@ async def db_session():
     test_engine = create_async_engine(TEST_DATABASE_URL, echo=False)
 
     async with test_engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+        if _IS_SQLITE:
+            await conn.run_sync(_create_tables_sqlite)
+        else:
+            await conn.run_sync(Base.metadata.create_all)
 
     session_factory = async_sessionmaker(
         test_engine, class_=AsyncSession, expire_on_commit=False
@@ -38,7 +82,10 @@ async def db_session():
         await session.rollback()
 
     async with test_engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
+        if _IS_SQLITE:
+            await conn.run_sync(_drop_tables_sqlite)
+        else:
+            await conn.run_sync(Base.metadata.drop_all)
     await test_engine.dispose()
 
 
@@ -52,6 +99,14 @@ async def client(db_session):
         yield db_session
 
     app.dependency_overrides[get_db] = override_get_db
+
+    # Reset rate limiter state between tests to avoid cross-test pollution
+    try:
+        from app.core.limiter import limiter
+        limiter.reset()
+    except Exception:
+        pass
+
     async with AsyncClient(
         transport=ASGITransport(app=app),
         base_url="http://test"

@@ -8,14 +8,14 @@ REGISTER_PAYLOAD = {
 }
 
 async def test_register_creates_org_and_user(client):
-    """L'inscription crée une organisation et un utilisateur admin."""
+    """L'inscription crée une organisation et renvoie un token."""
     resp = await client.post("/api/v1/auth/register", json=REGISTER_PAYLOAD)
     assert resp.status_code == 201, resp.text
     data = resp.json()
-    assert data["email"] == REGISTER_PAYLOAD["email"]
-    assert data["full_name"] == REGISTER_PAYLOAD["full_name"]
-    assert "id" in data
-    assert "org_id" in data
+    # Register returns TokenResponse, not user data
+    assert "access_token" in data
+    assert data["token_type"] == "bearer"
+    assert data["expires_in"] > 0
 
 async def test_register_duplicate_email_returns_400(client):
     """Deux inscriptions avec le même email → 400."""

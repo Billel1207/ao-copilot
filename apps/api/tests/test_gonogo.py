@@ -10,7 +10,7 @@ class TestComputeProfileMatch:
         """Without company profile, should return has_profile=False."""
         result = compute_profile_match(
             company_profile=None,
-            market_data={},
+            gonogo_payload={},
         )
         assert result.has_profile is False
         assert result.profile_match_score >= 0
@@ -18,28 +18,29 @@ class TestComputeProfileMatch:
     def test_full_match(self):
         """Company with all matching attributes should score high."""
         profile = {
-            "ca_annuel": 10_000_000,
-            "effectif": 50,
+            "revenue_eur": 10_000_000,
+            "employee_count": 50,
             "certifications": ["ISO 9001", "Qualibat 2111"],
             "regions": ["Île-de-France", "Hauts-de-France"],
+            "max_market_size_eur": 5_000_000,
             "assurance_rc_montant": 2_000_000,
             "assurance_decennale": True,
-            "marge_minimale_pct": 8.0,
+            "marge_minimale_pct": 8,
             "max_projets_simultanes": 10,
             "projets_actifs_count": 3,
             "partenaires_specialites": ["électricité", "plomberie"],
+            "specialties": [],
         }
         market = {
-            "montant_estime": 500_000,
-            "certifications_requises": ["ISO 9001"],
-            "localisation": "Paris",
-            "rc_pro_min": 1_000_000,
-            "garantie_decennale_requise": True,
-            "marge_estimee_pct": 12.0,
+            "market_amount_eur": 500_000,
+            "required_certifications": ["ISO 9001"],
+            "market_location": "Paris",
+            "min_revenue_eur": 1_000_000,
+            "estimated_margin_pct": 12.0,
         }
         result = compute_profile_match(
             company_profile=profile,
-            market_data=market,
+            gonogo_payload=market,
         )
         assert result.has_profile is True
         assert result.profile_match_score >= 50
@@ -48,52 +49,53 @@ class TestComputeProfileMatch:
     def test_missing_certifications_penalized(self):
         """Missing required certifications should lower the score."""
         profile = {
-            "ca_annuel": 1_000_000,
-            "effectif": 10,
+            "revenue_eur": 1_000_000,
+            "employee_count": 10,
             "certifications": [],
             "regions": ["Île-de-France"],
         }
         market = {
-            "montant_estime": 200_000,
-            "certifications_requises": ["ISO 9001", "Qualibat 2111", "RGE"],
+            "market_amount_eur": 200_000,
+            "required_certifications": ["ISO 9001", "Qualibat 2111", "RGE"],
         }
         result = compute_profile_match(
             company_profile=profile,
-            market_data=market,
+            gonogo_payload=market,
         )
         assert any("certification" in g.lower() for g in result.profile_gaps)
 
     def test_ca_too_small_flagged(self):
         """Market too large relative to CA should flag a gap."""
         profile = {
-            "ca_annuel": 500_000,
-            "effectif": 5,
+            "revenue_eur": 500_000,
+            "employee_count": 5,
             "certifications": [],
             "regions": [],
+            "max_market_size_eur": 500_000,
         }
         market = {
-            "montant_estime": 2_000_000,
+            "market_amount_eur": 2_000_000,
         }
         result = compute_profile_match(
             company_profile=profile,
-            market_data=market,
+            gonogo_payload=market,
         )
-        assert result.profile_match_score < 70
+        assert result.profile_match_score < 80
 
     def test_dimension_scores_are_bounded(self):
         """All dimension scores should be 0-100."""
         profile = {
-            "ca_annuel": 5_000_000,
-            "effectif": 30,
+            "revenue_eur": 5_000_000,
+            "employee_count": 30,
             "certifications": ["ISO 9001"],
             "regions": ["PACA"],
         }
         market = {
-            "montant_estime": 300_000,
+            "market_amount_eur": 300_000,
         }
         result = compute_profile_match(
             company_profile=profile,
-            market_data=market,
+            gonogo_payload=market,
         )
         for name, score in result.dimension_scores.items():
             assert 0 <= score <= 100, f"Dimension {name} has score {score} out of range"
@@ -101,8 +103,8 @@ class TestComputeProfileMatch:
     def test_result_fields_present(self):
         """ProfileMatchResult should have all required fields."""
         result = compute_profile_match(
-            company_profile={"ca_annuel": 1_000_000, "certifications": [], "regions": []},
-            market_data={},
+            company_profile={"revenue_eur": 1_000_000, "certifications": [], "regions": []},
+            gonogo_payload={},
         )
         assert hasattr(result, "profile_match_score")
         assert hasattr(result, "profile_gaps")

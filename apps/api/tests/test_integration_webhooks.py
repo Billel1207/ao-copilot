@@ -14,11 +14,11 @@ from app.models.organization import Organization
 from app.models.billing import Subscription
 from app.core.security import create_access_token
 # ── Helpers ────────────────────────────────────────────────────────────────
-def _make_headers(user_id: str) -> dict:
-    token = create_access_token({"sub": user_id})
+def _make_headers(user_id: str, org_id: str, role: str = "admin") -> dict:
+    token = create_access_token({"sub": user_id, "org_id": org_id, "role": role})
     return {"Authorization": f"Bearer {token}"}
 async def _create_org_user(
-    db: AsyncSession, plan: str = "free", quota: int = 3
+    db: AsyncSession, plan: str = "free", quota: int = 5
 ) -> tuple[Organization, User]:
     org = Organization(
         id=uuid.uuid4(),
@@ -47,6 +47,15 @@ def _mock_stripe_event(event_type: str, data_object: dict) -> dict:
         "type": event_type,
         "data": {"object": data_object},
     }
+
+def _mock_stripe_and_redis():
+    """Return context managers that mock both Stripe and Redis for webhooks."""
+    mock_stripe = MagicMock()
+    mock_redis = MagicMock()
+    # Redis idempotency check: set returns True = first time processing
+    mock_redis.set.return_value = True
+    return mock_stripe, mock_redis
+
 # ── Fixture ────────────────────────────────────────────────────────────────
 @pytest_asyncio.fixture
 async def client_db(db_session):
@@ -63,7 +72,7 @@ async def client_db(db_session):
 class TestWebhookSecurity:
     """Vérification des protections de l'endpoint webhook."""
 
-    
+
     async def test_webhook_without_signature_returns_400(self, client_db):
         client, _ = client_db
         resp = await client.post(
@@ -72,7 +81,7 @@ class TestWebhookSecurity:
         )
         assert resp.status_code == 400
 
-    
+
     async def test_webhook_with_empty_body_returns_error(self, client_db):
         client, _ = client_db
         resp = await client.post(
@@ -85,22 +94,27 @@ class TestWebhookSecurity:
 class TestCheckoutCompleted:
     """Webhook checkout.session.completed — upgrade de plan après paiement."""
 
-    
+
     async def test_checkout_completed_upgrades_org_to_pro(self, client_db):
         client, db = client_db
-        org, user = await _create_org_user(db, plan="free", quota=3)
+        org, user = await _create_org_user(db, plan="free", quota=5)
 
         event = _mock_stripe_event("checkout.session.completed", {
             "id": "cs_test_123",
             "subscription": "sub_new_pro",
             "customer": "cus_test_123",
-            "metadata": {"org_id": str(org.id), "plan_id": "pro"},
+            "metadata": {"org_id": str(org.id), "plan": "pro"},
         })
 
-        with patch("app.services.billing._get_stripe") as mock_stripe_factory:
+        with patch("app.services.billing._get_stripe") as mock_stripe_factory, \
+             patch("redis.from_url") as mock_redis_factory:
             mock_stripe = MagicMock()
             mock_stripe.Webhook.construct_event.return_value = event
             mock_stripe_factory.return_value = mock_stripe
+
+            mock_redis = MagicMock()
+            mock_redis.set.return_value = True
+            mock_redis_factory.return_value = mock_redis
 
             resp = await client.post(
                 "/api/v1/billing/webhook",
@@ -115,22 +129,27 @@ class TestCheckoutCompleted:
         assert org.plan == "pro"
         assert org.quota_docs == 60  # quota Pro
 
-    
+
     async def test_checkout_completed_creates_subscription_record(self, client_db):
         client, db = client_db
-        org, user = await _create_org_user(db, plan="free", quota=3)
+        org, user = await _create_org_user(db, plan="free", quota=5)
 
         event = _mock_stripe_event("checkout.session.completed", {
             "id": "cs_test_456",
             "subscription": "sub_starter_789",
             "customer": "cus_starter_456",
-            "metadata": {"org_id": str(org.id), "plan_id": "starter"},
+            "metadata": {"org_id": str(org.id), "plan": "starter"},
         })
 
-        with patch("app.services.billing._get_stripe") as mock_stripe_factory:
+        with patch("app.services.billing._get_stripe") as mock_stripe_factory, \
+             patch("redis.from_url") as mock_redis_factory:
             mock_stripe = MagicMock()
             mock_stripe.Webhook.construct_event.return_value = event
             mock_stripe_factory.return_value = mock_stripe
+
+            mock_redis = MagicMock()
+            mock_redis.set.return_value = True
+            mock_redis_factory.return_value = mock_redis
 
             resp = await client.post(
                 "/api/v1/billing/webhook",
@@ -153,7 +172,7 @@ class TestCheckoutCompleted:
 class TestSubscriptionCanceled:
     """Webhook customer.subscription.deleted — downgrade au plan free."""
 
-    
+
     async def test_subscription_deleted_downgrades_to_free(self, client_db):
         client, db = client_db
         org, user = await _create_org_user(db, plan="pro", quota=60)
@@ -174,10 +193,15 @@ class TestSubscriptionCanceled:
             "id": "sub_to_cancel_123",
         })
 
-        with patch("app.services.billing._get_stripe") as mock_stripe_factory:
+        with patch("app.services.billing._get_stripe") as mock_stripe_factory, \
+             patch("redis.from_url") as mock_redis_factory:
             mock_stripe = MagicMock()
             mock_stripe.Webhook.construct_event.return_value = event
             mock_stripe_factory.return_value = mock_stripe
+
+            mock_redis = MagicMock()
+            mock_redis.set.return_value = True
+            mock_redis_factory.return_value = mock_redis
 
             resp = await client.post(
                 "/api/v1/billing/webhook",
@@ -190,9 +214,10 @@ class TestSubscriptionCanceled:
         # Org retombe au plan free
         await db.refresh(org)
         assert org.plan == "free"
-        assert org.quota_docs == 3
+        # PLANS["free"].docs_per_month is 5
+        assert org.quota_docs == 5
 
-    
+
     async def test_cancellation_marks_subscription_as_canceled(self, client_db):
         client, db = client_db
         org, user = await _create_org_user(db, plan="starter", quota=15)
@@ -212,10 +237,15 @@ class TestSubscriptionCanceled:
             "id": "sub_cancel_456",
         })
 
-        with patch("app.services.billing._get_stripe") as mock_stripe_factory:
+        with patch("app.services.billing._get_stripe") as mock_stripe_factory, \
+             patch("redis.from_url") as mock_redis_factory:
             mock_stripe = MagicMock()
             mock_stripe.Webhook.construct_event.return_value = event
             mock_stripe_factory.return_value = mock_stripe
+
+            mock_redis = MagicMock()
+            mock_redis.set.return_value = True
+            mock_redis_factory.return_value = mock_redis
 
             resp = await client.post(
                 "/api/v1/billing/webhook",
@@ -231,7 +261,7 @@ class TestSubscriptionCanceled:
 class TestSubscriptionUpdated:
     """Webhook customer.subscription.updated — changement de plan."""
 
-    
+
     async def test_subscription_updated_changes_plan(self, client_db):
         client, db = client_db
         org, user = await _create_org_user(db, plan="starter", quota=15)
@@ -250,14 +280,19 @@ class TestSubscriptionUpdated:
         event = _mock_stripe_event("customer.subscription.updated", {
             "id": "sub_upgrade_789",
             "status": "active",
-            "metadata": {"plan_id": "pro"},
+            "metadata": {"plan": "pro"},
             "items": {"data": [{"price": {"id": "price_pro_monthly"}}]},
         })
 
-        with patch("app.services.billing._get_stripe") as mock_stripe_factory:
+        with patch("app.services.billing._get_stripe") as mock_stripe_factory, \
+             patch("redis.from_url") as mock_redis_factory:
             mock_stripe = MagicMock()
             mock_stripe.Webhook.construct_event.return_value = event
             mock_stripe_factory.return_value = mock_stripe
+
+            mock_redis = MagicMock()
+            mock_redis.set.return_value = True
+            mock_redis_factory.return_value = mock_redis
 
             resp = await client.post(
                 "/api/v1/billing/webhook",
@@ -271,7 +306,7 @@ class TestSubscriptionUpdated:
 class TestWebhookIdempotence:
     """Les webhooks doivent être idempotents — double envoi ne casse pas."""
 
-    
+
     async def test_double_cancellation_is_safe(self, client_db):
         client, db = client_db
         org, user = await _create_org_user(db, plan="pro", quota=60)
@@ -291,11 +326,18 @@ class TestWebhookIdempotence:
             "id": "sub_idempotent_001",
         })
 
-        for _ in range(2):
-            with patch("app.services.billing._get_stripe") as mock_stripe_factory:
+        for call_num in range(2):
+            with patch("app.services.billing._get_stripe") as mock_stripe_factory, \
+                 patch("redis.from_url") as mock_redis_factory:
                 mock_stripe = MagicMock()
                 mock_stripe.Webhook.construct_event.return_value = event
                 mock_stripe_factory.return_value = mock_stripe
+
+                mock_redis = MagicMock()
+                # First call: set returns True (not a duplicate)
+                # Second call: set returns False (duplicate) — should return "duplicate" status
+                mock_redis.set.return_value = (call_num == 0)
+                mock_redis_factory.return_value = mock_redis
 
                 resp = await client.post(
                     "/api/v1/billing/webhook",
@@ -304,6 +346,6 @@ class TestWebhookIdempotence:
                 )
                 assert resp.status_code == 200
 
-        # Org est free après les deux appels
+        # Org est free après les appels
         await db.refresh(org)
         assert org.plan == "free"

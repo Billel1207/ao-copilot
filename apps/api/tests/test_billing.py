@@ -58,7 +58,7 @@ async def client_db(db_session):
 class TestUsageEndpoint:
     """GET /api/v1/billing/usage — retourne les stats d'utilisation."""
 
-    
+
     async def test_get_usage_returns_stats(self, client_db):
         client, db = client_db
         org, user = await _create_org_user(db, quota=15)
@@ -75,13 +75,13 @@ class TestUsageEndpoint:
         assert isinstance(data["plans_available"], list)
         assert len(data["plans_available"]) > 0
 
-    
+
     async def test_usage_unauthenticated_returns_401(self, client_db):
         client, _ = client_db
         response = await client.get("/api/v1/billing/usage")
         assert response.status_code in (401, 403)
 
-    
+
     async def test_usage_reflects_uploaded_docs(self, client_db):
         client, db = client_db
         org, user = await _create_org_user(db, quota=10)
@@ -118,7 +118,7 @@ class TestUsageEndpoint:
 class TestSubscriptionEndpoint:
     """GET /api/v1/billing/subscription — retourne l'état de l'abonnement."""
 
-    
+
     async def test_subscription_no_stripe_returns_free_state(self, client_db):
         client, db = client_db
         org, user = await _create_org_user(db)
@@ -127,11 +127,11 @@ class TestSubscriptionEndpoint:
         response = await client.get("/api/v1/billing/subscription", headers=headers)
         assert response.status_code == 200
         data = response.json()
-        assert data["plan"] in ("starter", "free", "pro")
+        assert data["plan"] in ("starter", "free", "pro", "trial")
         assert data["status"] == "active"
         assert data["stripe_subscription_id"] is None
 
-    
+
     async def test_subscription_with_stripe_record(self, client_db):
         client, db = client_db
         org, user = await _create_org_user(db, plan="pro")
@@ -157,7 +157,7 @@ class TestSubscriptionEndpoint:
 class TestCheckoutEndpoint:
     """POST /api/v1/billing/checkout — crée une session Stripe Checkout."""
 
-    
+
     async def test_checkout_non_admin_returns_403(self, client_db):
         client, db = client_db
         org, user = await _create_org_user(db)
@@ -177,7 +177,7 @@ class TestCheckoutEndpoint:
         )
         assert response.status_code == 403
 
-    
+
     async def test_checkout_with_stripe_mock(self, client_db):
         client, db = client_db
         org, user = await _create_org_user(db)
@@ -215,7 +215,7 @@ class TestCheckoutEndpoint:
 class TestWebhookEndpoint:
     """POST /api/v1/billing/webhook — traite les événements Stripe."""
 
-    
+
     async def test_webhook_missing_signature_returns_400(self, client_db):
         client, _ = client_db
         response = await client.post(
@@ -224,7 +224,7 @@ class TestWebhookEndpoint:
         )
         assert response.status_code == 400
 
-    
+
     async def test_webhook_invalid_signature_returns_400(self, client_db):
         client, _ = client_db
 
@@ -244,7 +244,7 @@ class TestWebhookEndpoint:
             )
         assert response.status_code == 400
 
-    
+
     async def test_webhook_subscription_canceled_downgrades_plan(self, client_db):
         client, db = client_db
         org, user = await _create_org_user(db, plan="pro", quota=60)
@@ -263,14 +263,21 @@ class TestWebhookEndpoint:
 
         # Simuler un webhook customer.subscription.deleted
         event_payload = {
+            "id": "evt_test_cancel_123",
             "type": "customer.subscription.deleted",
             "data": {"object": {"id": "sub_to_cancel"}},
         }
 
-        with patch("app.services.billing._get_stripe") as mock_stripe_factory:
+        with patch("app.services.billing._get_stripe") as mock_stripe_factory, \
+             patch("redis.from_url") as mock_redis_factory:
             mock_stripe = MagicMock()
             mock_stripe.Webhook.construct_event.return_value = event_payload
             mock_stripe_factory.return_value = mock_stripe
+
+            # Mock Redis to allow idempotency check to pass (set returns True = first time)
+            mock_redis = MagicMock()
+            mock_redis.set.return_value = True
+            mock_redis_factory.return_value = mock_redis
 
             response = await client.post(
                 "/api/v1/billing/webhook",
@@ -283,11 +290,12 @@ class TestWebhookEndpoint:
         # Vérifier que le plan a été rétrogradé
         await db.refresh(org)
         assert org.plan == "free"
-        assert org.quota_docs == 3  # quota du plan free
+        # PLANS["free"].docs_per_month is 5
+        assert org.quota_docs == 5
 class TestQuotaEnforcement:
     """Tests de l'enforcement du quota via BillingService."""
 
-    
+
     async def test_enforce_quota_raises_when_exceeded(self, client_db):
         _, db = client_db
         from app.services.billing import billing_service

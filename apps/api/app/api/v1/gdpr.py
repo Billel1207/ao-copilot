@@ -126,10 +126,10 @@ async def export_user_data(
             docs_data.append({
                 "id": str(d.id),
                 "project_id": str(d.project_id),
-                "filename": d.filename,
+                "filename": d.original_name,
                 "doc_type": d.doc_type,
                 "status": d.status,
-                "created_at": d.created_at.isoformat() if d.created_at else None,
+                "uploaded_at": d.uploaded_at.isoformat() if d.uploaded_at else None,
             })
 
     # Profil entreprise
@@ -140,10 +140,11 @@ async def export_user_data(
     profile_data = None
     if profile:
         profile_data = {
-            "company_name": profile.company_name,
-            "siret": profile.siret,
-            "revenue_annual_eur": profile.revenue_annual_eur,
+            "revenue_eur": profile.revenue_eur,
             "employee_count": profile.employee_count,
+            "certifications": profile.certifications,
+            "specialties": profile.specialties,
+            "regions": profile.regions,
         }
 
     logger.info("gdpr_data_export", user_id=str(current_user.id), org_id=str(org.id))

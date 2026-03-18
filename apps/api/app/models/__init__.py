@@ -8,6 +8,11 @@ from app.models.company_profile import CompanyProfile
 from app.models.library import ResponseSnippet
 from app.models.annotation import ChecklistAnnotation
 from app.models.ao_alert import AoWatchConfig, AoWatchResult
+from app.models.billing import Subscription, Invoice, UsageRecord
+from app.models.team import TeamInvite
+from app.models.audit import AuditLog
+from app.models.api_key import ApiKey
+from app.models.webhook import WebhookEndpoint, WebhookDelivery
 
 __all__ = [
     "Organization", "User", "AoProject",
@@ -19,4 +24,9 @@ __all__ = [
     "ChecklistAnnotation",
     "AoWatchConfig",
     "AoWatchResult",
+    "Subscription", "Invoice", "UsageRecord",
+    "TeamInvite",
+    "AuditLog",
+    "ApiKey",
+    "WebhookEndpoint", "WebhookDelivery",
 ]

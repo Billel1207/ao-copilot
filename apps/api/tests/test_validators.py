@@ -92,53 +92,54 @@ class TestValidatedSummary:
 class TestLLMChecklistItem:
     def test_valid_checklist_item(self):
         item = LLMChecklistItem(
-            category="admin",
-            item="KBIS < 3 mois",
-            criticality="critical",
-            status="missing",
+            category="Administratif",
+            requirement="KBIS < 3 mois",
+            criticality="Éliminatoire",
+            status="MANQUANT",
             citations=[],
             confidence=0.9,
         )
-        assert item.criticality == "critical"
+        assert item.criticality == "Éliminatoire"
 
     def test_unknown_criticality_normalized(self):
-        """Unknown criticality should default to medium."""
+        """Unknown criticality should default to Important."""
         item = LLMChecklistItem(
-            category="admin",
-            item="Test",
+            category="Administratif",
+            requirement="Test",
             criticality="invalid_value",
-            status="missing",
+            status="MANQUANT",
             citations=[],
             confidence=0.5,
         )
-        # Pydantic should accept or coerce
-        assert item is not None
+        # Pydantic validator normalizes unknown criticality to "Important"
+        assert item.criticality == "Important"
 
 
 class TestValidatedGoNoGo:
     def test_score_boundaries(self):
         data = {
-            "go_score": 75,
-            "recommendation": "go",
+            "score": 75,
+            "recommendation": "GO",
             "strengths": ["Expérience"],
-            "weaknesses": ["Budget serré"],
-            "risks": [],
-            "key_factors": [],
-            "confidence_overall": 0.8,
+            "risks": ["Budget serré"],
+            "summary": "",
         }
         result = ValidatedGoNoGo.model_validate(data)
-        assert 0 <= result.go_score <= 100
-        assert result.recommendation == "go"
+        assert 0 <= result.score <= 100
+        assert result.recommendation == "GO"
 
 
 class TestValidatedTimeline:
-    def test_timeline_tasks(self):
+    def test_timeline_fields(self):
         data = {
-            "tasks": [
-                {"label": "Retirer le DCE", "deadline": "2026-03-15", "done": False, "priority": "high"},
-                {"label": "Visite de site", "deadline": "2026-03-20", "done": False, "priority": "medium"},
+            "submission_deadline": "2026-03-15",
+            "execution_start": "2026-04-01",
+            "execution_duration_months": 12,
+            "key_dates": [
+                {"label": "Retirer le DCE", "date": "2026-03-15", "mandatory": True},
+                {"label": "Visite de site", "date": "2026-03-20", "mandatory": False},
             ],
-            "confidence_overall": 0.7,
         }
         result = ValidatedTimeline.model_validate(data)
-        assert len(result.tasks) == 2
+        assert len(result.key_dates) == 2
+        assert result.execution_duration_months == 12

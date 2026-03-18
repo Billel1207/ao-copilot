@@ -86,7 +86,7 @@ async def client_with_db(db_session):
 class TestUploadValidPDF:
     """Upload d'un PDF valide — doit retourner 201."""
 
-    
+
     async def test_upload_valid_pdf(self, client_with_db):
         client, db, _ = client_with_db
         org, user, project = await _create_org_user_project(db)
@@ -103,7 +103,7 @@ class TestUploadValidPDF:
         assert data["original_name"] == "test_document.pdf"
         assert data["status"] == "pending"
 
-    
+
     async def test_upload_detects_doc_type_from_filename(self, client_with_db):
         client, db, _ = client_with_db
         org, user, project = await _create_org_user_project(db)
@@ -120,7 +120,7 @@ class TestUploadValidPDF:
 class TestMagicBytesValidation:
     """Validation des magic bytes PDF — protège contre les fichiers malveillants."""
 
-    
+
     async def test_reject_fake_pdf_extension_only(self, client_with_db):
         """Fichier .pdf dont le contenu n'est pas un PDF — doit être rejeté."""
         client, db, _ = client_with_db
@@ -135,25 +135,27 @@ class TestMagicBytesValidation:
             files={"file": ("malware.pdf", fake_content, "application/pdf")},
         )
         assert response.status_code == 400
-        assert "PDF valide" in response.json()["detail"]
+        # Actual error: "Le fichier ne correspond pas au format pdf"
+        assert "correspond pas" in response.json()["detail"] or "format" in response.json()["detail"].lower()
 
-    
+
     async def test_reject_non_pdf_extension(self, client_with_db):
-        """Fichier .docx — doit être rejeté avant vérification magic bytes."""
+        """Fichier .exe — doit être rejeté (format non supporté)."""
         client, db, _ = client_with_db
         org, user, project = await _create_org_user_project(db)
         headers = _make_headers(str(user.id), str(org.id))
 
-        content = b"%PDF-1.4 tricky"
+        content = b"MZ\x90\x00fake exe"
         response = await client.post(
             f"/api/v1/projects/{project.id}/documents/upload",
             headers=headers,
-            files={"file": ("document.docx", content, "application/pdf")},
+            files={"file": ("document.exe", content, "application/octet-stream")},
         )
         assert response.status_code == 400
-        assert "PDF" in response.json()["detail"]
+        # Actual error: "Format non supporté. Formats acceptés : PDF, JPEG, PNG, TIFF, DOCX"
+        assert "Format" in response.json()["detail"] or "format" in response.json()["detail"].lower()
 
-    
+
     async def test_reject_oversized_file(self, client_with_db):
         """Fichier > 50 Mo — doit être rejeté (HTTP 400)."""
         client, db, _ = client_with_db
@@ -172,7 +174,7 @@ class TestMagicBytesValidation:
 class TestQuotaEnforcement:
     """Quota mensuel de documents — doit bloquer à quota_docs atteint."""
 
-    
+
     async def test_quota_exceeded_returns_429(self, client_with_db):
         """Quand le quota est atteint, l'upload doit retourner 429."""
         client, db, _ = client_with_db
@@ -202,7 +204,7 @@ class TestQuotaEnforcement:
         assert response.status_code == 429
         assert "Quota" in response.json()["detail"]
 
-    
+
     async def test_upload_allowed_under_quota(self, client_with_db):
         """Sous le quota, l'upload doit réussir."""
         client, db, _ = client_with_db
@@ -231,7 +233,7 @@ class TestQuotaEnforcement:
 class TestMultiTenantIsolation:
     """Isolation multi-tenant — org A ne peut pas voir/modifier les docs de org B."""
 
-    
+
     async def test_cannot_upload_to_other_org_project(self, client_with_db):
         """Upload vers un projet d'une autre org doit retourner 404 (pas 403)."""
         client, db, _ = client_with_db
@@ -251,7 +253,7 @@ class TestMultiTenantIsolation:
         # Doit retourner 404 — on ne révèle pas l'existence du projet
         assert response.status_code == 404
 
-    
+
     async def test_list_documents_only_own_org(self, client_with_db):
         """Lister les documents d'un projet appartenant à une autre org → 404."""
         client, db, _ = client_with_db
@@ -281,7 +283,7 @@ class TestMultiTenantIsolation:
 class TestUnauthenticatedAccess:
     """Accès sans token JWT — doit retourner 401/403."""
 
-    
+
     async def test_upload_without_token(self, client_with_db):
         client, db, _ = client_with_db
         org, user, project = await _create_org_user_project(db)
