@@ -1,7 +1,5 @@
 """Tests pour le CRUD des projets (isolation org, archive, etc.)."""
 import pytest
-
-
 # ── Helpers ────────────────────────────────────────────────────────────────
 
 async def register_and_login(client, email="user@test.fr", org="Org Test"):
@@ -17,23 +15,15 @@ async def register_and_login(client, email="user@test.fr", org="Org Test"):
         "password": "SecurePass123!",
     })
     return resp.json()["access_token"]
-
-
 def auth(token):
     return {"Authorization": f"Bearer {token}"}
-
-
 PROJECT_DATA = {
     "title": "Appel d'offres Travaux RN7",
     "reference": "AO-2026-001",
     "buyer": "DIR Méditerranée",
     "market_type": "travaux",
 }
-
-
 # ── Tests ──────────────────────────────────────────────────────────────────
-
-@pytest.mark.asyncio
 async def test_create_project(client):
     """Création d'un projet → 201 + champs corrects."""
     token = await register_and_login(client)
@@ -45,8 +35,6 @@ async def test_create_project(client):
     assert "id" in data
     assert "org_id" in data
 
-
-@pytest.mark.asyncio
 async def test_list_projects_only_own_org(client):
     """Un utilisateur ne voit pas les projets d'une autre organisation."""
     token_a = await register_and_login(client, email="a@test.fr", org="Org A")
@@ -62,8 +50,6 @@ async def test_list_projects_only_own_org(client):
     assert data["total"] == 0
     assert data["items"] == []
 
-
-@pytest.mark.asyncio
 async def test_get_project_not_found_returns_404(client):
     """GET sur un UUID inexistant → 404."""
     token = await register_and_login(client, email="c@test.fr", org="Org C")
@@ -71,8 +57,6 @@ async def test_get_project_not_found_returns_404(client):
     resp = await client.get(f"/api/v1/projects/{fake_id}", headers=auth(token))
     assert resp.status_code == 404
 
-
-@pytest.mark.asyncio
 async def test_update_project(client):
     """PATCH met à jour les champs autorisés."""
     token = await register_and_login(client, email="d@test.fr", org="Org D")
@@ -87,8 +71,6 @@ async def test_update_project(client):
     assert resp.status_code == 200
     assert resp.json()["title"] == "Titre modifié"
 
-
-@pytest.mark.asyncio
 async def test_archive_project_persists(client):
     """
     DELETE (archive) d'un projet → status='archived' persisté en DB.

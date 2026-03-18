@@ -16,14 +16,10 @@ from app.models.document import AoDocument
 from app.core.security import hash_password, create_access_token
 
 # ── Helpers ────────────────────────────────────────────────────────────────
-
-
 def _make_headers(user_id: str, org_id: str, role: str = "admin") -> dict:
     """Crée un Bearer token de test."""
     token = create_access_token({"sub": user_id, "org_id": org_id, "role": role})
     return {"Authorization": f"Bearer {token}"}
-
-
 async def _create_org_user_project(db: AsyncSession, plan: str = "starter", quota: int = 15):
     """Crée une org + user admin + projet pour les tests."""
     org = Organization(
@@ -58,11 +54,7 @@ async def _create_org_user_project(db: AsyncSession, plan: str = "starter", quot
     await db.flush()
 
     return org, user, project
-
-
 # ── Fixtures ───────────────────────────────────────────────────────────────
-
-
 @pytest_asyncio.fixture
 async def client_with_db(db_session):
     """Client HTTP avec override DB + mocks storage/celery."""
@@ -90,15 +82,11 @@ async def client_with_db(db_session):
             yield ac, db_session, storage_mock
 
     app.dependency_overrides.clear()
-
-
 # ── Tests ──────────────────────────────────────────────────────────────────
-
-
 class TestUploadValidPDF:
     """Upload d'un PDF valide — doit retourner 201."""
 
-    @pytest.mark.asyncio
+    
     async def test_upload_valid_pdf(self, client_with_db):
         client, db, _ = client_with_db
         org, user, project = await _create_org_user_project(db)
@@ -115,7 +103,7 @@ class TestUploadValidPDF:
         assert data["original_name"] == "test_document.pdf"
         assert data["status"] == "pending"
 
-    @pytest.mark.asyncio
+    
     async def test_upload_detects_doc_type_from_filename(self, client_with_db):
         client, db, _ = client_with_db
         org, user, project = await _create_org_user_project(db)
@@ -129,12 +117,10 @@ class TestUploadValidPDF:
         )
         assert response.status_code == 201
         assert response.json()["doc_type"] == "CCTP"
-
-
 class TestMagicBytesValidation:
     """Validation des magic bytes PDF — protège contre les fichiers malveillants."""
 
-    @pytest.mark.asyncio
+    
     async def test_reject_fake_pdf_extension_only(self, client_with_db):
         """Fichier .pdf dont le contenu n'est pas un PDF — doit être rejeté."""
         client, db, _ = client_with_db
@@ -151,7 +137,7 @@ class TestMagicBytesValidation:
         assert response.status_code == 400
         assert "PDF valide" in response.json()["detail"]
 
-    @pytest.mark.asyncio
+    
     async def test_reject_non_pdf_extension(self, client_with_db):
         """Fichier .docx — doit être rejeté avant vérification magic bytes."""
         client, db, _ = client_with_db
@@ -167,7 +153,7 @@ class TestMagicBytesValidation:
         assert response.status_code == 400
         assert "PDF" in response.json()["detail"]
 
-    @pytest.mark.asyncio
+    
     async def test_reject_oversized_file(self, client_with_db):
         """Fichier > 50 Mo — doit être rejeté (HTTP 400)."""
         client, db, _ = client_with_db
@@ -183,12 +169,10 @@ class TestMagicBytesValidation:
         )
         assert response.status_code == 400
         assert "volumineux" in response.json()["detail"]
-
-
 class TestQuotaEnforcement:
     """Quota mensuel de documents — doit bloquer à quota_docs atteint."""
 
-    @pytest.mark.asyncio
+    
     async def test_quota_exceeded_returns_429(self, client_with_db):
         """Quand le quota est atteint, l'upload doit retourner 429."""
         client, db, _ = client_with_db
@@ -218,7 +202,7 @@ class TestQuotaEnforcement:
         assert response.status_code == 429
         assert "Quota" in response.json()["detail"]
 
-    @pytest.mark.asyncio
+    
     async def test_upload_allowed_under_quota(self, client_with_db):
         """Sous le quota, l'upload doit réussir."""
         client, db, _ = client_with_db
@@ -244,12 +228,10 @@ class TestQuotaEnforcement:
             files={"file": ("allowed.pdf", pdf_content, "application/pdf")},
         )
         assert response.status_code == 201
-
-
 class TestMultiTenantIsolation:
     """Isolation multi-tenant — org A ne peut pas voir/modifier les docs de org B."""
 
-    @pytest.mark.asyncio
+    
     async def test_cannot_upload_to_other_org_project(self, client_with_db):
         """Upload vers un projet d'une autre org doit retourner 404 (pas 403)."""
         client, db, _ = client_with_db
@@ -269,7 +251,7 @@ class TestMultiTenantIsolation:
         # Doit retourner 404 — on ne révèle pas l'existence du projet
         assert response.status_code == 404
 
-    @pytest.mark.asyncio
+    
     async def test_list_documents_only_own_org(self, client_with_db):
         """Lister les documents d'un projet appartenant à une autre org → 404."""
         client, db, _ = client_with_db
@@ -296,12 +278,10 @@ class TestMultiTenantIsolation:
             headers=headers_b,
         )
         assert response.status_code == 404
-
-
 class TestUnauthenticatedAccess:
     """Accès sans token JWT — doit retourner 401/403."""
 
-    @pytest.mark.asyncio
+    
     async def test_upload_without_token(self, client_with_db):
         client, db, _ = client_with_db
         org, user, project = await _create_org_user_project(db)

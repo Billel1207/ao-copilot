@@ -13,16 +13,10 @@ from app.models.user import User
 from app.models.organization import Organization
 from app.models.billing import Subscription
 from app.core.security import create_access_token
-
-
 # ── Helpers ────────────────────────────────────────────────────────────────
-
-
 def _make_headers(user_id: str) -> dict:
     token = create_access_token({"sub": user_id})
     return {"Authorization": f"Bearer {token}"}
-
-
 async def _create_org_user(
     db: AsyncSession, plan: str = "free", quota: int = 3
 ) -> tuple[Organization, User]:
@@ -47,19 +41,13 @@ async def _create_org_user(
     db.add(user)
     await db.flush()
     return org, user
-
-
 def _mock_stripe_event(event_type: str, data_object: dict) -> dict:
     return {
         "id": f"evt_{uuid.uuid4().hex[:16]}",
         "type": event_type,
         "data": {"object": data_object},
     }
-
-
 # ── Fixture ────────────────────────────────────────────────────────────────
-
-
 @pytest_asyncio.fixture
 async def client_db(db_session):
     async def override_get_db():
@@ -71,15 +59,11 @@ async def client_db(db_session):
     ) as ac:
         yield ac, db_session
     app.dependency_overrides.clear()
-
-
 # ── Tests — Webhook manquant ──────────────────────────────────────────────
-
-
 class TestWebhookSecurity:
     """Vérification des protections de l'endpoint webhook."""
 
-    @pytest.mark.asyncio
+    
     async def test_webhook_without_signature_returns_400(self, client_db):
         client, _ = client_db
         resp = await client.post(
@@ -88,7 +72,7 @@ class TestWebhookSecurity:
         )
         assert resp.status_code == 400
 
-    @pytest.mark.asyncio
+    
     async def test_webhook_with_empty_body_returns_error(self, client_db):
         client, _ = client_db
         resp = await client.post(
@@ -97,15 +81,11 @@ class TestWebhookSecurity:
             headers={"stripe-signature": "sig_test"},
         )
         assert resp.status_code in (400, 422, 500)
-
-
 # ── Tests — checkout.session.completed ────────────────────────────────────
-
-
 class TestCheckoutCompleted:
     """Webhook checkout.session.completed — upgrade de plan après paiement."""
 
-    @pytest.mark.asyncio
+    
     async def test_checkout_completed_upgrades_org_to_pro(self, client_db):
         client, db = client_db
         org, user = await _create_org_user(db, plan="free", quota=3)
@@ -135,7 +115,7 @@ class TestCheckoutCompleted:
         assert org.plan == "pro"
         assert org.quota_docs == 60  # quota Pro
 
-    @pytest.mark.asyncio
+    
     async def test_checkout_completed_creates_subscription_record(self, client_db):
         client, db = client_db
         org, user = await _create_org_user(db, plan="free", quota=3)
@@ -169,15 +149,11 @@ class TestCheckoutCompleted:
         if sub:
             assert sub.stripe_subscription_id == "sub_starter_789"
             assert sub.stripe_customer_id == "cus_starter_456"
-
-
 # ── Tests — customer.subscription.deleted ─────────────────────────────────
-
-
 class TestSubscriptionCanceled:
     """Webhook customer.subscription.deleted — downgrade au plan free."""
 
-    @pytest.mark.asyncio
+    
     async def test_subscription_deleted_downgrades_to_free(self, client_db):
         client, db = client_db
         org, user = await _create_org_user(db, plan="pro", quota=60)
@@ -216,7 +192,7 @@ class TestSubscriptionCanceled:
         assert org.plan == "free"
         assert org.quota_docs == 3
 
-    @pytest.mark.asyncio
+    
     async def test_cancellation_marks_subscription_as_canceled(self, client_db):
         client, db = client_db
         org, user = await _create_org_user(db, plan="starter", quota=15)
@@ -251,15 +227,11 @@ class TestSubscriptionCanceled:
 
         await db.refresh(sub)
         assert sub.status == "canceled"
-
-
 # ── Tests — customer.subscription.updated ─────────────────────────────────
-
-
 class TestSubscriptionUpdated:
     """Webhook customer.subscription.updated — changement de plan."""
 
-    @pytest.mark.asyncio
+    
     async def test_subscription_updated_changes_plan(self, client_db):
         client, db = client_db
         org, user = await _create_org_user(db, plan="starter", quota=15)
@@ -295,15 +267,11 @@ class TestSubscriptionUpdated:
 
         # Le handler peut retourner 200 (traité) ou ignorer
         assert resp.status_code == 200
-
-
 # ── Tests — Idempotence ───────────────────────────────────────────────────
-
-
 class TestWebhookIdempotence:
     """Les webhooks doivent être idempotents — double envoi ne casse pas."""
 
-    @pytest.mark.asyncio
+    
     async def test_double_cancellation_is_safe(self, client_db):
         client, db = client_db
         org, user = await _create_org_user(db, plan="pro", quota=60)

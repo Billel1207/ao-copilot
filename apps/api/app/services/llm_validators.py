@@ -123,6 +123,13 @@ class ValidatedSummary(BaseModel):
     actions_next_48h: list[LLMNextAction] = []
     confidence_overall: float | None = None
 
+    @field_validator("confidence_overall", mode="before")
+    @classmethod
+    def clamp_confidence(cls, v):
+        if v is None:
+            return None
+        return max(0.0, min(1.0, float(v)))
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # CHECKLIST

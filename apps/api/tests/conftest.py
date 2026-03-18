@@ -4,12 +4,13 @@ import pytest_asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+import os
 
 from app.main import app
 from app.database import Base, get_db
 
+
 # ── Base de données de test (PostgreSQL du CI ou SQLite fallback) ──────────
-import os
 
 TEST_DATABASE_URL = os.getenv(
     "DATABASE_URL",
@@ -17,20 +18,19 @@ TEST_DATABASE_URL = os.getenv(
 )
 
 
-@pytest_asyncio.fixture(scope="session")
+@pytest_asyncio.fixture(loop_scope="session", scope="session")
 async def engine():
     """Moteur DB pour les tests — PostgreSQL en CI, SQLite en local."""
     engine = create_async_engine(TEST_DATABASE_URL, echo=False)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     yield engine
-    # Nettoyage : drop toutes les tables après la session de test
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
     await engine.dispose()
 
 
-@pytest_asyncio.fixture
+@pytest_asyncio.fixture(loop_scope="session")
 async def db_session(engine):
     """Session de DB isolée par test — rollback automatique après chaque test."""
     TestingSessionLocal = async_sessionmaker(
@@ -41,7 +41,7 @@ async def db_session(engine):
         await session.rollback()
 
 
-@pytest_asyncio.fixture
+@pytest_asyncio.fixture(loop_scope="session")
 async def client(db_session):
     """Client HTTP de test avec override de la dépendance DB."""
     async def override_get_db():
@@ -109,7 +109,6 @@ def mock_llm():
 
     def side_effect(system_prompt, user_prompt, json_schema=None):
         call_count["n"] += 1
-        # Retourner un résultat différent selon l'ordre d'appel dans le pipeline
         if call_count["n"] == 1:
             return MOCK_SUMMARY
         elif call_count["n"] == 2:

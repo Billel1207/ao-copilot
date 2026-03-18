@@ -124,13 +124,13 @@ async def health():
 async def health_ready():
     """Deep healthcheck — vérifie DB + Redis. Utilisé par monitoring / load balancer."""
     import time
-    from app.core.database import SessionLocal
+    from app.core.database import SyncSessionLocal
     checks: dict = {"api": "ok", "version": "0.1.0"}
     start = time.monotonic()
 
     # Check PostgreSQL
     try:
-        db = SessionLocal()
+        db = SyncSessionLocal()
         db.execute(text("SELECT 1"))
         db.close()
         checks["database"] = "ok"

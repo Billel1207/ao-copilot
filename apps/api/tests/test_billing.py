@@ -17,13 +17,9 @@ from app.models.billing import Subscription
 from app.core.security import create_access_token
 
 # ── Helpers ────────────────────────────────────────────────────────────────
-
-
 def _make_headers(user_id: str, org_id: str, role: str = "admin") -> dict:
     token = create_access_token({"sub": user_id, "org_id": org_id, "role": role})
     return {"Authorization": f"Bearer {token}"}
-
-
 async def _create_org_user(db: AsyncSession, plan: str = "starter", quota: int = 15):
     org = Organization(
         id=uuid.uuid4(),
@@ -46,11 +42,7 @@ async def _create_org_user(db: AsyncSession, plan: str = "starter", quota: int =
     db.add(user)
     await db.flush()
     return org, user
-
-
 # ── Fixtures ───────────────────────────────────────────────────────────────
-
-
 @pytest_asyncio.fixture
 async def client_db(db_session):
     async def override_get_db():
@@ -62,15 +54,11 @@ async def client_db(db_session):
     ) as ac:
         yield ac, db_session
     app.dependency_overrides.clear()
-
-
 # ── Tests ──────────────────────────────────────────────────────────────────
-
-
 class TestUsageEndpoint:
     """GET /api/v1/billing/usage — retourne les stats d'utilisation."""
 
-    @pytest.mark.asyncio
+    
     async def test_get_usage_returns_stats(self, client_db):
         client, db = client_db
         org, user = await _create_org_user(db, quota=15)
@@ -87,13 +75,13 @@ class TestUsageEndpoint:
         assert isinstance(data["plans_available"], list)
         assert len(data["plans_available"]) > 0
 
-    @pytest.mark.asyncio
+    
     async def test_usage_unauthenticated_returns_401(self, client_db):
         client, _ = client_db
         response = await client.get("/api/v1/billing/usage")
         assert response.status_code in (401, 403)
 
-    @pytest.mark.asyncio
+    
     async def test_usage_reflects_uploaded_docs(self, client_db):
         client, db = client_db
         org, user = await _create_org_user(db, quota=10)
@@ -127,12 +115,10 @@ class TestUsageEndpoint:
         data = response.json()
         assert data["docs_used_this_month"] == 3
         assert data["quota_pct"] == 30.0
-
-
 class TestSubscriptionEndpoint:
     """GET /api/v1/billing/subscription — retourne l'état de l'abonnement."""
 
-    @pytest.mark.asyncio
+    
     async def test_subscription_no_stripe_returns_free_state(self, client_db):
         client, db = client_db
         org, user = await _create_org_user(db)
@@ -145,7 +131,7 @@ class TestSubscriptionEndpoint:
         assert data["status"] == "active"
         assert data["stripe_subscription_id"] is None
 
-    @pytest.mark.asyncio
+    
     async def test_subscription_with_stripe_record(self, client_db):
         client, db = client_db
         org, user = await _create_org_user(db, plan="pro")
@@ -168,12 +154,10 @@ class TestSubscriptionEndpoint:
         data = response.json()
         assert data["plan"] == "pro"
         assert data["stripe_subscription_id"] == "sub_test456"
-
-
 class TestCheckoutEndpoint:
     """POST /api/v1/billing/checkout — crée une session Stripe Checkout."""
 
-    @pytest.mark.asyncio
+    
     async def test_checkout_non_admin_returns_403(self, client_db):
         client, db = client_db
         org, user = await _create_org_user(db)
@@ -193,7 +177,7 @@ class TestCheckoutEndpoint:
         )
         assert response.status_code == 403
 
-    @pytest.mark.asyncio
+    
     async def test_checkout_with_stripe_mock(self, client_db):
         client, db = client_db
         org, user = await _create_org_user(db)
@@ -228,12 +212,10 @@ class TestCheckoutEndpoint:
         # Avec les mocks, devrait retourner 200 et une checkout_url
         # (ou 400 si le price_id est vide dans les settings de test — acceptable)
         assert response.status_code in (200, 400)
-
-
 class TestWebhookEndpoint:
     """POST /api/v1/billing/webhook — traite les événements Stripe."""
 
-    @pytest.mark.asyncio
+    
     async def test_webhook_missing_signature_returns_400(self, client_db):
         client, _ = client_db
         response = await client.post(
@@ -242,7 +224,7 @@ class TestWebhookEndpoint:
         )
         assert response.status_code == 400
 
-    @pytest.mark.asyncio
+    
     async def test_webhook_invalid_signature_returns_400(self, client_db):
         client, _ = client_db
 
@@ -262,7 +244,7 @@ class TestWebhookEndpoint:
             )
         assert response.status_code == 400
 
-    @pytest.mark.asyncio
+    
     async def test_webhook_subscription_canceled_downgrades_plan(self, client_db):
         client, db = client_db
         org, user = await _create_org_user(db, plan="pro", quota=60)
@@ -302,12 +284,10 @@ class TestWebhookEndpoint:
         await db.refresh(org)
         assert org.plan == "free"
         assert org.quota_docs == 3  # quota du plan free
-
-
 class TestQuotaEnforcement:
     """Tests de l'enforcement du quota via BillingService."""
 
-    @pytest.mark.asyncio
+    
     async def test_enforce_quota_raises_when_exceeded(self, client_db):
         _, db = client_db
         from app.services.billing import billing_service

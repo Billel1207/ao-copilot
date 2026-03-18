@@ -12,16 +12,10 @@ from app.models.organization import Organization
 from app.models.project import AoProject
 from app.models.document import AoDocument
 from app.core.security import create_access_token
-
-
 # ── Helpers ────────────────────────────────────────────────────────────────
-
-
 def _make_headers(user_id: str) -> dict:
     token = create_access_token({"sub": user_id})
     return {"Authorization": f"Bearer {token}"}
-
-
 async def _create_tenant(
     db: AsyncSession, suffix: str, plan: str = "pro", quota: int = 60
 ) -> tuple[Organization, User]:
@@ -46,8 +40,6 @@ async def _create_tenant(
     db.add(user)
     await db.flush()
     return org, user
-
-
 async def _create_project(
     db: AsyncSession, org: Organization, user: User, title: str
 ) -> AoProject:
@@ -61,11 +53,7 @@ async def _create_project(
     db.add(project)
     await db.flush()
     return project
-
-
 # ── Fixture ────────────────────────────────────────────────────────────────
-
-
 @pytest_asyncio.fixture
 async def client_db(db_session):
     async def override_get_db():
@@ -77,15 +65,11 @@ async def client_db(db_session):
     ) as ac:
         yield ac, db_session
     app.dependency_overrides.clear()
-
-
 # ── Tests — Isolation des projets ─────────────────────────────────────────
-
-
 class TestProjectIsolation:
     """Les projets d'une org ne sont pas visibles par une autre org."""
 
-    @pytest.mark.asyncio
+    
     async def test_tenant_a_cannot_see_tenant_b_projects(self, client_db):
         client, db = client_db
 
@@ -117,7 +101,7 @@ class TestProjectIsolation:
         assert "Projet Beta — Hôpital" in titles_b
         assert "Projet Alpha — Lycée" not in titles_b
 
-    @pytest.mark.asyncio
+    
     async def test_tenant_cannot_access_other_project_by_id(self, client_db):
         client, db = client_db
 
@@ -133,15 +117,11 @@ class TestProjectIsolation:
         )
         # Doit être 404 ou 403
         assert resp.status_code in (403, 404)
-
-
 # ── Tests — Isolation des documents ───────────────────────────────────────
-
-
 class TestDocumentIsolation:
     """Les documents d'un tenant ne sont pas accessibles par un autre."""
 
-    @pytest.mark.asyncio
+    
     async def test_tenant_sees_only_own_docs(self, client_db):
         client, db = client_db
 
@@ -183,15 +163,11 @@ class TestDocumentIsolation:
         docs_a = resp_a.json()
         assert len(docs_a) == 2
         assert all("epsilon" in d["original_name"] for d in docs_a)
-
-
 # ── Tests — Isolation du billing ──────────────────────────────────────────
-
-
 class TestBillingIsolation:
     """Les stats de consommation sont isolées par org."""
 
-    @pytest.mark.asyncio
+    
     async def test_usage_reflects_only_own_org_docs(self, client_db):
         client, db = client_db
 
@@ -235,15 +211,11 @@ class TestBillingIsolation:
         assert resp_b.status_code == 200
         data_b = resp_b.json()
         assert data_b["docs_used_this_month"] == 10
-
-
 # ── Tests — Isolation de la suppression GDPR ──────────────────────────────
-
-
 class TestGdprIsolation:
     """La suppression d'un tenant ne touche pas un autre."""
 
-    @pytest.mark.asyncio
+    
     async def test_delete_one_org_does_not_affect_other(self, client_db):
         client, db = client_db
 

@@ -1,8 +1,6 @@
 """Tests pour le pipeline d'analyse IA (avec LLM et embedder mockés)."""
 import pytest
 from unittest.mock import patch, MagicMock
-
-
 # ── Helpers ────────────────────────────────────────────────────────────────
 
 async def register_and_login(client, email="analyst@test.fr", org="Org Analyst"):
@@ -16,12 +14,8 @@ async def register_and_login(client, email="analyst@test.fr", org="Org Analyst")
         "email": email, "password": "SecurePass123!",
     })
     return resp.json()["access_token"]
-
-
 def auth(token):
     return {"Authorization": f"Bearer {token}"}
-
-
 async def create_project(client, token, title="Projet Test Analyse"):
     resp = await client.post(
         "/api/v1/projects",
@@ -29,11 +23,7 @@ async def create_project(client, token, title="Projet Test Analyse"):
         headers=auth(token),
     )
     return resp.json()["id"]
-
-
 # ── Tests ──────────────────────────────────────────────────────────────────
-
-@pytest.mark.asyncio
 async def test_trigger_analysis_returns_task_id(client, mock_celery):
     """POST /analyze → 202 + task_id."""
     token = await register_and_login(client)
@@ -48,8 +38,6 @@ async def test_trigger_analysis_returns_task_id(client, mock_celery):
     assert "task_id" in data
     assert data["project_id"] == project_id
 
-
-@pytest.mark.asyncio
 async def test_get_status_returns_progress(client, mock_celery):
     """
     GET /analyze/status renvoie progress_pct réel depuis Redis.
@@ -83,8 +71,6 @@ async def test_get_status_returns_progress(client, mock_celery):
     assert data["current_step"] == "Génération checklist"
     assert data["status"] == "analyzing"
 
-
-@pytest.mark.asyncio
 async def test_get_checklist_with_filters(client, db_session):
     """GET /checklist avec filtres criticality et status."""
     from app.models.analysis import ChecklistItem
@@ -142,8 +128,6 @@ async def test_get_checklist_with_filters(client, db_session):
     assert len(resp2.json()["checklist"]) == 1
     assert resp2.json()["checklist"][0]["status"] == "OK"
 
-
-@pytest.mark.asyncio
 async def test_get_summary_not_available_before_analysis(client):
     """GET /summary avant analyse → 404."""
     token = await register_and_login(client, email="summary@test.fr", org="Org Summary")

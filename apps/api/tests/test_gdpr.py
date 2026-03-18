@@ -14,16 +14,10 @@ from app.models.project import AoProject
 from app.models.document import AoDocument
 from app.models.company_profile import CompanyProfile
 from app.core.security import create_access_token
-
-
 # ── Helpers ────────────────────────────────────────────────────────────────
-
-
 def _make_headers(user_id: str, role: str = "owner") -> dict:
     token = create_access_token({"sub": user_id, "role": role})
     return {"Authorization": f"Bearer {token}"}
-
-
 async def _create_org_user(
     db: AsyncSession, role: str = "owner", plan: str = "pro"
 ) -> tuple[Organization, User]:
@@ -48,8 +42,6 @@ async def _create_org_user(
     db.add(user)
     await db.flush()
     return org, user
-
-
 async def _seed_project_with_docs(
     db: AsyncSession, org: Organization, user: User, n_docs: int = 2
 ) -> AoProject:
@@ -75,11 +67,7 @@ async def _seed_project_with_docs(
         db.add(doc)
     await db.flush()
     return project
-
-
 # ── Fixture ────────────────────────────────────────────────────────────────
-
-
 @pytest_asyncio.fixture
 async def client_db(db_session):
     async def override_get_db():
@@ -91,15 +79,11 @@ async def client_db(db_session):
     ) as ac:
         yield ac, db_session
     app.dependency_overrides.clear()
-
-
 # ── Tests — Suppression de compte ─────────────────────────────────────────
-
-
 class TestAccountDeletion:
     """POST /api/v1/account/delete — soft-delete org + anonymise users."""
 
-    @pytest.mark.asyncio
+    
     async def test_owner_can_request_deletion(self, client_db):
         client, db = client_db
         org, user = await _create_org_user(db, role="owner")
@@ -121,7 +105,7 @@ class TestAccountDeletion:
         assert user.full_name == "Compte supprimé"
         assert user.hashed_pw == "DELETED"
 
-    @pytest.mark.asyncio
+    
     async def test_non_owner_cannot_delete(self, client_db):
         client, db = client_db
         org, user = await _create_org_user(db, role="member")
@@ -130,7 +114,7 @@ class TestAccountDeletion:
         resp = await client.post("/api/v1/account/delete", headers=headers)
         assert resp.status_code == 403
 
-    @pytest.mark.asyncio
+    
     async def test_deletion_anonymises_all_org_users(self, client_db):
         client, db = client_db
         org, owner = await _create_org_user(db, role="owner")
@@ -154,15 +138,11 @@ class TestAccountDeletion:
         await db.refresh(member)
         assert "anonymized" in member.email
         assert member.full_name == "Compte supprimé"
-
-
 # ── Tests — Export de données ─────────────────────────────────────────────
-
-
 class TestDataExport:
     """GET /api/v1/account/export — export JSON RGPD Art. 20."""
 
-    @pytest.mark.asyncio
+    
     async def test_export_returns_user_data(self, client_db):
         client, db = client_db
         org, user = await _create_org_user(db)
@@ -178,7 +158,7 @@ class TestDataExport:
         assert data["organization"]["name"] == org.name
         assert data["organization"]["plan"] == org.plan
 
-    @pytest.mark.asyncio
+    
     async def test_export_includes_projects_and_docs(self, client_db):
         client, db = client_db
         org, user = await _create_org_user(db)
@@ -193,7 +173,7 @@ class TestDataExport:
         assert data["projects"][0]["title"] == "Projet GDPR test"
         assert len(data["documents"]) == 3
 
-    @pytest.mark.asyncio
+    
     async def test_export_includes_company_profile(self, client_db):
         client, db = client_db
         org, user = await _create_org_user(db)
@@ -217,20 +197,16 @@ class TestDataExport:
         assert data["company_profile"]["company_name"] == "BTP Test SAS"
         assert data["company_profile"]["siret"] == "12345678901234"
 
-    @pytest.mark.asyncio
+    
     async def test_export_unauthenticated_returns_401(self, client_db):
         client, _ = client_db
         resp = await client.get("/api/v1/account/export")
         assert resp.status_code in (401, 403)
-
-
 # ── Tests — Désabonnement emails ──────────────────────────────────────────
-
-
 class TestEmailUnsubscribe:
     """POST /api/v1/account/unsubscribe-emails — préférence email RGPD."""
 
-    @pytest.mark.asyncio
+    
     async def test_unsubscribe_succeeds(self, client_db):
         client, db = client_db
         org, user = await _create_org_user(db)
@@ -247,7 +223,7 @@ class TestEmailUnsubscribe:
         assert "désabonné" in data["message"]
         mock_redis.set.assert_called_once()
 
-    @pytest.mark.asyncio
+    
     async def test_unsubscribe_redis_failure_returns_500(self, client_db):
         client, db = client_db
         org, user = await _create_org_user(db)
