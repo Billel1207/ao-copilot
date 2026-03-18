@@ -284,46 +284,18 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-          cache-dependency-path: apps/web/package-lock.json
 
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build Next.js
-        run: npm run build
-        env:
-          NEXT_PUBLIC_API_URL: https://api.ao-copilot.fr/api/v1
-
-      - name: Create deployment archive
+      - name: Create source archive (no build output, no node_modules)
         run: |
           zip -r ${{ github.workspace }}/aocopilot-web-deploy.zip . \
             --exclude "node_modules/*" \
             --exclude ".git/*" \
+            --exclude ".next/*" \
             --exclude "*.test.*" \
             --exclude "__tests__/*"
 
-      - name: Upload archive to Hostinger
-        run: |
-          curl -sf -X POST \
-            "https://api.hostinger.com/v1/hosting/u171376354/files/upload" \
-            -H "Authorization: Bearer ${{ secrets.HOSTINGER_API_TOKEN }}" \
-            -F "file=@${{ github.workspace }}/aocopilot-web-deploy.zip" \
-            -F "path=/home/u171376354/domains/ao-copilot.fr/aocopilot-web-deploy.zip"
-
-      - name: Trigger Hostinger JS deployment
-        run: |
-          curl -sf -X POST \
-            "https://api.hostinger.com/v1/hosting/ao-copilot.fr/applications/deployments" \
-            -H "Authorization: Bearer ${{ secrets.HOSTINGER_API_TOKEN }}" \
-            -H "Content-Type: application/json" \
-            -d '{
-              "node_version": 20,
-              "app_type": "next",
-              "output_directory": ".next",
-              "build_script": "build",
-              "source_type": "archive",
-              "source_options": {
-                "archive_path": "aocopilot-web-deploy.zip"
-              }
-            }'
+      - name: Deploy to Hostinger via API
+        env:
+          HOSTINGER_API_TOKEN: ${{ secrets.HOSTINGER_API_TOKEN }}
+          HOSTINGER_DOMAIN: ao-copilot.fr
+        run: node scripts/deploy-hostinger.mjs ${{ github.workspace }}/aocopilot-web-deploy.zip
