@@ -59,8 +59,8 @@ test_dce_pdfs/
 *.pdf
 test_results.json
 create_test_pdfs*.py
-test_*.py
-test_pipeline.py
+/test_*.py
+/test_pipeline.py
 
 # ─── Alembic versions générées (garder le dossier, ignorer .pyc) ──
 apps/api/alembic/versions/__pycache__/
