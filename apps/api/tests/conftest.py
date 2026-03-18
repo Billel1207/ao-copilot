@@ -8,17 +8,25 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sess
 from app.main import app
 from app.database import Base, get_db
 
-# ── Base de données de test (SQLite en mémoire) ────────────────────────────
-TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
+# ── Base de données de test (PostgreSQL du CI ou SQLite fallback) ──────────
+import os
+
+TEST_DATABASE_URL = os.getenv(
+    "DATABASE_URL",
+    "sqlite+aiosqlite:///:memory:"
+)
 
 
 @pytest_asyncio.fixture(scope="session")
 async def engine():
-    """Moteur SQLite en mémoire pour les tests — créé une fois par session."""
+    """Moteur DB pour les tests — PostgreSQL en CI, SQLite en local."""
     engine = create_async_engine(TEST_DATABASE_URL, echo=False)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     yield engine
+    # Nettoyage : drop toutes les tables après la session de test
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
     await engine.dispose()
 
 
