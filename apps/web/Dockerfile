@@ -12,7 +12,7 @@ COPY . .
 ARG NEXT_PUBLIC_API_URL=https://votre-domaine.com/api/v1
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 
-RUN npm run build
+RUN mkdir -p public && npm run build
 
 FROM node:20-alpine AS runner
 WORKDIR /app
