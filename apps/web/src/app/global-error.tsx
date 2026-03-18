@@ -1,5 +1,8 @@
 "use client";
 
+import * as Sentry from "@sentry/nextjs";
+import { useEffect } from "react";
+
 export default function GlobalError({
   error,
   reset,
@@ -7,6 +10,10 @@ export default function GlobalError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  useEffect(() => {
+    Sentry.captureException(error);
+  }, [error]);
+
   return (
     <html lang="fr">
       <body>
@@ -23,7 +30,7 @@ export default function GlobalError({
               Erreur critique
             </h2>
             <p style={{ color: "#dc2626", fontSize: "0.875rem", marginBottom: "1rem" }}>
-              L&apos;application a rencontré une erreur critique.
+              L&apos;application a rencontr&eacute; une erreur critique.
             </p>
             <button
               onClick={reset}

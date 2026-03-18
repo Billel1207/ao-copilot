@@ -58,14 +58,14 @@ export function AnalysisTabWrapper<T>({
 }: AnalysisTabWrapperProps<T>) {
   // ── Loading ──
   if (query.isLoading) {
-    return <>{skeleton ?? <DefaultSkeleton />}</>;
+    return <div aria-busy="true" aria-label="Chargement en cours">{skeleton ?? <DefaultSkeleton />}</div>;
   }
 
   // ── Error ──
   if (query.isError) {
     return (
-      <div className="card p-8 flex flex-col items-center gap-3 text-center animate-fade-in">
-        <AlertTriangle className="w-10 h-10 text-amber-400" />
+      <div role="alert" className="card p-8 flex flex-col items-center gap-3 text-center animate-fade-in">
+        <AlertTriangle className="w-10 h-10 text-amber-400" aria-hidden="true" />
         <p className="text-slate-600 dark:text-slate-400 font-medium">
           {errorMessage}
         </p>
@@ -79,8 +79,8 @@ export function AnalysisTabWrapper<T>({
   // ── Empty / no data ──
   if (!query.data) {
     return (
-      <div className="card p-8 flex flex-col items-center gap-3 text-center animate-fade-in">
-        <FileX className="w-10 h-10 text-slate-300 dark:text-slate-600" />
+      <div role="status" className="card p-8 flex flex-col items-center gap-3 text-center animate-fade-in">
+        <FileX className="w-10 h-10 text-slate-300 dark:text-slate-600" aria-hidden="true" />
         <p className="text-slate-500 dark:text-slate-400">{emptyMessage}</p>
       </div>
     );

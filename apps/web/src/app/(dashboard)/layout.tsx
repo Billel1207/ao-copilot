@@ -88,7 +88,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     <div className="flex h-screen bg-slate-50 dark:bg-slate-950 overflow-hidden">
 
       {/* ── Sidebar ── */}
-      <aside className="w-60 bg-white dark:bg-slate-900 border-r border-slate-100 dark:border-slate-800 flex flex-col flex-shrink-0 shadow-sm">
+      <aside role="navigation" aria-label="Navigation principale" className="w-60 bg-white dark:bg-slate-900 border-r border-slate-100 dark:border-slate-800 flex flex-col flex-shrink-0 shadow-sm">
 
         {/* Logo */}
         <div className="px-4 py-5 border-b border-slate-100 dark:border-slate-800">
