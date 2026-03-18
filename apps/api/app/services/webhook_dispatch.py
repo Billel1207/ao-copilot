@@ -118,7 +118,7 @@ async def get_subscribed_endpoints(
         if event_type not in subscribed_events:
             continue
         if not _is_safe_url(ep.url):
-            logger.warning("webhook_skipped_unsafe_url", endpoint_url=ep.url, event=event_type)
+            logger.warning("webhook_skipped_unsafe_url", endpoint_url=ep.url, event_type=event_type)
             continue
         eligible.append({
             "endpoint_id": str(ep.id),
@@ -207,7 +207,7 @@ def deliver_single_webhook_sync(
     logger.info(
         "webhook_delivered",
         endpoint_url=url,
-        event=event_type,
+        event_type=event_type,
         success=success,
         status_code=status_code,
         attempt=attempt_number,

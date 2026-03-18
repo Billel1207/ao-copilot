@@ -6,6 +6,26 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // ── Mocks ────────────────────────────────────────────────────────────────
 
+// Mock zustand/middleware persist to use in-memory storage (avoids jsdom localStorage issues)
+vi.mock("zustand/middleware", async () => {
+  const actual = await vi.importActual<typeof import("zustand/middleware")>("zustand/middleware");
+  return {
+    ...actual,
+    persist: (config: unknown, options: Record<string, unknown>) =>
+      actual.persist(config as never, {
+        ...options,
+        storage: actual.createJSONStorage(() => {
+          const store: Record<string, string> = {};
+          return {
+            getItem: (key: string) => store[key] ?? null,
+            setItem: (key: string, value: string) => { store[key] = value; },
+            removeItem: (key: string) => { delete store[key]; },
+          };
+        }),
+      } as never),
+  };
+});
+
 vi.mock("@/lib/api", () => ({
   authApi: {
     login: vi.fn(),
