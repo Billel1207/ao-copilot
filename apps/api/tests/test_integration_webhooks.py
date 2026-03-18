@@ -48,7 +48,7 @@ def _mock_stripe_event(event_type: str, data_object: dict) -> dict:
         "data": {"object": data_object},
     }
 # ── Fixture ────────────────────────────────────────────────────────────────
-@pytest_asyncio.fixture(loop_scope="session")
+@pytest_asyncio.fixture
 async def client_db(db_session):
     async def override_get_db():
         yield db_session

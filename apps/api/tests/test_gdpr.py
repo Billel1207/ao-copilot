@@ -68,7 +68,7 @@ async def _seed_project_with_docs(
     await db.flush()
     return project
 # ── Fixture ────────────────────────────────────────────────────────────────
-@pytest_asyncio.fixture(loop_scope="session")
+@pytest_asyncio.fixture
 async def client_db(db_session):
     async def override_get_db():
         yield db_session

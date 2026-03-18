@@ -43,7 +43,7 @@ async def _create_org_user(db: AsyncSession, plan: str = "starter", quota: int =
     await db.flush()
     return org, user
 # ── Fixtures ───────────────────────────────────────────────────────────────
-@pytest_asyncio.fixture(loop_scope="session")
+@pytest_asyncio.fixture
 async def client_db(db_session):
     async def override_get_db():
         yield db_session

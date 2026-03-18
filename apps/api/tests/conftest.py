@@ -1,55 +1,53 @@
 """Fixtures pytest pour la suite de tests AO Copilot.
 
-Stratégie event loop : utiliser l'engine global de app.database (pas un séparé)
-pour éviter "Future attached to a different loop". Tout tourne dans le même
-event loop session-scoped de pytest-asyncio.
+Stratégie : tout en function-scope (default) pour éviter les conflits
+d'event loop avec pytest-asyncio 0.24. Chaque test a son propre loop,
+son propre client, sa propre session DB.
 """
 import pytest
 import pytest_asyncio
 from unittest.mock import MagicMock, patch
 from httpx import AsyncClient, ASGITransport
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+import os
 
-from app.database import engine, Base, AsyncSessionLocal, get_db
-from app.main import app
-
-import asyncio
+from app.database import Base
 
 
-def pytest_collection_modifyitems(items):
-    """Force tous les tests async à utiliser le session event loop.
+# ── Base de données de test ──────────────────────────────────────────────────
 
-    Sans ça, les tests async utilisent un loop function-scoped par défaut,
-    ce qui entre en conflit avec les fixtures session-scoped.
-    """
-    session_marker = pytest.mark.asyncio(loop_scope="session")
-    for item in items:
-        if asyncio.iscoroutinefunction(item.obj):
-            item.add_marker(session_marker)
+TEST_DATABASE_URL = os.getenv(
+    "DATABASE_URL",
+    "sqlite+aiosqlite:///:memory:"
+)
 
 
-@pytest_asyncio.fixture(loop_scope="session", scope="session")
-async def _create_tables():
-    """Crée toutes les tables au début de la session de test, drop à la fin."""
-    async with engine.begin() as conn:
+@pytest_asyncio.fixture
+async def db_session():
+    """Engine + session isolée par test. Crée les tables, rollback à la fin."""
+    test_engine = create_async_engine(TEST_DATABASE_URL, echo=False)
+
+    async with test_engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-    yield
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
-    await engine.dispose()
 
-
-@pytest_asyncio.fixture(loop_scope="session")
-async def db_session(_create_tables):
-    """Session de DB isolée par test — rollback automatique après chaque test."""
-    async with AsyncSessionLocal() as session:
+    session_factory = async_sessionmaker(
+        test_engine, class_=AsyncSession, expire_on_commit=False
+    )
+    async with session_factory() as session:
         yield session
         await session.rollback()
 
+    async with test_engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
+    await test_engine.dispose()
 
-@pytest_asyncio.fixture(loop_scope="session")
+
+@pytest_asyncio.fixture
 async def client(db_session):
     """Client HTTP de test avec override de la dépendance DB."""
+    from app.main import app
+    from app.database import get_db
+
     async def override_get_db():
         yield db_session
 
