@@ -219,9 +219,14 @@ def fetch_export_data(db: Session, project_id: str) -> ExportData:
             "DC1", "DC2", "DC4", "DOE", "DIUO", "OPR", "GPA",
             "Retenue de garantie", "Caution bancaire", "Avance forfaitaire",
             "Pénalités de retard", "Révision de prix", "Intérêts moratoires",
+            "Sous-traitance", "Mandataire", "Cotraitant",
+            "Garantie décennale", "Garantie biennale", "RC Pro",
+            "Allotissement", "Variante", "MAPA", "NF DTU",
+            "PPSPS", "VRD", "BIM",
         ]
+        # Format tuples (terme, definition) pour Jinja2 : {% for term, def in glossaire_btp %}
         glossaire_btp = [
-            {"terme": t, "definition": BTP_GLOSSARY[t]}
+            (t, BTP_GLOSSARY[t])
             for t in priority_terms if t in BTP_GLOSSARY
         ]
     except Exception:

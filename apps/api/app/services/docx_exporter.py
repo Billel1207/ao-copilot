@@ -1,13 +1,13 @@
-"""Génération du rapport Word (.docx) complet — extrait de exporter.py."""
-import uuid
+"""Génération du rapport Word (.docx) complet — extrait de exporter.py.
+
+Utilise fetch_export_data() pour centraliser les queries DB.
+"""
 import structlog
 from datetime import datetime
 from io import BytesIO
 from sqlalchemy.orm import Session
 
-from app.models.project import AoProject
-from app.models.document import AoDocument
-from app.models.analysis import ExtractionResult, ChecklistItem
+from app.services.export_data import fetch_export_data
 
 logger = structlog.get_logger(__name__)
 
@@ -27,72 +27,30 @@ def generate_export_docx(db: Session, project_id: str) -> bytes:
     except ImportError as e:
         raise RuntimeError("python-docx non installé. Ajoutez python-docx==1.1.0.") from e
 
-    pid = uuid.UUID(project_id)
-    project = db.query(AoProject).filter_by(id=pid).first()
-    if not project:
-        raise ValueError("Projet introuvable")
+    # ── Charger TOUTES les données via le helper centralisé ──────────────
+    data = fetch_export_data(db, project_id)
+    project = data.project
 
-    # ── Charger TOUTES les analyses ──────────────────────────────────────
-    def _get(result_type):
-        r = db.query(ExtractionResult).filter_by(
-            project_id=pid, result_type=result_type
-        ).order_by(ExtractionResult.version.desc()).first()
-        return r.payload if r and r.payload else {}
-
-    summary = _get("summary")
-    criteria = _get("criteria")
-    timeline = _get("timeline")
-    gonogo = _get("gonogo")
-    ccap = _get("ccap_risks") or _get("ccap")
-    rc = _get("rc_analysis") or _get("rc")
-    cctp = _get("cctp_analysis") or _get("cctp")
-    questions_data = _get("questions")
-    scoring = _get("scoring")
-    cashflow = _get("cashflow_simulation") or _get("cashflow")
-    subcontracting = _get("subcontracting")
-    ae = _get("ae_analysis")
-    dc_check = _get("dc_check")
-    conflicts_data = _get("conflicts")
-
-    # DPGF Pricing
-    dpgf_pricing = None
-    try:
-        dpgf_result = db.query(ExtractionResult).filter_by(
-            project_id=pid, result_type="dpgf_pricing"
-        ).order_by(ExtractionResult.version.desc()).first()
-        if dpgf_result and dpgf_result.payload:
-            dpgf_pricing = dpgf_result.payload if isinstance(dpgf_result.payload, list) else dpgf_result.payload.get("lines", [])
-        if not dpgf_pricing:
-            dpgf_extract = db.query(ExtractionResult).filter_by(
-                project_id=pid, result_type="dpgf_extraction"
-            ).order_by(ExtractionResult.version.desc()).first()
-            if dpgf_extract and dpgf_extract.payload:
-                rows = dpgf_extract.payload.get("lines") or dpgf_extract.payload.get("rows") or []
-                if rows:
-                    from app.services.btp_pricing import check_dpgf_pricing
-                    dpgf_pricing = check_dpgf_pricing(rows)
-    except Exception:
-        dpgf_pricing = None
-
-    # Glossaire BTP
-    try:
-        from app.services.btp_knowledge import BTP_GLOSSARY
-        priority_terms = [
-            "RC", "CCTP", "CCAP", "DPGF", "BPU", "AE", "DCE", "CCAG",
-            "SOPAQ", "DOE", "DIUO", "PPSPS", "OPR", "DQE", "SOGED",
-            "MOA", "MOE", "AMO", "CSPS", "BET", "DTU", "NF",
-            "Retenue de garantie", "Avance forfaitaire", "Pénalités de retard",
-            "Sous-traitance", "DC1", "DC2", "DUME", "Allotissement",
-        ]
-        glossaire_btp = [(t, BTP_GLOSSARY[t]) for t in priority_terms if t in BTP_GLOSSARY]
-    except Exception:
-        glossaire_btp = []
-
-    checklist_items = db.query(ChecklistItem).filter_by(
-        project_id=pid
-    ).order_by(ChecklistItem.criticality, ChecklistItem.category).all()
-
-    documents = db.query(AoDocument).filter_by(project_id=pid).all()
+    # Mapper les champs ExportData vers les variables locales
+    # (certaines analyses retournent {} au lieu de None pour compatibilité)
+    summary = data.summary or {}
+    criteria = data.criteria or {}
+    timeline = data.timeline or {}
+    gonogo = data.gonogo or {}
+    ccap = data.ccap_analysis or {}
+    rc = data.rc_analysis or {}
+    cctp = data.cctp_analysis or {}
+    questions_data = {"questions": data.questions} if data.questions else {}
+    scoring = data.scoring or {}
+    cashflow = data.cashflow or {}
+    subcontracting = data.subcontracting or {}
+    ae = data.ae_analysis or {}
+    dc_check = data.dc_check or {}
+    conflicts_data = data.conflicts or {}
+    dpgf_pricing = data.dpgf_pricing
+    glossaire_btp = data.glossaire_btp or []
+    checklist_items = data.checklist_items
+    documents = data.documents
 
     po = summary.get("project_overview", {})
 

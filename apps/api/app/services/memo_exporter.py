@@ -1,13 +1,10 @@
 """Génération de la mémoire technique Word (.docx) — extrait de exporter.py."""
-import uuid
 import structlog
 from datetime import datetime
 from io import BytesIO
 from sqlalchemy.orm import Session
 
-from app.models.project import AoProject
-from app.models.document import AoDocument
-from app.models.analysis import ExtractionResult, ChecklistItem
+from app.services.export_data import fetch_export_data
 
 logger = structlog.get_logger(__name__)
 
@@ -33,33 +30,35 @@ def generate_memo_technique(db: Session, project_id: str) -> bytes:
     from app.models.company_profile import CompanyProfile
     from app.models.organization import Organization
 
-    pid = uuid.UUID(project_id)
-    project = db.query(AoProject).filter_by(id=pid).first()
-    if not project:
-        raise ValueError("Projet introuvable")
+    # ── Charger toutes les données via fetch_export_data ──────────────────
+    data = fetch_export_data(db, project_id)
+    project = data.project
 
-    # ── Charger toutes les données ────────────────────────────────────────
-    def _get(result_type):
-        r = db.query(ExtractionResult).filter_by(
-            project_id=pid, result_type=result_type
-        ).order_by(ExtractionResult.version.desc()).first()
-        return r.payload if r and r.payload else {}
-
-    summary = _get("summary")
-    criteria = _get("criteria")
-    timeline = _get("timeline")
-    cctp = _get("cctp")
-    ccap = _get("ccap")
-    scoring = _get("scoring")
-    rc = _get("rc")
-    subcontracting = _get("subcontracting")
-    gonogo = _get("gonogo")
+    summary = data.summary or {}
+    criteria = data.criteria or {}
+    timeline = data.timeline or {}
+    cctp = data.cctp_analysis or {}
+    ccap = data.ccap_analysis or {}
+    scoring = data.scoring or {}
+    rc = data.rc_analysis or {}
+    subcontracting = data.subcontracting or {}
+    gonogo = data.gonogo or {}
+    checklist_items = data.checklist_items
+    documents = data.documents
+    cashflow_data = data.cashflow or {}
 
     po = summary.get("project_overview", {})
     key_points = summary.get("key_points", [])
     risks = summary.get("risks", [])
     evaluation = criteria.get("evaluation", {})
     scoring_criteria = evaluation.get("scoring_criteria", [])
+
+    # Charger le profil entreprise
+    org = db.query(Organization).filter_by(id=project.org_id).first()
+    company = None
+    if org:
+        company = db.query(CompanyProfile).filter_by(org_id=org.id).first()
+    org_name = (org.name if org else None) or "Notre Entreprise"
 
     # ── Génération des narratifs LLM (graceful degradation) ──────────────
     _memo_intro_text: str | None = None
@@ -130,25 +129,10 @@ def generate_memo_technique(db: Session, project_id: str) -> bytes:
                 gonogo.get("score"),
                 project.title or "AO",
             )
-        cashflow_raw = _get("cashflow")
-        if cashflow_raw:
-            _cashflow_buf = generate_cashflow_chart(cashflow_raw, project.title or "AO")
+        if cashflow_data:
+            _cashflow_buf = generate_cashflow_chart(cashflow_data, project.title or "AO")
     except Exception as _chart_err:
         logger.warning("memo_chart_generation_skipped", error=str(_chart_err))
-
-    checklist_items = db.query(ChecklistItem).filter_by(
-        project_id=pid
-    ).order_by(ChecklistItem.criticality, ChecklistItem.category).all()
-
-    documents = db.query(AoDocument).filter_by(project_id=pid).all()
-
-    # Charger le profil entreprise
-    org = db.query(Organization).filter_by(id=project.org_id).first()
-    company = None
-    if org:
-        company = db.query(CompanyProfile).filter_by(org_id=org.id).first()
-
-    org_name = (org.name if org else None) or "Notre Entreprise"
 
     doc = Document()
 

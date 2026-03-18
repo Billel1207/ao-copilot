@@ -9,18 +9,18 @@
     size: A4;
     @bottom-left {
       content: "AO Copilot — Confidentiel";
-      font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
-      font-size: 7.5px; color: #94A3B8;
+      font-family: {{ theme.font_family }};
+      font-size: 7.5px; color: {{ theme.text_muted }};
     }
     @bottom-center {
       content: counter(page) " / " counter(pages);
-      font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+      font-family: {{ theme.font_family }};
       font-size: 7.5px; color: #64748B; font-weight: 600;
     }
     @bottom-right {
       content: "Généré le {{ generation_date }}";
-      font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
-      font-size: 7.5px; color: #94A3B8;
+      font-family: {{ theme.font_family }};
+      font-size: 7.5px; color: {{ theme.text_muted }};
     }
   }
   @page :first {
@@ -29,25 +29,25 @@
     @bottom-right { content: ""; }
   }
   body {
-    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
-    font-size: 11px; color: #1a1a2e; line-height: 1.55;
+    font-family: {{ theme.font_family }};
+    font-size: {{ theme.font_size_body }}; color: {{ theme.text_primary }}; line-height: {{ theme.line_height }};
     margin: 0; padding: 0;
   }
   .page { padding: 8px 0; }
 
   /* ══════════════ TITRES ══════════════ */
   h1 {
-    font-size: 20px; color: #0f1b4c; font-weight: 700;
-    border-bottom: 2px solid #2563eb; padding-bottom: 6px;
+    font-size: {{ theme.font_size_h1 }}; color: {{ theme.header_bg }}; font-weight: 700;
+    border-bottom: 2px solid {{ theme.primary }}; padding-bottom: 6px;
     margin-top: 0; margin-bottom: 14px; letter-spacing: 0.3px;
   }
   h2 {
-    font-size: 14px; color: #0f1b4c; font-weight: 700;
+    font-size: {{ theme.font_size_h2 }}; color: {{ theme.header_bg }}; font-weight: 700;
     margin-top: 22px; margin-bottom: 8px;
     border-bottom: 1px solid #cbd5e1; padding-bottom: 3px;
   }
   h3 {
-    font-size: 12px; color: #334155; font-weight: 600;
+    font-size: {{ theme.font_size_h3 }}; color: #334155; font-weight: 600;
     margin-top: 16px; margin-bottom: 6px;
   }
 
@@ -56,26 +56,26 @@
     display: inline-block; padding: 2px 6px; font-size: 8px;
     font-weight: 700; letter-spacing: 0.2px;
   }
-  .badge-red { background: #fde8e8; color: #b91c1c; border: 1px solid #f5c6c6; }
-  .badge-yellow { background: #fef3c7; color: #b45309; border: 1px solid #fde68a; }
-  .badge-green { background: #d1fae5; color: #047857; border: 1px solid #a7f3d0; }
-  .badge-blue { background: #dbeafe; color: #1d4ed8; border: 1px solid #bfdbfe; }
-  .badge-gray { background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0; }
+  .badge-red { background: {{ theme.risk_high_bg }}; color: {{ theme.risk_high_text }}; border: 1px solid #f5c6c6; }
+  .badge-yellow { background: {{ theme.risk_med_bg }}; color: {{ theme.risk_med_text }}; border: 1px solid #fde68a; }
+  .badge-green { background: {{ theme.go_bg }}; color: #047857; border: 1px solid #a7f3d0; }
+  .badge-blue { background: #dbeafe; color: {{ theme.primary_dark }}; border: 1px solid #bfdbfe; }
+  .badge-gray { background: {{ theme.neutral_bg }}; color: {{ theme.text_secondary }}; border: 1px solid {{ theme.border_color }}; }
 
   /* ══════════════ TABLEAUX ══════════════ */
   table {
     width: 100%; border-collapse: collapse; margin-top: 10px; margin-bottom: 10px;
   }
   th {
-    background: #0f1b4c; color: #ffffff; font-weight: 600;
-    text-align: left; padding: 5px 6px; font-size: 9px;
+    background: {{ theme.header_bg }}; color: {{ theme.header_text }}; font-weight: 600;
+    text-align: left; padding: 5px 6px; font-size: {{ theme.font_size_small }};
     letter-spacing: 0.3px; text-transform: uppercase;
     border: 1px solid #1e3a8a;
     word-wrap: break-word; overflow: hidden;
   }
   td {
-    padding: 4px 6px; border: 1px solid #e2e8f0;
-    vertical-align: top; font-size: 9px; line-height: 1.4;
+    padding: 4px 6px; border: 1px solid {{ theme.border_color }};
+    vertical-align: top; font-size: {{ theme.font_size_small }}; line-height: 1.4;
     word-wrap: break-word; overflow: hidden;
   }
   tr:nth-child(even) td { background: #f8fafc; }
@@ -85,27 +85,27 @@
 
   /* ══════════════ ENCADRÉS ══════════════ */
   .summary-box {
-    background: #eff6ff; border-left: 5px solid #2563eb;
-    padding: 12px 16px; margin: 12px 0; font-size: 11px; line-height: 1.6;
+    background: {{ theme.info_bg }}; border-left: 5px solid {{ theme.primary }};
+    padding: 12px 16px; margin: 12px 0; font-size: {{ theme.font_size_body }}; line-height: 1.6;
   }
   .financial-box {
-    background: #ecfdf5; border-left: 5px solid #10b981;
-    padding: 12px 16px; margin: 12px 0; font-size: 11px;
+    background: {{ theme.risk_low_bg }}; border-left: 5px solid #10b981;
+    padding: 12px 16px; margin: 12px 0; font-size: {{ theme.font_size_body }};
   }
   .warning-box {
     background: #fef2f2; border-left: 5px solid #ef4444;
     padding: 10px 14px; font-size: 10px; color: #991b1b; margin: 10px 0;
   }
   .info-box {
-    background: #eff6ff; border-left: 5px solid #3b82f6;
+    background: {{ theme.info_bg }}; border-left: 5px solid #3b82f6;
     padding: 10px 14px; font-size: 10px; color: #1e3a8a; margin: 10px 0;
   }
 
   /* ══════════════ GO/NO-GO BOX ══════════════ */
   .gonogo-box { padding: 18px; margin: 14px 0; text-align: center; }
-  .gonogo-go { background: #d1fae5; border: 3px solid #059669; }
-  .gonogo-attention { background: #fef3c7; border: 3px solid #d97706; }
-  .gonogo-nogo { background: #fde8e8; border: 3px solid #dc2626; }
+  .gonogo-go { background: {{ theme.go_bg }}; border: 3px solid {{ theme.risk_low_text }}; }
+  .gonogo-attention { background: {{ theme.risk_med_bg }}; border: 3px solid #d97706; }
+  .gonogo-nogo { background: {{ theme.risk_high_bg }}; border: 3px solid #dc2626; }
   .gonogo-score { font-size: 36px; font-weight: 800; letter-spacing: -0.5px; }
   .gonogo-label { font-size: 16px; font-weight: 700; margin-top: 4px; letter-spacing: 1px; }
 
@@ -114,30 +114,30 @@
   .stat-cell {
     display: table-cell; text-align: center;
     padding: 14px 8px; width: 25%;
-    border: 1px solid #e2e8f0; background: #f8fafc;
+    border: 1px solid {{ theme.border_color }}; background: #f8fafc;
   }
-  .stat-number { font-size: 24px; font-weight: 800; color: #0f1b4c; }
-  .stat-label { font-size: 9px; color: #64748b; margin-top: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .stat-number { font-size: 24px; font-weight: 800; color: {{ theme.header_bg }}; }
+  .stat-label { font-size: {{ theme.font_size_small }}; color: #64748b; margin-top: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
 
   /* ══════════════ BARRE DE CONFIANCE ══════════════ */
-  .confidence-bar { background: #e2e8f0; height: 10px; margin-top: 6px; }
+  .confidence-bar { background: {{ theme.border_color }}; height: 10px; margin-top: 6px; }
   .confidence-fill { height: 10px; }
 
   /* ══════════════ PAGE DE COUVERTURE ══════════════ */
   .cover-page { text-align: center; padding-top: 60px; }
   .cover-brand {
-    font-size: 13px; color: #2563eb; letter-spacing: 4px;
+    font-size: 13px; color: {{ theme.primary }}; letter-spacing: 4px;
     text-transform: uppercase; font-weight: 700; margin-bottom: 6px;
   }
   .cover-line {
-    width: 80px; height: 3px; background: #2563eb;
+    width: 80px; height: 3px; background: {{ theme.primary }};
     margin: 12px auto;
   }
   .cover-title {
-    font-size: 30px; color: #0f1b4c; font-weight: 800;
+    font-size: 30px; color: {{ theme.header_bg }}; font-weight: 800;
     margin-bottom: 6px; line-height: 1.25; letter-spacing: -0.3px;
   }
-  .cover-subtitle { font-size: 16px; color: #475569; margin-bottom: 30px; font-weight: 400; }
+  .cover-subtitle { font-size: 16px; color: {{ theme.text_secondary }}; margin-bottom: 30px; font-weight: 400; }
   .cover-info { font-size: 12px; color: #64748b; margin: 5px 0; line-height: 1.5; }
   .cover-badge {
     display: inline-block; padding: 8px 28px;
@@ -147,7 +147,7 @@
   .cover-meta {
     margin-top: 50px; padding-top: 16px;
     border-top: 1px solid #cbd5e1;
-    color: #94a3b8; font-size: 10px;
+    color: {{ theme.text_muted }}; font-size: 10px;
   }
 
   /* ══════════════ SOMMAIRE ══════════════ */
@@ -158,7 +158,7 @@
   }
   .toc-num {
     display: inline-block; width: 28px; font-weight: 700;
-    color: #2563eb; font-size: 11px;
+    color: {{ theme.primary }}; font-size: {{ theme.font_size_body }};
   }
   .toc-text { color: #334155; }
 
@@ -169,47 +169,47 @@
     margin-top: 24px;
   }
   .footer {
-    text-align: center; color: #94a3b8; font-size: 8px;
+    text-align: center; color: {{ theme.text_muted }}; font-size: 8px;
     margin-top: 16px; padding-top: 8px;
-    border-top: 1px solid #e2e8f0;
+    border-top: 1px solid {{ theme.border_color }};
   }
   .page-break { page-break-before: always; }
 
   /* ══════════════ SECTION HEADER (numérotation élégante) ══════════════ */
   .section-num {
-    display: inline-block; background: #0f1b4c; color: #ffffff;
-    padding: 2px 8px; font-size: 11px; font-weight: 700;
+    display: inline-block; background: {{ theme.header_bg }}; color: {{ theme.header_text }};
+    padding: 2px 8px; font-size: {{ theme.font_size_body }}; font-weight: 700;
     margin-right: 6px;
   }
 
   /* ══════════════ PARTIE SEPARATOR ══════════════ */
   .part-header {
-    background: #0f1b4c; color: #ffffff; padding: 12px 18px;
-    font-size: 14px; font-weight: 800; letter-spacing: 1.5px;
+    background: {{ theme.header_bg }}; color: {{ theme.header_text }}; padding: 12px 18px;
+    font-size: {{ theme.font_size_h2 }}; font-weight: 800; letter-spacing: 1.5px;
     text-transform: uppercase; margin: 0; page-break-before: always;
   }
   .part-header-sub {
     font-size: 10px; font-weight: 400; letter-spacing: 0.5px;
-    color: #94a3b8; margin-top: 4px;
+    color: {{ theme.text_muted }}; margin-top: 4px;
   }
 
   /* ══════════════ RISK GAUGE BAR ══════════════ */
   .risk-gauge {
-    background: #e2e8f0; height: 14px; margin: 8px 0; position: relative;
+    background: {{ theme.border_color }}; height: 14px; margin: 8px 0; position: relative;
   }
   .risk-gauge-fill {
     height: 14px; display: inline-block;
   }
   .risk-gauge-label {
-    font-size: 8px; font-weight: 700; color: #ffffff;
+    font-size: 8px; font-weight: 700; color: {{ theme.header_text }};
     padding: 0 6px; line-height: 14px;
   }
 
   /* ══════════════ STATUS BADGE (DPGF) ══════════════ */
-  .status-sous { background: #fde8e8; color: #b91c1c; border: 1px solid #f5c6c6; font-weight: 700; padding: 2px 6px; font-size: 8px; }
-  .status-sur { background: #fef3c7; color: #b45309; border: 1px solid #fde68a; font-weight: 700; padding: 2px 6px; font-size: 8px; }
-  .status-normal { background: #d1fae5; color: #047857; border: 1px solid #a7f3d0; font-weight: 700; padding: 2px 6px; font-size: 8px; }
-  .status-inconnu { background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0; font-weight: 700; padding: 2px 6px; font-size: 8px; }
+  .status-sous { background: {{ theme.risk_high_bg }}; color: {{ theme.risk_high_text }}; border: 1px solid #f5c6c6; font-weight: 700; padding: 2px 6px; font-size: 8px; }
+  .status-sur { background: {{ theme.risk_med_bg }}; color: {{ theme.risk_med_text }}; border: 1px solid #fde68a; font-weight: 700; padding: 2px 6px; font-size: 8px; }
+  .status-normal { background: {{ theme.go_bg }}; color: #047857; border: 1px solid #a7f3d0; font-weight: 700; padding: 2px 6px; font-size: 8px; }
+  .status-inconnu { background: {{ theme.neutral_bg }}; color: {{ theme.text_secondary }}; border: 1px solid {{ theme.border_color }}; font-weight: 700; padding: 2px 6px; font-size: 8px; }
 </style>
 </head>
 <body>
@@ -1720,7 +1720,7 @@
   </div>
 
   <div class="footer" style="margin-top: 40px;">
-    <div style="margin-bottom: 4px;"><strong style="color: #2563eb; letter-spacing: 2px;">AO COPILOT</strong></div>
+    <div style="margin-bottom: 4px;"><strong style="color: {{ theme.primary }}; letter-spacing: 2px;">AO COPILOT</strong></div>
     aocopilot.fr — {{ generated_at }} — Rapport confidentiel — Reproduction interdite
   </div>
 </div>
