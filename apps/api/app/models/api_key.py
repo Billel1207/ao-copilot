@@ -24,6 +24,8 @@ class ApiKey(Base):
     can_write_projects: Mapped[bool] = mapped_column(Boolean, default=False, server_default=text("false"))
     can_read_analysis: Mapped[bool] = mapped_column(Boolean, default=True, server_default=text("true"))
     can_trigger_analysis: Mapped[bool] = mapped_column(Boolean, default=False, server_default=text("false"))
+    can_manage_billing: Mapped[bool] = mapped_column(Boolean, default=False, server_default=text("false"))
+    can_export: Mapped[bool] = mapped_column(Boolean, default=False, server_default=text("false"))
 
     # Rate limiting
     rate_limit_per_minute: Mapped[int] = mapped_column(Integer, default=60, server_default=text("60"))

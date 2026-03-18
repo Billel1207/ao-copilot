@@ -2,7 +2,7 @@
 
 import { useCctpAnalysis } from "@/hooks/useAnalysis";
 import { AlertTriangle, CheckCircle2, FileWarning, Info, Loader2, Wrench, Shield, FlaskConical, FileText, Ban } from "lucide-react";
-import AIDisclaimer from "@/components/ui/AIDisclaimer";
+import { AnalysisTabWrapper } from "@/components/analysis/AnalysisTabWrapper";
 import ConfidenceWarning from "@/components/ui/ConfidenceWarning";
 
 interface Props {
@@ -66,26 +66,38 @@ function ComplexityGauge({ score }: { score: number }) {
   );
 }
 
+function CctpSkeleton() {
+  return (
+    <div className="flex items-center justify-center py-16">
+      <Loader2 className="w-6 h-6 animate-spin text-blue-500 mr-2" />
+      <span className="text-sm text-slate-500 dark:text-slate-400">Analyse CCTP en cours...</span>
+    </div>
+  );
+}
+
 export default function CctpAnalysisTab({ projectId }: Props) {
-  const { data, isLoading, error } = useCctpAnalysis(projectId);
+  const query = useCctpAnalysis(projectId);
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-16">
-        <Loader2 className="w-6 h-6 animate-spin text-blue-500 mr-2" />
-        <span className="text-sm text-slate-500 dark:text-slate-400">Analyse CCTP en cours...</span>
-      </div>
-    );
-  }
+  return (
+    <AnalysisTabWrapper<any>
+      query={query}
+      errorMessage="Erreur lors de l'analyse CCTP."
+      skeleton={<CctpSkeleton />}
+    >
+      {(data) => <CctpAnalysisContent data={data} />}
+    </AnalysisTabWrapper>
+  );
+}
 
-  if (error || !data) {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function CctpAnalysisContent({ data }: { data: any }) {
+  // Empty state: no CCTP document
+  if (data.no_cctp_document) {
     return (
       <div className="text-center py-12 text-slate-500 dark:text-slate-400">
         <FileWarning className="w-10 h-10 mx-auto mb-2 text-slate-400 dark:text-slate-500" />
         <p className="text-sm">
-          {data?.no_cctp_document
-            ? "Aucun document CCTP trouvé. Uploadez un Cahier des Clauses Techniques."
-            : "Erreur lors de l'analyse CCTP."}
+          Aucun document CCTP trouvé. Uploadez un Cahier des Clauses Techniques.
         </p>
       </div>
     );
@@ -273,9 +285,8 @@ export default function CctpAnalysisTab({ projectId }: Props) {
         </div>
       )}
 
-      {/* Confidence + Footer disclaimer */}
+      {/* Confidence */}
       <ConfidenceWarning confidence={data.confidence_overall} />
-      <AIDisclaimer />
     </div>
   );
 }

@@ -91,20 +91,18 @@ def _sign_payload(payload_json: str, secret: str) -> str:
     ).hexdigest()
 
 
-async def dispatch_event(
+async def get_subscribed_endpoints(
     db: AsyncSession,
     org_id: str,
     event_type: str,
-    data: dict,
-) -> int:
-    """Envoie un événement à tous les endpoints actifs de l'organisation.
+) -> list[dict]:
+    """Récupère les endpoints actifs abonnés à un événement.
 
     Returns:
-        Nombre d'endpoints notifiés avec succès.
+        Liste de dicts {endpoint_id, url, secret} pour chaque endpoint éligible.
     """
     import uuid
 
-    # Récupérer les endpoints actifs qui écoutent cet événement
     result = await db.execute(
         select(WebhookEndpoint).where(
             WebhookEndpoint.org_id == uuid.UUID(str(org_id)),
@@ -114,10 +112,125 @@ async def dispatch_event(
     )
     endpoints = result.scalars().all()
 
+    eligible = []
+    for ep in endpoints:
+        subscribed_events = [e.strip() for e in ep.events.split(",")]
+        if event_type not in subscribed_events:
+            continue
+        if not _is_safe_url(ep.url):
+            logger.warning("webhook_skipped_unsafe_url", endpoint_url=ep.url, event=event_type)
+            continue
+        eligible.append({
+            "endpoint_id": str(ep.id),
+            "url": ep.url,
+            "secret": ep.secret,
+        })
+
+    return eligible
+
+
+def deliver_single_webhook_sync(
+    endpoint_id: str,
+    url: str,
+    secret: str,
+    event_type: str,
+    payload_json: str,
+    attempt_number: int,
+) -> dict:
+    """Livre un webhook à un endpoint unique (synchrone, pour Celery).
+
+    Returns:
+        Dict avec status de la livraison.
+    """
+    import uuid
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import Session, sessionmaker
+    from app.config import settings
+
+    signature = _sign_payload(payload_json, secret)
+
+    status_code = None
+    success = False
+    error_message = None
+
+    try:
+        import httpx as _httpx
+        with _httpx.Client(timeout=WEBHOOK_TIMEOUT) as client:
+            resp = client.post(
+                url,
+                content=payload_json,
+                headers={
+                    "Content-Type": "application/json",
+                    "X-AO-Copilot-Signature": f"sha256={signature}",
+                    "X-AO-Copilot-Event": event_type,
+                },
+            )
+            status_code = resp.status_code
+            success = 200 <= resp.status_code < 300
+            if not success:
+                error_message = f"HTTP {resp.status_code}"
+    except Exception as exc:
+        error_message = str(exc)[:500]
+
+    # Persister le résultat en DB (session synchrone pour Celery)
+    engine = create_engine(
+        settings.DATABASE_URL.replace("+asyncpg", "").replace("+aiosqlite", ""),
+        pool_pre_ping=True,
+    )
+    SessionLocal = sessionmaker(bind=engine)
+    db = SessionLocal()
+    try:
+        delivery = WebhookDelivery(
+            endpoint_id=uuid.UUID(endpoint_id),
+            event_type=event_type,
+            payload=payload_json,
+            attempt_number=attempt_number,
+            status_code=status_code,
+            success=success,
+            error_message=error_message,
+        )
+        db.add(delivery)
+
+        ep = db.get(WebhookEndpoint, uuid.UUID(endpoint_id))
+        if ep:
+            ep.last_delivery_at = datetime.now(timezone.utc)
+            if success:
+                ep.failure_count = 0
+            else:
+                ep.failure_count = (ep.failure_count or 0) + 1
+
+        db.commit()
+    finally:
+        db.close()
+        engine.dispose()
+
+    logger.info(
+        "webhook_delivered",
+        endpoint_url=url,
+        event=event_type,
+        success=success,
+        status_code=status_code,
+        attempt=attempt_number,
+    )
+
+    return {"success": success, "status_code": status_code, "error": error_message}
+
+
+# Legacy — conservé pour rétro-compatibilité mais déprécié
+async def dispatch_event(
+    db: AsyncSession,
+    org_id: str,
+    event_type: str,
+    data: dict,
+) -> int:
+    """[DEPRECATED] Utilisez dispatch_webhook_event (Celery fan-out) à la place.
+
+    Conservé pour les appels directs en mode test.
+    """
+    endpoints = await get_subscribed_endpoints(db, org_id, event_type)
     if not endpoints:
         return 0
 
-    # Construire le payload
     payload = {
         "event": event_type,
         "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -126,37 +239,18 @@ async def dispatch_event(
     payload_json = json.dumps(payload, ensure_ascii=False, default=str)
 
     success_count = 0
-
     async with httpx.AsyncClient(timeout=WEBHOOK_TIMEOUT) as client:
-        for endpoint in endpoints:
-            # Vérifier que l'endpoint écoute cet événement
-            subscribed_events = [e.strip() for e in endpoint.events.split(",")]
-            if event_type not in subscribed_events:
-                continue
-
-            # SSRF protection : vérifier que l'URL ne pointe pas vers un réseau privé
-            if not _is_safe_url(endpoint.url):
-                logger.warning(
-                    "webhook_skipped_unsafe_url",
-                    endpoint_url=endpoint.url,
-                    event=event_type,
-                )
-                continue
-
-            # Signer le payload
-            signature = _sign_payload(payload_json, endpoint.secret)
-
-            # Livrer
+        for ep in endpoints:
+            signature = _sign_payload(payload_json, ep["secret"])
             delivery = WebhookDelivery(
-                endpoint_id=endpoint.id,
+                endpoint_id=__import__("uuid").UUID(ep["endpoint_id"]),
                 event_type=event_type,
                 payload=payload_json,
                 attempt_number=1,
             )
-
             try:
                 resp = await client.post(
-                    endpoint.url,
+                    ep["url"],
                     content=payload_json,
                     headers={
                         "Content-Type": "application/json",
@@ -166,33 +260,15 @@ async def dispatch_event(
                 )
                 delivery.status_code = resp.status_code
                 delivery.success = 200 <= resp.status_code < 300
-
                 if delivery.success:
-                    endpoint.failure_count = 0
                     success_count += 1
                 else:
-                    endpoint.failure_count += 1
                     delivery.error_message = f"HTTP {resp.status_code}"
-
-            except httpx.TimeoutException:
-                delivery.success = False
-                delivery.error_message = "Timeout"
-                endpoint.failure_count += 1
             except Exception as exc:
                 delivery.success = False
                 delivery.error_message = str(exc)[:500]
-                endpoint.failure_count += 1
 
-            endpoint.last_delivery_at = datetime.now(timezone.utc)
             db.add(delivery)
-
-            logger.info(
-                "webhook_delivered",
-                endpoint_url=endpoint.url,
-                event=event_type,
-                success=delivery.success,
-                status_code=delivery.status_code,
-            )
 
     await db.flush()
     return success_count

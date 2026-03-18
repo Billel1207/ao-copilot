@@ -1,15 +1,10 @@
 """Tâches Celery asynchrones pour le pipeline IA."""
 import io
 import uuid
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
 
 from app.config import settings
+from app.database import SyncSessionLocal as SyncSession
 from app.worker.celery_app import celery_app
-
-# Session synchrone pour les workers Celery
-SyncEngine = create_engine(settings.DATABASE_URL_SYNC, pool_pre_ping=True)
-SyncSession = sessionmaker(bind=SyncEngine)
 
 
 def _set_progress(task_id: str, pct: int, step: str):
@@ -536,37 +531,127 @@ def purge_expired_data():
         db.close()
 
 
-@celery_app.task(name="dispatch_webhook_event", time_limit=60, soft_time_limit=50, max_retries=2)
+@celery_app.task(name="dispatch_webhook_event", time_limit=30, soft_time_limit=25)
 def dispatch_webhook_event(org_id: str, event_type: str, data: dict):
-    """Dispatch un événement webhook à tous les endpoints actifs de l'organisation.
+    """Fan-out : récupère les endpoints abonnés et lance une task deliver_webhook par endpoint.
 
-    Exécuté de manière asynchrone via Celery pour ne pas bloquer le pipeline IA.
+    Architecture fan-out :
+    1. Ce task récupère la liste des endpoints éligibles (DB query sync)
+    2. Construit le payload JSON signé
+    3. Lance N tasks deliver_webhook en parallèle (une par endpoint)
+
+    Chaque deliver_webhook a son propre retry backoff — un endpoint lent
+    ne bloque plus les autres.
     """
     import asyncio
+    import json
     import logging as _logging
+    from datetime import datetime, timezone
     from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession as _AsyncSession
     from sqlalchemy.orm import sessionmaker as _sessionmaker
-    from app.services.webhook_dispatch import dispatch_event
+    from app.services.webhook_dispatch import get_subscribed_endpoints
 
     _log = _logging.getLogger(__name__)
 
-    async def _dispatch():
+    async def _get_endpoints():
         engine = create_async_engine(settings.DATABASE_URL, pool_pre_ping=True)
         async_session = _sessionmaker(engine, class_=_AsyncSession, expire_on_commit=False)
         async with async_session() as session:
-            success_count = await dispatch_event(session, org_id, event_type, data)
-            await session.commit()
-            return success_count
+            endpoints = await get_subscribed_endpoints(session, org_id, event_type)
+        await engine.dispose()
+        return endpoints
 
     try:
         loop = asyncio.new_event_loop()
-        success_count = loop.run_until_complete(_dispatch())
+        endpoints = loop.run_until_complete(_get_endpoints())
         loop.close()
-        _log.info(
-            "webhook_dispatched event=%s org=%s success=%d",
-            event_type, org_id, success_count,
-        )
-        return {"event": event_type, "org_id": org_id, "success_count": success_count}
     except Exception as exc:
-        _log.error("webhook_dispatch_failed event=%s org=%s: %s", event_type, org_id, exc)
+        _log.error("webhook_fanout_failed event=%s org=%s: %s", event_type, org_id, exc)
         raise
+
+    if not endpoints:
+        _log.info("webhook_no_endpoints event=%s org=%s", event_type, org_id)
+        return {"event": event_type, "org_id": org_id, "dispatched": 0}
+
+    # Construire le payload une seule fois
+    payload = {
+        "event": event_type,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "data": data,
+    }
+    payload_json = json.dumps(payload, ensure_ascii=False, default=str)
+
+    # Fan-out : une task par endpoint
+    for ep in endpoints:
+        deliver_webhook.delay(
+            endpoint_id=ep["endpoint_id"],
+            url=ep["url"],
+            secret=ep["secret"],
+            event_type=event_type,
+            payload_json=payload_json,
+        )
+
+    _log.info(
+        "webhook_fanout_complete event=%s org=%s dispatched=%d",
+        event_type, org_id, len(endpoints),
+    )
+    return {"event": event_type, "org_id": org_id, "dispatched": len(endpoints)}
+
+
+@celery_app.task(
+    name="deliver_webhook",
+    bind=True,
+    max_retries=3,
+    default_retry_delay=10,  # 10s, 20s, 40s (backoff exponentiel)
+    time_limit=30,
+    soft_time_limit=20,
+    acks_late=True,
+)
+def deliver_webhook(
+    self,
+    endpoint_id: str,
+    url: str,
+    secret: str,
+    event_type: str,
+    payload_json: str,
+):
+    """Livre un webhook à un endpoint unique avec retry backoff exponentiel.
+
+    Retry policy :
+    - Max 3 retries (4 tentatives au total)
+    - Backoff : 10s → 20s → 40s
+    - Après 3 échecs, le webhook est loggé en dead letter (pas de perte silencieuse)
+    """
+    import logging as _logging
+    from app.services.webhook_dispatch import deliver_single_webhook_sync
+
+    _log = _logging.getLogger(__name__)
+    attempt = self.request.retries + 1
+
+    result = deliver_single_webhook_sync(
+        endpoint_id=endpoint_id,
+        url=url,
+        secret=secret,
+        event_type=event_type,
+        payload_json=payload_json,
+        attempt_number=attempt,
+    )
+
+    if result["success"]:
+        return result
+
+    # Échec — retry avec backoff exponentiel
+    if self.request.retries < self.max_retries:
+        backoff = 10 * (2 ** self.request.retries)  # 10, 20, 40 secondes
+        _log.warning(
+            "webhook_retry attempt=%d/%d backoff=%ds endpoint=%s event=%s error=%s",
+            attempt, self.max_retries + 1, backoff, url, event_type, result["error"],
+        )
+        raise self.retry(countdown=backoff)
+
+    # Tous les retries épuisés — dead letter log
+    _log.error(
+        "webhook_dead_letter endpoint=%s event=%s attempts=%d last_error=%s",
+        url, event_type, attempt, result["error"],
+    )
+    return {**result, "dead_letter": True, "total_attempts": attempt}

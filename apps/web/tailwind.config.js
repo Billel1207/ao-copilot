@@ -2,6 +2,7 @@ const path = require("path");
 
 /** @type {import('tailwindcss').Config} */
 module.exports = {
+  darkMode: "class",
   content: [
     path.join(__dirname, "src/pages/**/*.{js,ts,jsx,tsx,mdx}"),
     path.join(__dirname, "src/components/**/*.{js,ts,jsx,tsx,mdx}"),
@@ -74,6 +75,7 @@ module.exports = {
           700: "#334155",
           800: "#1E293B",
           900: "#0F172A",
+          950: "#020617",
         },
       },
       fontFamily: {

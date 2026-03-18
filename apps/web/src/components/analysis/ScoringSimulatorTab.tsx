@@ -5,7 +5,6 @@ import {
   TrendingUp,
   Award,
   AlertTriangle,
-  FileX,
   Info,
   Lightbulb,
   BarChart3,
@@ -13,7 +12,7 @@ import {
 } from "lucide-react";
 import { useScoringSimulation } from "@/hooks/useAnalysis";
 import { cn } from "@/lib/utils";
-import AIDisclaimer from "@/components/ui/AIDisclaimer";
+import { AnalysisTabWrapper } from "@/components/analysis/AnalysisTabWrapper";
 
 interface Props {
   projectId: string;
@@ -303,35 +302,21 @@ function ScoringSkeleton() {
 // -- Main component ----------------------------------------------------------
 
 export function ScoringSimulatorTab({ projectId }: Props) {
-  const { data, isLoading, isError } = useScoringSimulation(projectId);
+  const query = useScoringSimulation(projectId);
 
-  if (isLoading) return <ScoringSkeleton />;
+  return (
+    <AnalysisTabWrapper<ScoringSimulationData>
+      query={query as ReturnType<typeof useScoringSimulation>}
+      errorMessage="Impossible de charger la simulation de notation."
+      disclaimerText="Simulation indicative basée sur l'IA — les notes réelles dépendent de l'offre finale soumise. Ne se substitue pas à un conseil professionnel."
+      skeleton={<ScoringSkeleton />}
+    >
+      {(data) => <ScoringContent data={data} />}
+    </AnalysisTabWrapper>
+  );
+}
 
-  if (isError) {
-    return (
-      <div className="card p-8 flex flex-col items-center gap-3 text-center animate-fade-in">
-        <AlertTriangle className="w-10 h-10 text-amber-400" />
-        <p className="text-slate-600 dark:text-slate-400 font-medium">
-          Impossible de charger la simulation de notation.
-        </p>
-        <p className="text-slate-400 dark:text-slate-500 text-sm">
-          Vérifiez que l&apos;analyse du projet a bien été lancée.
-        </p>
-      </div>
-    );
-  }
-
-  if (!data) {
-    return (
-      <div className="card p-8 flex flex-col items-center gap-3 text-center animate-fade-in">
-        <FileX className="w-10 h-10 text-slate-300" />
-        <p className="text-slate-500 dark:text-slate-400">Aucune donnée disponible.</p>
-      </div>
-    );
-  }
-
-  const scoring = data as ScoringSimulationData;
-
+function ScoringContent({ data: scoring }: { data: ScoringSimulationData }) {
   // Empty dimensions
   if (!scoring.dimensions || scoring.dimensions.length === 0) {
     return (
@@ -460,8 +445,6 @@ export function ScoringSimulatorTab({ projectId }: Props) {
         </div>
       )}
 
-      {/* -- Footer disclaimer -- */}
-      <AIDisclaimer text="Simulation indicative basée sur l'IA — les notes réelles dépendent de l'offre finale soumise. Ne se substitue pas à un conseil professionnel." />
     </div>
   );
 }

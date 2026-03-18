@@ -2,7 +2,7 @@
 
 import { useSubcontracting } from "@/hooks/useAnalysis";
 import { AnalysisTabSkeleton } from "@/components/ui/AnalysisSkeleton";
-import AIDisclaimer from "@/components/ui/AIDisclaimer";
+import { AnalysisTabWrapper } from "@/components/analysis/AnalysisTabWrapper";
 import ConfidenceWarning from "@/components/ui/ConfidenceWarning";
 import { AlertTriangle, CheckCircle2, XCircle, Users, ShieldAlert } from "lucide-react";
 
@@ -36,18 +36,27 @@ interface Conflict {
 }
 
 export function SubcontractingTab({ projectId }: { projectId: string }) {
-  const { data, isLoading, error } = useSubcontracting(projectId);
+  const query = useSubcontracting(projectId);
 
-  if (isLoading) return <AnalysisTabSkeleton />;
-  if (error) return <p className="text-red-500 text-sm">Erreur de chargement de l&apos;analyse sous-traitance.</p>;
-  if (!data) return <p className="text-slate-400 text-sm">Lancez l&apos;analyse pour voir les résultats.</p>;
+  return (
+    <AnalysisTabWrapper<any>
+      query={query}
+      errorMessage="Erreur de chargement de l'analyse sous-traitance."
+      emptyMessage="Lancez l'analyse pour voir les résultats."
+      skeleton={<AnalysisTabSkeleton />}
+    >
+      {(data) => <SubcontractingContent data={data} />}
+    </AnalysisTabWrapper>
+  );
+}
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function SubcontractingContent({ data }: { data: any }) {
   const score = data.score_risque ?? 0;
   const scoreColor = score > 60 ? "text-red-600" : score > 30 ? "text-amber-600" : "text-green-600";
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <AIDisclaimer />
       <ConfidenceWarning confidence={data.confidence_overall} />
 
       {/* Header + Score */}

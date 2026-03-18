@@ -14,9 +14,48 @@ from app.services.embedder import embed_query
 
 logger = structlog.get_logger(__name__)
 
-# Seuil minimum de similarité — en dessous, le chunk est considéré non pertinent
-# 0.50 = plus strict que 0.35, réduit les hallucinations sur DCE mal structurés/OCR
+# Seuil par défaut de similarité — en dessous, le chunk est considéré non pertinent
+# Ajusté dynamiquement selon la qualité OCR du projet (voir get_dynamic_threshold)
 SIMILARITY_THRESHOLD = 0.50
+
+
+def get_dynamic_threshold(db: Session, project_id: str, ocr_quality: float | None = None) -> float:
+    """Compute a dynamic similarity threshold based on OCR quality.
+
+    - OCR > 80%  → 0.50 (strict, good text quality)
+    - OCR 50-80% → 0.40 (moderate, some OCR noise)
+    - OCR < 50%  → 0.30 (lenient, poor OCR / scanned docs)
+
+    If ocr_quality is not provided, computes the average OCR score
+    from all documents in the project.
+    """
+    if ocr_quality is None:
+        try:
+            row = db.execute(
+                text(
+                    "SELECT AVG(ocr_quality_score) FROM ao_documents "
+                    "WHERE project_id = :pid AND ocr_quality_score IS NOT NULL"
+                ),
+                {"pid": project_id},
+            ).fetchone()
+            ocr_quality = float(row[0]) if row and row[0] is not None else 85.0
+        except Exception:
+            ocr_quality = 85.0  # Default: assume good quality
+
+    if ocr_quality > 80:
+        threshold = 0.50
+    elif ocr_quality >= 50:
+        threshold = 0.40
+    else:
+        threshold = 0.30
+
+    logger.debug(
+        "dynamic_threshold",
+        project_id=project_id,
+        ocr_quality=round(ocr_quality, 1),
+        threshold=threshold,
+    )
+    return threshold
 
 
 def retrieve_relevant_chunks(
@@ -24,16 +63,25 @@ def retrieve_relevant_chunks(
     project_id: str,
     query: str,
     top_k: int = 15,
-    min_similarity: float = SIMILARITY_THRESHOLD,
+    min_similarity: float | None = None,
+    ocr_quality: float | None = None,
 ) -> list[dict]:
     """pgvector cosine similarity search with minimum threshold.
 
     Uses the <=> operator (cosine distance) for server-side vector search.
     cosine_distance = 1 - cosine_similarity, so we filter where distance < (1 - min_similarity).
 
+    If min_similarity is None, computes a dynamic threshold based on the project's
+    average OCR quality (via get_dynamic_threshold). Pass ocr_quality explicitly to
+    avoid the DB lookup when the value is already known.
+
     Returns chunks sorted by similarity DESC, filtered by min_similarity.
     Each chunk includes a 'similarity' field for downstream confidence scoring.
     """
+    # Resolve dynamic threshold if not explicitly set
+    if min_similarity is None:
+        min_similarity = get_dynamic_threshold(db, project_id, ocr_quality=ocr_quality)
+
     # Vérification rapide : pas de chunks → retourner vide sans appel API embedding
     count_row = db.execute(
         text("SELECT COUNT(*) FROM chunks WHERE project_id = :pid AND embedding IS NOT NULL"),

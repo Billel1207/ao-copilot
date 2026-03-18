@@ -80,7 +80,24 @@ class Settings(BaseSettings):
 
     @property
     def allowed_origins_list(self) -> list[str]:
-        return [o.strip() for o in self.ALLOWED_ORIGINS.split(",")]
+        origins = [o.strip() for o in self.ALLOWED_ORIGINS.split(",") if o.strip()]
+
+        if self.APP_ENV == "production":
+            # In production, wildcard "*" is forbidden
+            if "*" in origins:
+                raise RuntimeError(
+                    "CRITICAL: ALLOWED_ORIGINS contains '*' in production. "
+                    "Specify explicit HTTPS origins (e.g. https://ao-copilot.fr)."
+                )
+            # All production origins must be HTTPS
+            for origin in origins:
+                if not origin.startswith("https://"):
+                    raise RuntimeError(
+                        f"CRITICAL: ALLOWED_ORIGINS contains non-HTTPS origin '{origin}' "
+                        f"in production. All origins must use HTTPS."
+                    )
+
+        return origins
 
 
 settings = Settings()

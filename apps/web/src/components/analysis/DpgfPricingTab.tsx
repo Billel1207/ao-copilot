@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { useDpgfPricing } from "@/hooks/useAnalysis";
 import { cn } from "@/lib/utils";
-import AIDisclaimer from "@/components/ui/AIDisclaimer";
+import { AnalysisTabWrapper } from "@/components/analysis/AnalysisTabWrapper";
 
 interface Props {
   projectId: string;
@@ -236,34 +236,21 @@ function DpgfSkeleton() {
 // -- Main component ----------------------------------------------------------
 
 export function DpgfPricingTab({ projectId }: Props) {
-  const { data, isLoading, isError } = useDpgfPricing(projectId);
+  const query = useDpgfPricing(projectId);
 
-  if (isLoading) return <DpgfSkeleton />;
+  return (
+    <AnalysisTabWrapper<DpgfPricingData>
+      query={query as ReturnType<typeof useDpgfPricing>}
+      errorMessage="Impossible de charger l'analyse tarifaire DPGF."
+      disclaimerText="Référentiel indicatif 2024 (ajusté 2026) — les prix réels varient selon localisation, quantités et conjoncture. Ne se substitue pas à une estimation professionnelle."
+      skeleton={<DpgfSkeleton />}
+    >
+      {(data) => <DpgfPricingContent data={data} />}
+    </AnalysisTabWrapper>
+  );
+}
 
-  if (isError) {
-    return (
-      <div className="card p-8 flex flex-col items-center gap-3 text-center animate-fade-in">
-        <AlertTriangle className="w-10 h-10 text-amber-400" />
-        <p className="text-slate-600 dark:text-slate-400 font-medium">
-          Impossible de charger l&apos;analyse tarifaire DPGF.
-        </p>
-        <p className="text-slate-400 dark:text-slate-500 text-sm">
-          Vérifiez que l&apos;analyse du projet a bien été lancée.
-        </p>
-      </div>
-    );
-  }
-
-  if (!data) {
-    return (
-      <div className="card p-8 flex flex-col items-center gap-3 text-center animate-fade-in">
-        <FileX className="w-10 h-10 text-slate-300" />
-        <p className="text-slate-500 dark:text-slate-400">Aucune donnée disponible.</p>
-      </div>
-    );
-  }
-
-  const pricing = data as DpgfPricingData;
+function DpgfPricingContent({ data: pricing }: { data: DpgfPricingData }) {
 
   // Empty state: no DPGF docs
   if ((!pricing.pricing_analysis || pricing.pricing_analysis.length === 0) && pricing.message) {
@@ -468,8 +455,6 @@ export function DpgfPricingTab({ projectId }: Props) {
         </div>
       </div>
 
-      {/* -- Footer disclaimer -- */}
-      <AIDisclaimer text="Référentiel indicatif 2024 (ajusté 2026) — les prix réels varient selon localisation, quantités et conjoncture. Ne se substitue pas à une estimation professionnelle." />
     </div>
   );
 }

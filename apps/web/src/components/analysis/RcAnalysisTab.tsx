@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { useRcAnalysis } from "@/hooks/useAnalysis";
 import { cn } from "@/lib/utils";
-import AIDisclaimer from "@/components/ui/AIDisclaimer";
+import { AnalysisTabWrapper } from "@/components/analysis/AnalysisTabWrapper";
 
 interface Props {
   projectId: string;
@@ -195,31 +195,20 @@ function formatMontant(val: string | number | null): string {
 // ── Main component ────────────────────────────────────────────────────────
 
 export function RcAnalysisTab({ projectId }: Props) {
-  const { data, isLoading, isError } = useRcAnalysis(projectId);
+  const query = useRcAnalysis(projectId);
 
-  if (isLoading) return <RcSkeleton />;
+  return (
+    <AnalysisTabWrapper<RcAnalysisData>
+      query={query as ReturnType<typeof useRcAnalysis>}
+      errorMessage="Impossible de charger l'analyse du Règlement de Consultation."
+      skeleton={<RcSkeleton />}
+    >
+      {(data) => <RcAnalysisContent data={data} />}
+    </AnalysisTabWrapper>
+  );
+}
 
-  if (isError) {
-    return (
-      <div className="card p-8 flex flex-col items-center gap-3 text-center animate-fade-in">
-        <AlertTriangle className="w-10 h-10 text-amber-400" />
-        <p className="text-slate-600 dark:text-slate-400 font-medium">Impossible de charger l&apos;analyse du R&egrave;glement de Consultation.</p>
-        <p className="text-slate-400 dark:text-slate-500 text-sm">V&eacute;rifiez que l&apos;analyse du projet a bien &eacute;t&eacute; lanc&eacute;e.</p>
-      </div>
-    );
-  }
-
-  if (!data) {
-    return (
-      <div className="card p-8 flex flex-col items-center gap-3 text-center animate-fade-in">
-        <FileX className="w-10 h-10 text-slate-300" />
-        <p className="text-slate-500 dark:text-slate-400">Aucune donn&eacute;e disponible.</p>
-      </div>
-    );
-  }
-
-  const rcData = data as RcAnalysisData;
-
+function RcAnalysisContent({ data: rcData }: { data: RcAnalysisData }) {
   // Empty state: no RC document
   if (rcData.no_rc_document) {
     return (
@@ -461,8 +450,6 @@ export function RcAnalysisTab({ projectId }: Props) {
         </InfoCard>
       )}
 
-      {/* ── Footer disclaimer ── */}
-      <AIDisclaimer />
     </div>
   );
 }

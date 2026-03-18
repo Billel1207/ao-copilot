@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { useConflicts } from "@/hooks/useAnalysis";
 import { cn } from "@/lib/utils";
-import AIDisclaimer from "@/components/ui/AIDisclaimer";
+import { AnalysisTabWrapper } from "@/components/analysis/AnalysisTabWrapper";
 import ConfidenceWarning from "@/components/ui/ConfidenceWarning";
 
 interface Props {
@@ -353,35 +353,21 @@ function ConflictsSkeleton() {
 // ── Main component ────────────────────────────────────────────────────────
 
 export function ConflictsTab({ projectId }: Props) {
-  const { data, isLoading, isError } = useConflicts(projectId);
+  const query = useConflicts(projectId);
+
+  return (
+    <AnalysisTabWrapper<ConflictsData>
+      query={query as ReturnType<typeof useConflicts>}
+      errorMessage="Impossible de charger la détection des conflits."
+      skeleton={<ConflictsSkeleton />}
+    >
+      {(data) => <ConflictsContent data={data} />}
+    </AnalysisTabWrapper>
+  );
+}
+
+function ConflictsContent({ data: conflictsData }: { data: ConflictsData }) {
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
-
-  if (isLoading) return <ConflictsSkeleton />;
-
-  if (isError) {
-    return (
-      <div className="card p-8 flex flex-col items-center gap-3 text-center animate-fade-in">
-        <AlertTriangle className="w-10 h-10 text-amber-400" />
-        <p className="text-slate-600 dark:text-slate-400 font-medium">
-          Impossible de charger la détection des conflits.
-        </p>
-        <p className="text-slate-400 dark:text-slate-500 text-sm">
-          Vérifiez que l&apos;analyse du projet a bien été lancée.
-        </p>
-      </div>
-    );
-  }
-
-  if (!data) {
-    return (
-      <div className="card p-8 flex flex-col items-center gap-3 text-center animate-fade-in">
-        <FileX className="w-10 h-10 text-slate-300" />
-        <p className="text-slate-500 dark:text-slate-400">Aucune donnée disponible.</p>
-      </div>
-    );
-  }
-
-  const conflictsData = data as ConflictsData;
 
   // Empty state: no conflicts possible (missing docs, etc.)
   if (conflictsData.no_conflicts_possible) {
@@ -432,7 +418,6 @@ export function ConflictsTab({ projectId }: Props) {
             </p>
           </div>
         </div>
-        <AIDisclaimer compact />
       </div>
     );
   }
@@ -538,9 +523,8 @@ export function ConflictsTab({ projectId }: Props) {
         ))}
       </div>
 
-      {/* ── Confidence + Disclaimer ── */}
+      {/* ── Confidence ── */}
       <ConfidenceWarning confidence={conflictsData.confidence_overall} />
-      <AIDisclaimer />
     </div>
   );
 }

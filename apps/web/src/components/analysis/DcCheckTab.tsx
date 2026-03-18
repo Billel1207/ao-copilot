@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { useDcCheck } from "@/hooks/useAnalysis";
 import { cn } from "@/lib/utils";
-import AIDisclaimer from "@/components/ui/AIDisclaimer";
+import { AnalysisTabWrapper } from "@/components/analysis/AnalysisTabWrapper";
 
 interface Props {
   projectId: string;
@@ -191,31 +191,20 @@ function DcSkeleton() {
 // ── Main component ────────────────────────────────────────────────────────
 
 export function DcCheckTab({ projectId }: Props) {
-  const { data, isLoading, isError } = useDcCheck(projectId);
+  const query = useDcCheck(projectId);
 
-  if (isLoading) return <DcSkeleton />;
+  return (
+    <AnalysisTabWrapper<DcCheckData>
+      query={query as ReturnType<typeof useDcCheck>}
+      errorMessage="Impossible de charger la vérification des documents administratifs."
+      skeleton={<DcSkeleton />}
+    >
+      {(data) => <DcCheckContent data={data} />}
+    </AnalysisTabWrapper>
+  );
+}
 
-  if (isError) {
-    return (
-      <div className="card p-8 flex flex-col items-center gap-3 text-center animate-fade-in">
-        <AlertTriangle className="w-10 h-10 text-amber-400" />
-        <p className="text-slate-600 dark:text-slate-400 font-medium">Impossible de charger la v&eacute;rification des documents administratifs.</p>
-        <p className="text-slate-400 dark:text-slate-500 text-sm">V&eacute;rifiez que l&apos;analyse du projet a bien &eacute;t&eacute; lanc&eacute;e.</p>
-      </div>
-    );
-  }
-
-  if (!data) {
-    return (
-      <div className="card p-8 flex flex-col items-center gap-3 text-center animate-fade-in">
-        <FileX className="w-10 h-10 text-slate-300" />
-        <p className="text-slate-500 dark:text-slate-400">Aucune donn&eacute;e disponible.</p>
-      </div>
-    );
-  }
-
-  const dcData = data as DcCheckData;
-
+function DcCheckContent({ data: dcData }: { data: DcCheckData }) {
   // Empty state: no DC context
   if (dcData.no_dc_context) {
     return (
@@ -453,8 +442,6 @@ export function DcCheckTab({ projectId }: Props) {
         </div>
       )}
 
-      {/* ── Footer disclaimer ── */}
-      <AIDisclaimer />
     </div>
   );
 }

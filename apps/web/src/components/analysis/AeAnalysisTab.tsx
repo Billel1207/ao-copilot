@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { useAeAnalysis } from "@/hooks/useAnalysis";
 import { cn } from "@/lib/utils";
-import AIDisclaimer from "@/components/ui/AIDisclaimer";
+import { AnalysisTabWrapper } from "@/components/analysis/AnalysisTabWrapper";
 
 interface Props {
   projectId: string;
@@ -320,31 +320,20 @@ function AeSkeleton() {
 // ── Main component ────────────────────────────────────────────────────────
 
 export function AeAnalysisTab({ projectId }: Props) {
-  const { data, isLoading, isError } = useAeAnalysis(projectId);
+  const query = useAeAnalysis(projectId);
 
-  if (isLoading) return <AeSkeleton />;
+  return (
+    <AnalysisTabWrapper<AeAnalysisData>
+      query={query as ReturnType<typeof useAeAnalysis>}
+      errorMessage="Impossible de charger l'analyse de l'Acte d'Engagement."
+      skeleton={<AeSkeleton />}
+    >
+      {(data) => <AeAnalysisContent data={data} />}
+    </AnalysisTabWrapper>
+  );
+}
 
-  if (isError) {
-    return (
-      <div className="card p-8 flex flex-col items-center gap-3 text-center animate-fade-in">
-        <AlertTriangle className="w-10 h-10 text-amber-400" />
-        <p className="text-slate-600 dark:text-slate-400 font-medium">Impossible de charger l&apos;analyse de l&apos;Acte d&apos;Engagement.</p>
-        <p className="text-slate-400 dark:text-slate-500 text-sm">V&eacute;rifiez que l&apos;analyse du projet a bien &eacute;t&eacute; lanc&eacute;e.</p>
-      </div>
-    );
-  }
-
-  if (!data) {
-    return (
-      <div className="card p-8 flex flex-col items-center gap-3 text-center animate-fade-in">
-        <FileX className="w-10 h-10 text-slate-300" />
-        <p className="text-slate-500 dark:text-slate-400">Aucune donn&eacute;e disponible.</p>
-      </div>
-    );
-  }
-
-  const aeData = data as AeAnalysisData;
-
+function AeAnalysisContent({ data: aeData }: { data: AeAnalysisData }) {
   // Empty state: no AE document
   if (aeData.no_ae_document) {
     return (
@@ -557,8 +546,6 @@ export function AeAnalysisTab({ projectId }: Props) {
         </div>
       )}
 
-      {/* ── Footer disclaimer ── */}
-      <AIDisclaimer />
     </div>
   );
 }

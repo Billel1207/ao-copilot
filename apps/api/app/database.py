@@ -1,5 +1,6 @@
+from sqlalchemy import create_engine as create_sync_engine
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
-from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy.orm import DeclarativeBase, sessionmaker
 from app.config import settings
 
 
@@ -15,6 +16,16 @@ engine = create_async_engine(
 AsyncSessionLocal = async_sessionmaker(
     engine, class_=AsyncSession, expire_on_commit=False
 )
+
+# ── Sync engine & session pour les workers Celery ──────────────────────
+SyncEngine = create_sync_engine(
+    settings.DATABASE_URL_SYNC,
+    pool_pre_ping=True,
+    pool_size=10,
+    max_overflow=20,
+    pool_recycle=1800,
+)
+SyncSessionLocal = sessionmaker(bind=SyncEngine)
 
 
 class Base(DeclarativeBase):

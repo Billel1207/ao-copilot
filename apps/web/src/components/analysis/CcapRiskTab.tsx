@@ -2,7 +2,7 @@
 
 import { AlertTriangle, AlertOctagon, Info, ShieldAlert, FileX, CheckCircle } from "lucide-react";
 import { useCcapRisks } from "@/hooks/useAnalysis";
-import AIDisclaimer from "@/components/ui/AIDisclaimer";
+import { AnalysisTabWrapper } from "@/components/analysis/AnalysisTabWrapper";
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -281,31 +281,20 @@ function CcapSkeleton() {
 // ── Main component ──────────────────────────────────────────────────────────
 
 export function CcapRiskTab({ projectId }: Props) {
-  const { data, isLoading, isError } = useCcapRisks(projectId);
+  const query = useCcapRisks(projectId);
 
-  if (isLoading) return <CcapSkeleton />;
+  return (
+    <AnalysisTabWrapper<CcapRisksData>
+      query={query as ReturnType<typeof useCcapRisks>}
+      errorMessage="Impossible de charger l'analyse des risques CCAP."
+      skeleton={<CcapSkeleton />}
+    >
+      {(data) => <CcapRiskContent data={data} />}
+    </AnalysisTabWrapper>
+  );
+}
 
-  if (isError) {
-    return (
-      <div className="card p-8 flex flex-col items-center gap-3 text-center animate-fade-in">
-        <AlertTriangle className="w-10 h-10 text-amber-400" />
-        <p className="text-slate-600 font-medium">Impossible de charger l&apos;analyse des risques CCAP.</p>
-        <p className="text-slate-400 dark:text-slate-500 text-sm">Vérifiez que l&apos;analyse du projet a bien été lancée.</p>
-      </div>
-    );
-  }
-
-  if (!data) {
-    return (
-      <div className="card p-8 flex flex-col items-center gap-3 text-center animate-fade-in">
-        <FileX className="w-10 h-10 text-slate-300" />
-        <p className="text-slate-500 dark:text-slate-400">Aucune donnée disponible.</p>
-      </div>
-    );
-  }
-
-  const ccapData = data as CcapRisksData;
-
+function CcapRiskContent({ data: ccapData }: { data: CcapRisksData }) {
   // Empty state : pas de document CCAP ou pas de texte
   if (ccapData.no_ccap_document || ccapData.no_ccap_text) {
     return (
@@ -412,8 +401,6 @@ export function CcapRiskTab({ projectId }: Props) {
         ))}
       </div>
 
-      {/* ── Footer disclaimer ── */}
-      <AIDisclaimer />
     </div>
   );
 }

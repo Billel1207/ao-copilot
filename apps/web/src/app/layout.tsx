@@ -12,14 +12,24 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   }));
 
   return (
-    <html lang="fr">
+    <html lang="fr" suppressHydrationWarning>
       <head>
         <title>AO Copilot — Analyse d&apos;Appels d&apos;Offres BTP</title>
         <meta name="description" content="Analysez vos DCE en 5 minutes avec l'IA" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        {/*
+          Anti-flash dark mode script.
+          This is a static string literal (no user input) so dangerouslySetInnerHTML
+          is safe here — it only reads localStorage and adds a CSS class.
+        */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var t=localStorage.getItem("ao-theme");if(t==="dark"||(t==null&&window.matchMedia("(prefers-color-scheme:dark)").matches)){document.documentElement.classList.add("dark")}}catch(e){}})();`,
+          }}
+        />
       </head>
-      <body>
+      <body className="bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100">
         <QueryClientProvider client={queryClient}>
           {children}
           <Toaster position="top-right" richColors />

@@ -31,6 +31,8 @@ class ApiKeyCreateIn(BaseModel):
     can_write_projects: bool = False
     can_read_analysis: bool = True
     can_trigger_analysis: bool = False
+    can_manage_billing: bool = False
+    can_export: bool = False
 
 
 class ApiKeyOut(BaseModel):
@@ -41,6 +43,8 @@ class ApiKeyOut(BaseModel):
     can_write_projects: bool
     can_read_analysis: bool
     can_trigger_analysis: bool
+    can_manage_billing: bool
+    can_export: bool
     is_active: bool
     last_used_at: str | None
     created_at: str
@@ -98,6 +102,8 @@ async def list_api_keys(
             can_write_projects=k.can_write_projects,
             can_read_analysis=k.can_read_analysis,
             can_trigger_analysis=k.can_trigger_analysis,
+            can_manage_billing=k.can_manage_billing,
+            can_export=k.can_export,
             is_active=k.is_active,
             last_used_at=k.last_used_at.isoformat() if k.last_used_at else None,
             created_at=k.created_at.isoformat(),
@@ -142,6 +148,8 @@ async def create_api_key(
         can_write_projects=body.can_write_projects,
         can_read_analysis=body.can_read_analysis,
         can_trigger_analysis=body.can_trigger_analysis,
+        can_manage_billing=body.can_manage_billing,
+        can_export=body.can_export,
     )
     db.add(api_key)
     await db.flush()
@@ -158,6 +166,8 @@ async def create_api_key(
         can_write_projects=api_key.can_write_projects,
         can_read_analysis=api_key.can_read_analysis,
         can_trigger_analysis=api_key.can_trigger_analysis,
+        can_manage_billing=api_key.can_manage_billing,
+        can_export=api_key.can_export,
         is_active=api_key.is_active,
         last_used_at=None,
         created_at=api_key.created_at.isoformat(),

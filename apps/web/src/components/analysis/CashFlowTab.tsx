@@ -1,8 +1,8 @@
 "use client";
 
 import { useCashflowSimulation } from "@/hooks/useAnalysis";
-import { AlertTriangle, Info, Loader2, TrendingDown, TrendingUp, Wallet, FileWarning } from "lucide-react";
-import AIDisclaimer from "@/components/ui/AIDisclaimer";
+import { AlertTriangle, Info, Loader2, TrendingDown, TrendingUp, Wallet } from "lucide-react";
+import { AnalysisTabWrapper } from "@/components/analysis/AnalysisTabWrapper";
 
 interface Props {
   projectId: string;
@@ -155,27 +155,33 @@ function MonthlyTable({ data }: { data: any[] }) {
   );
 }
 
+function CashFlowSkeleton() {
+  return (
+    <div className="flex items-center justify-center py-16">
+      <Loader2 className="w-6 h-6 animate-spin text-blue-500 mr-2" />
+      <span className="text-sm text-slate-500 dark:text-slate-400">Simulation trésorerie en cours...</span>
+    </div>
+  );
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export default function CashFlowTab({ projectId }: Props) {
-  const { data, isLoading, error } = useCashflowSimulation(projectId);
+  const query = useCashflowSimulation(projectId);
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-16">
-        <Loader2 className="w-6 h-6 animate-spin text-blue-500 mr-2" />
-        <span className="text-sm text-slate-500 dark:text-slate-400">Simulation trésorerie en cours...</span>
-      </div>
-    );
-  }
+  return (
+    <AnalysisTabWrapper<any>
+      query={query}
+      errorMessage="Erreur lors de la simulation de trésorerie."
+      disclaimerText="Simulation de trésorerie indicative basée sur les données contractuelles — ne se substitue pas à un conseil financier professionnel."
+      skeleton={<CashFlowSkeleton />}
+    >
+      {(data) => <CashFlowContent data={data} />}
+    </AnalysisTabWrapper>
+  );
+}
 
-  if (error || !data) {
-    return (
-      <div className="text-center py-12 text-slate-500 dark:text-slate-400">
-        <FileWarning className="w-10 h-10 mx-auto mb-2 text-slate-400 dark:text-slate-500" />
-        <p className="text-sm">Erreur lors de la simulation de trésorerie.</p>
-      </div>
-    );
-  }
-
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function CashFlowContent({ data }: { data: any }) {
   const riskCfg = RISK_BADGE[data.risk_level] || RISK_BADGE.INCONNU;
 
   return (
@@ -265,8 +271,6 @@ export default function CashFlowTab({ projectId }: Props) {
       {/* Monthly table */}
       <MonthlyTable data={data.monthly_cashflow || []} />
 
-      {/* Footer disclaimer */}
-      <AIDisclaimer text="Simulation de trésorerie indicative basée sur les données contractuelles — ne se substitue pas à un conseil financier professionnel." />
     </div>
   );
 }

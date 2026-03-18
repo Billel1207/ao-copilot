@@ -6,7 +6,6 @@ import {
   AlertOctagon,
   Info,
   ShieldAlert,
-  FileX,
   HelpCircle,
   FileText,
   Copy,
@@ -14,7 +13,7 @@ import {
 } from "lucide-react";
 import { useQuestions } from "@/hooks/useAnalysis";
 import { cn } from "@/lib/utils";
-import AIDisclaimer from "@/components/ui/AIDisclaimer";
+import { AnalysisTabWrapper } from "@/components/analysis/AnalysisTabWrapper";
 
 interface Props {
   projectId: string;
@@ -280,35 +279,21 @@ function QuestionsSkeleton() {
 // ── Main component ────────────────────────────────────────────────────────
 
 export function QuestionsTab({ projectId }: Props) {
-  const { data, isLoading, isError } = useQuestions(projectId);
+  const query = useQuestions(projectId);
+
+  return (
+    <AnalysisTabWrapper<QuestionsData>
+      query={query as ReturnType<typeof useQuestions>}
+      errorMessage="Impossible de charger les questions à poser."
+      skeleton={<QuestionsSkeleton />}
+    >
+      {(data) => <QuestionsContent data={data} />}
+    </AnalysisTabWrapper>
+  );
+}
+
+function QuestionsContent({ data: questionsData }: { data: QuestionsData }) {
   const [activePriority, setActivePriority] = useState<string | null>(null);
-
-  if (isLoading) return <QuestionsSkeleton />;
-
-  if (isError) {
-    return (
-      <div className="card p-8 flex flex-col items-center gap-3 text-center animate-fade-in">
-        <AlertTriangle className="w-10 h-10 text-amber-400" />
-        <p className="text-slate-600 dark:text-slate-400 font-medium">
-          Impossible de charger les questions à poser.
-        </p>
-        <p className="text-slate-400 dark:text-slate-500 text-sm">
-          Vérifiez que l&apos;analyse du projet a bien été lancée.
-        </p>
-      </div>
-    );
-  }
-
-  if (!data) {
-    return (
-      <div className="card p-8 flex flex-col items-center gap-3 text-center animate-fade-in">
-        <FileX className="w-10 h-10 text-slate-300" />
-        <p className="text-slate-500 dark:text-slate-400">Aucune donnée disponible.</p>
-      </div>
-    );
-  }
-
-  const questionsData = data as QuestionsData;
 
   // Empty state: no questions generated
   if (!questionsData.questions || questionsData.questions.length === 0) {
@@ -341,7 +326,6 @@ export function QuestionsTab({ projectId }: Props) {
             </p>
           </div>
         </div>
-        <AIDisclaimer compact />
       </div>
     );
   }
@@ -437,8 +421,6 @@ export function QuestionsTab({ projectId }: Props) {
         </p>
       </div>
 
-      {/* ── Footer disclaimer ── */}
-      <AIDisclaimer />
     </div>
   );
 }
