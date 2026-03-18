@@ -62,6 +62,20 @@ create_test_pdfs*.py
 /test_*.py
 /test_pipeline.py
 
+# ─── Dev artifacts & screenshots ─────────────────────────────────
+/*.png
+/*.zip
+/simulation_*.py
+/create_dce_*.py
+apps/api/.local-storage/
+
+# ─── MCP & Playwright ───────────────────────────────────────────
+.mcp.json
+.playwright-mcp/
+
+# ─── Pip junk (broken install artifacts) ─────────────────────────
+apps/api/=*
+
 # ─── Alembic versions générées (garder le dossier, ignorer .pyc) ──
 apps/api/alembic/versions/__pycache__/
 
