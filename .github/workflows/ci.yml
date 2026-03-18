@@ -1,0 +1,321 @@
+name: CI/CD — AO Copilot
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+env:
+  PYTHON_VERSION: "3.12"
+  NODE_VERSION: "20"
+  REGISTRY: ghcr.io
+  API_IMAGE: ghcr.io/${{ github.repository_owner }}/ao-copilot-api
+  WEB_IMAGE: ghcr.io/${{ github.repository_owner }}/ao-copilot-web
+
+jobs:
+  # ──────────────────────────────────────────────
+  # Backend — Tests Python (FastAPI + Pytest)
+  # ──────────────────────────────────────────────
+  test-backend:
+    name: Test Backend (Python 3.12)
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: aocopilot
+          POSTGRES_PASSWORD: aocopilot_secret
+          POSTGRES_DB: aocopilot_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U aocopilot"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql+asyncpg://aocopilot:aocopilot_secret@localhost:5432/aocopilot_test
+      DATABASE_URL_SYNC: postgresql://aocopilot:aocopilot_secret@localhost:5432/aocopilot_test
+      REDIS_URL: redis://localhost:6379/0
+      CELERY_BROKER_URL: redis://localhost:6379/1
+      CELERY_RESULT_BACKEND: redis://localhost:6379/2
+      SECRET_KEY: ci-test-secret-key-minimum-32-characters
+      APP_ENV: development
+      S3_ENDPOINT_URL: http://localhost:9000
+      S3_ACCESS_KEY: test
+      S3_SECRET_KEY: test
+      S3_BUCKET_NAME: test-bucket
+      S3_REGION: fr-par
+      ANTHROPIC_API_KEY: sk-ant-test-placeholder
+      OPENAI_API_KEY: sk-test-placeholder
+      LLM_MODEL: claude-sonnet-4-6
+      STRIPE_SECRET_KEY: sk_test_placeholder
+      STRIPE_WEBHOOK_SECRET: whsec_test_placeholder
+      RESEND_API_KEY: re_test_placeholder
+      FRONTEND_URL: http://localhost:3000
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: apps/api/requirements.txt
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            tesseract-ocr \
+            tesseract-ocr-fra \
+            tesseract-ocr-eng \
+            poppler-utils \
+            libfreetype6-dev \
+            pkg-config
+
+      - name: Install Python dependencies
+        working-directory: apps/api
+        run: pip install -r requirements.txt
+
+      - name: Run pytest
+        run: pytest apps/api/tests -v --tb=short
+
+      - name: Install security scanning tools
+        run: pip install bandit pip-audit
+
+      - name: Run Bandit security linter
+        run: bandit -r apps/api/app -s B101 -q
+
+      - name: Run pip-audit dependency check
+        run: pip-audit --strict
+
+  # ──────────────────────────────────────────────
+  # Frontend — Tests Vitest (Next.js)
+  # ──────────────────────────────────────────────
+  test-frontend:
+    name: Test Frontend (Node 20)
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: apps/web
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run Vitest
+        run: npm run test
+
+      - name: Run npm audit
+        run: npm audit --audit-level=high || true
+
+  # ──────────────────────────────────────────────
+  # Docker — Build + Push vers ghcr.io
+  # ──────────────────────────────────────────────
+  push-images:
+    name: Build & Push Docker Images
+    runs-on: ubuntu-latest
+    needs: [test-backend, test-frontend]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    permissions:
+      contents: read
+      packages: write
+
+    outputs:
+      api_tag: ${{ steps.meta-api.outputs.version }}
+      web_tag: ${{ steps.meta-web.outputs.version }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Metadata API image
+        id: meta-api
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.API_IMAGE }}
+          tags: |
+            type=sha,prefix=sha-,format=short
+            type=raw,value=latest
+
+      - name: Build & Push API image
+        uses: docker/build-push-action@v5
+        with:
+          context: apps/api
+          file: apps/api/Dockerfile
+          push: true
+          tags: ${{ steps.meta-api.outputs.tags }}
+          labels: ${{ steps.meta-api.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Metadata Web image
+        id: meta-web
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.WEB_IMAGE }}
+          tags: |
+            type=sha,prefix=sha-,format=short
+            type=raw,value=latest
+
+      - name: Build & Push Web image
+        uses: docker/build-push-action@v5
+        with:
+          context: apps/web
+          file: apps/web/Dockerfile
+          push: true
+          tags: ${{ steps.meta-web.outputs.tags }}
+          labels: ${{ steps.meta-web.outputs.labels }}
+          build-args: |
+            NEXT_PUBLIC_API_URL=https://api.ao-copilot.fr
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ──────────────────────────────────────────────
+  # Deploy Backend — SSH vers serveur de production
+  # ──────────────────────────────────────────────
+  deploy-backend:
+    name: Deploy Backend (SSH)
+    runs-on: ubuntu-latest
+    needs: push-images
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    environment:
+      name: production
+      url: https://api.ao-copilot.fr/health
+
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SSH_PORT || 22 }}
+          script: |
+            # Authentification ghcr.io
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io \
+              -u ${{ github.actor }} --password-stdin
+
+            cd /opt/ao-copilot
+
+            # Pull les nouvelles images
+            docker compose pull api celery_worker
+
+            # Redemarrage sans downtime (rolling)
+            docker compose up -d --no-deps api celery_worker
+
+            # Migrations Alembic
+            docker compose exec -T api alembic upgrade head
+
+            # Nettoyage des vieilles images
+            docker image prune -f
+
+            echo "Backend deploye — $(date)"
+
+  # ──────────────────────────────────────────────
+  # Deploy Frontend — Hostinger (Next.js ZIP)
+  # ──────────────────────────────────────────────
+  deploy-frontend:
+    name: Deploy Frontend (Hostinger)
+    runs-on: ubuntu-latest
+    needs: [test-frontend]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    environment:
+      name: production
+      url: https://ao-copilot.fr
+
+    defaults:
+      run:
+        working-directory: apps/web
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Next.js
+        run: npm run build
+        env:
+          NEXT_PUBLIC_API_URL: https://api.ao-copilot.fr/api/v1
+
+      - name: Create deployment archive
+        run: |
+          zip -r ${{ github.workspace }}/aocopilot-web-deploy.zip . \
+            --exclude "node_modules/*" \
+            --exclude ".git/*" \
+            --exclude "*.test.*" \
+            --exclude "__tests__/*"
+
+      - name: Upload archive to Hostinger
+        run: |
+          curl -sf -X POST \
+            "https://api.hostinger.com/v1/hosting/u171376354/files/upload" \
+            -H "Authorization: Bearer ${{ secrets.HOSTINGER_API_TOKEN }}" \
+            -F "file=@${{ github.workspace }}/aocopilot-web-deploy.zip" \
+            -F "path=/home/u171376354/domains/ao-copilot.fr/aocopilot-web-deploy.zip"
+
+      - name: Trigger Hostinger JS deployment
+        run: |
+          curl -sf -X POST \
+            "https://api.hostinger.com/v1/hosting/ao-copilot.fr/applications/deployments" \
+            -H "Authorization: Bearer ${{ secrets.HOSTINGER_API_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "node_version": 20,
+              "app_type": "next",
+              "output_directory": ".next",
+              "build_script": "build",
+              "source_type": "archive",
+              "source_options": {
+                "archive_path": "aocopilot-web-deploy.zip"
+              }
+            }'
