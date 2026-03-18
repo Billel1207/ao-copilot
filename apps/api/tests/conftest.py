@@ -13,6 +13,20 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from app.database import engine, Base, AsyncSessionLocal, get_db
 from app.main import app
 
+import asyncio
+
+
+def pytest_collection_modifyitems(items):
+    """Force tous les tests async à utiliser le session event loop.
+
+    Sans ça, les tests async utilisent un loop function-scoped par défaut,
+    ce qui entre en conflit avec les fixtures session-scoped.
+    """
+    session_marker = pytest.mark.asyncio(loop_scope="session")
+    for item in items:
+        if asyncio.iscoroutinefunction(item.obj):
+            item.add_marker(session_marker)
+
 
 @pytest_asyncio.fixture(loop_scope="session", scope="session")
 async def _create_tables():
