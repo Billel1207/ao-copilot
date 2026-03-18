@@ -354,7 +354,9 @@ def export_project_pack(project_id: str) -> str:
     """Génère un ZIP complet (PDF + Word + DPGF Excel + Mémoire technique) et retourne la clé S3."""
     import zipfile
     import uuid as uuid_lib
-    from app.services.exporter import generate_export_pdf, generate_export_docx, generate_memo_technique
+    from app.services.exporter import generate_export_pdf
+    from app.services.docx_exporter import generate_export_docx
+    from app.services.memo_exporter import generate_memo_technique
     from app.services.storage import storage_service
     from app.models.document import AoDocument
     from app.services.dpgf_extractor import extract_tables_from_pdf, generate_excel
@@ -428,7 +430,7 @@ def export_project_pack(project_id: str) -> str:
 @celery_app.task(name="export_project_docx", time_limit=300, soft_time_limit=280)
 def export_project_docx(project_id: str) -> str:
     """Génère un rapport Word (.docx) et retourne la clé S3. Plan Pro requis (vérifié en route)."""
-    from app.services.exporter import generate_export_docx
+    from app.services.docx_exporter import generate_export_docx
     from app.services.storage import storage_service
     import uuid as uuid_lib
 

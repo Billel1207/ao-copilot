@@ -197,7 +197,7 @@ async def export_memo_technique(
         )
 
     # generate_memo_technique utilise une Session synchrone via run_sync
-    from app.services.exporter import generate_memo_technique
+    from app.services.memo_exporter import generate_memo_technique
     import re as _re
 
     try:
