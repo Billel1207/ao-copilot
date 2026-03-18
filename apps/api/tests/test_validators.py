@@ -5,9 +5,8 @@ from app.services.llm_validators import (
     LLMProjectOverview,
     LLMKeyPoint,
     LLMRisk,
+    LLMChecklistItem,
     ValidatedSummary,
-    ValidatedChecklistItem,
-    ValidatedCriterion,
     ValidatedGoNoGo,
     ValidatedTimeline,
 )
@@ -90,9 +89,9 @@ class TestValidatedSummary:
         assert result.confidence_overall <= 1.0
 
 
-class TestValidatedChecklistItem:
+class TestLLMChecklistItem:
     def test_valid_checklist_item(self):
-        item = ValidatedChecklistItem(
+        item = LLMChecklistItem(
             category="admin",
             item="KBIS < 3 mois",
             criticality="critical",
@@ -104,7 +103,7 @@ class TestValidatedChecklistItem:
 
     def test_unknown_criticality_normalized(self):
         """Unknown criticality should default to medium."""
-        item = ValidatedChecklistItem(
+        item = LLMChecklistItem(
             category="admin",
             item="Test",
             criticality="invalid_value",
