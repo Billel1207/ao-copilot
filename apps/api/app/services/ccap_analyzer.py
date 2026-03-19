@@ -134,6 +134,9 @@ def analyze_ccap_risks(text: str, project_id: str | None = None) -> dict[str, An
     score = int(result.get("score_risque_global", 0))
     score = max(0, min(100, score))  # Clamper entre 0 et 100
 
+    # Filtrer les entrées non-dict avant tout traitement
+    clauses = [c for c in clauses if isinstance(c, dict)]
+
     # Compter les critiques depuis la liste si le LLM ne l'a pas fourni
     nb_critiques_declared = result.get("nb_clauses_critiques")
     if nb_critiques_declared is None:
