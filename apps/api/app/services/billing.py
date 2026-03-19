@@ -515,7 +515,13 @@ class BillingService:
         )
 
     async def enforce_quota(self, org: Organization, db: AsyncSession) -> None:
-        """Lève HTTP 429 si le quota mensuel est atteint."""
+        """Lève HTTP 429 si le quota mensuel est atteint.
+
+        Bypass temporaire : plan business/trial avec quota >= 99999 sont exemptés.
+        """
+        # Bypass pour simulation / plan business
+        if org.plan == "business" or org.quota_docs >= 99999:
+            return
         usage = await self.get_usage(org.id, db)
         if usage.docs_used_this_month >= org.quota_docs:
             raise HTTPException(

@@ -47,7 +47,7 @@ async def export_word(
 ):
     """Export Word — plan Pro ou supérieur requis."""
     # Vérification plan Pro
-    if org.plan not in ("pro", "europe", "business"):
+    if org.plan not in ("pro", "europe", "business", "trial"):
         raise HTTPException(
             status_code=403,
             detail="L'export Word est disponible à partir du plan Pro. Mettez à niveau votre abonnement sur /billing.",
@@ -82,7 +82,7 @@ async def export_dpgf_excel(
     via pdfplumber et retourne directement un fichier .xlsx en téléchargement.
     """
     # Vérification plan Pro (même gate que l'export Word)
-    if org.plan not in ("pro", "europe", "business"):
+    if org.plan not in ("pro", "europe", "business", "trial"):
         raise HTTPException(
             status_code=403,
             detail=(
@@ -174,7 +174,7 @@ async def export_memo_technique(
     Réservé au plan Pro ou supérieur.
     """
     # Vérification plan Pro (même gate que Word export)
-    if org.plan not in ("pro", "europe", "business"):
+    if org.plan not in ("pro", "europe", "business", "trial"):
         raise HTTPException(
             status_code=403,
             detail=(
@@ -230,7 +230,7 @@ async def export_pack(
     org: Organization = Depends(get_current_org),
 ):
     """Export complet ZIP (PDF + Word + DPGF Excel + Mémoire technique). Plan Pro requis."""
-    if org.plan not in ("pro", "europe", "business"):
+    if org.plan not in ("pro", "europe", "business", "trial"):
         raise HTTPException(
             status_code=403,
             detail="L'export Pack complet est disponible à partir du plan Pro.",
