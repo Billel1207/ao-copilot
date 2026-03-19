@@ -3,10 +3,10 @@ name: Admin — Upgrade Plan to Business
 on:
   workflow_dispatch:
     inputs:
-      email:
-        description: 'Email du compte à upgrader'
+      org_id:
+        description: 'Organization UUID'
         required: true
-        default: 'billel_abbas@yahoo.fr'
+        default: '23fb05be-8fc3-4b43-8676-b16f5da3c786'
       plan:
         description: 'Plan cible'
         required: true
@@ -28,18 +28,17 @@ jobs:
             cd /opt/ao-copilot
             docker compose exec -T api python -c "
             from app.database import SyncSessionLocal
-            from app.models.user import User
             from app.models.organization import Organization
+            import uuid
             db = SyncSessionLocal()
-            user = db.query(User).filter_by(email='${{ github.event.inputs.email }}'.lower()).first()
-            if user:
-                org = db.query(Organization).filter_by(id=user.org_id).first()
+            org = db.query(Organization).filter_by(id=uuid.UUID('${{ github.event.inputs.org_id }}')).first()
+            if org:
                 old = org.plan
                 org.plan = '${{ github.event.inputs.plan }}'
                 org.quota_docs = 99999
                 db.commit()
-                print(f'OK: {org.name} — {old} -> {org.plan} (quota: 99999)')
+                print(f'OK: {org.name} (slug={org.slug}) plan: {old} -> {org.plan}, quota: 99999')
             else:
-                print('ERREUR: utilisateur non trouve')
+                print('ERREUR: org non trouvee')
             db.close()
             "
