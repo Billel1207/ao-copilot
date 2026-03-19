@@ -8,12 +8,12 @@ import {
   AlertCircle, Zap, RefreshCw, MessageSquare, Calendar,
   TrendingUp, Eye, X, ShieldAlert, Trophy, ThumbsDown, Ban, Pencil,
   ScrollText, FileCheck, GitCompareArrows, HelpCircle, BarChart3, DollarSign,
-  Wrench, Wallet, Users,
+  Wrench, Wallet, Users, Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useProject } from "@/hooks/useProjects";
-import { useDocuments } from "@/hooks/useDocuments";
+import { useDocuments, useDeleteDocument } from "@/hooks/useDocuments";
 import { useSummary, useTriggerAnalysis } from "@/hooks/useAnalysis";
 import { documentsApi, projectsApi } from "@/lib/api";
 import { SummaryTab }   from "@/components/summary/SummaryTab";
@@ -454,6 +454,15 @@ export default function ProjectPage() {
   const { data: documents } = useDocuments(projectId);
   const { data: summary } = useSummary(projectId, project?.status === "ready");
   const triggerAnalysis = useTriggerAnalysis(projectId);
+  const deleteDocument = useDeleteDocument(projectId);
+
+  const handleDeleteDoc = (docId: string, docName: string) => {
+    if (!confirm(`Supprimer « ${docName} » ? Cette action est irréversible.`)) return;
+    deleteDocument.mutate(docId, {
+      onSuccess: () => toast.success(`${docName} supprimé`),
+      onError: () => toast.error(`Erreur lors de la suppression de ${docName}`),
+    });
+  };
 
   // Billing — pour gating des exports Word/Mémoire
   const { usage, fetchBilling } = useBillingStore();
@@ -733,6 +742,14 @@ export default function ProjectPage() {
                           <Eye className="w-4 h-4" />
                         </button>
                       )}
+                      <button
+                        onClick={() => handleDeleteDoc(doc.id, doc.original_name)}
+                        disabled={deleteDocument.isPending}
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-danger-600 hover:bg-danger-50 transition-colors disabled:opacity-50"
+                        title="Supprimer ce document"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
                     </div>
                   </div>
                   <OcrQualityBanner quality={doc.ocr_quality_score ?? undefined} documentName={doc.original_name} />
