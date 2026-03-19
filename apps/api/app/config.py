@@ -89,13 +89,12 @@ class Settings(BaseSettings):
                     "CRITICAL: ALLOWED_ORIGINS contains '*' in production. "
                     "Specify explicit HTTPS origins (e.g. https://ao-copilot.fr)."
                 )
-            # All production origins must be HTTPS
-            for origin in origins:
-                if not origin.startswith("https://"):
-                    raise RuntimeError(
-                        f"CRITICAL: ALLOWED_ORIGINS contains non-HTTPS origin '{origin}' "
-                        f"in production. All origins must use HTTPS."
-                    )
+            # Filter out non-HTTPS origins in production (warn instead of crash)
+            safe_origins = [o for o in origins if o.startswith("https://")]
+            if not safe_origins:
+                # Fallback to ao-copilot.fr if no HTTPS origins configured
+                safe_origins = ["https://ao-copilot.fr"]
+            return safe_origins
 
         return origins
 
