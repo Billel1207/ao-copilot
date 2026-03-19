@@ -1,0 +1,23 @@
+name: Admin — Restart Backend
+
+on:
+  workflow_dispatch:
+
+jobs:
+  restart:
+    name: Restart API via SSH
+    runs-on: ubuntu-latest
+    steps:
+      - name: Restart containers
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SSH_PORT || 22 }}
+          script: |
+            cd /opt/ao-copilot
+            docker compose restart api
+            sleep 3
+            docker compose logs api --tail 5
+            echo "Backend restarted — $(date)"
