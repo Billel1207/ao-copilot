@@ -26,18 +26,32 @@ jobs:
           port: ${{ secrets.SSH_PORT || 22 }}
           script: |
             cd /opt/ao-copilot
+
+            # Get DATABASE_URL from docker env
+            DB_URL=$(docker compose exec -T api printenv DATABASE_URL_SYNC 2>/dev/null || echo "")
+            echo "DB_URL prefix: ${DB_URL:0:30}..."
+
+            # Try psql directly if available, or use python with the right DB
             docker compose exec -T api python -c "
-            from sqlalchemy import create_engine, text
             import os
-            url = os.environ.get('DATABASE_URL_SYNC', 'postgresql://aocopilot:aocopilot_secret@db:5432/aocopilot')
+            from sqlalchemy import create_engine, text
+
+            # Try multiple DB URL sources
+            url = os.environ.get('DATABASE_URL_SYNC', '')
+            if not url:
+                url = os.environ.get('DATABASE_URL', '').replace('+asyncpg', '')
+            print(f'Using DB: {url[:40]}...')
+
             engine = create_engine(url)
             with engine.connect() as conn:
-                # List all users first
-                rows = conn.execute(text('SELECT u.email, u.org_id, o.name, o.slug, o.plan FROM users u JOIN organizations o ON u.org_id = o.id')).fetchall()
+                rows = conn.execute(text('SELECT u.email, o.name, o.slug, o.plan, o.quota_docs FROM users u JOIN organizations o ON u.org_id = o.id LIMIT 20')).fetchall()
                 for r in rows:
-                    print(f'USER: {r[0]} | org={r[2]} ({r[3]}) | plan={r[4]}')
-                # Upgrade all orgs to business
-                result = conn.execute(text(\"UPDATE organizations SET plan='business', quota_docs=99999 WHERE plan != 'business'\"))
+                    print(f'USER: {r[0]} | org={r[1]} ({r[2]}) | plan={r[3]} | quota={r[4]}')
+                if not rows:
+                    print('NO USERS FOUND - checking tables...')
+                    tables = conn.execute(text(\"SELECT tablename FROM pg_tables WHERE schemaname='public'\")).fetchall()
+                    print(f'Tables: {[t[0] for t in tables]}')
+                result = conn.execute(text(\"UPDATE organizations SET plan='business', quota_docs=99999\"))
                 conn.commit()
                 print(f'UPGRADED {result.rowcount} org(s) to business')
             "
