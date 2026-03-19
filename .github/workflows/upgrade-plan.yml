@@ -1,0 +1,45 @@
+name: Admin — Upgrade Plan to Business
+
+on:
+  workflow_dispatch:
+    inputs:
+      email:
+        description: 'Email du compte à upgrader'
+        required: true
+        default: 'billel_abbas@yahoo.fr'
+      plan:
+        description: 'Plan cible'
+        required: true
+        default: 'business'
+
+jobs:
+  upgrade:
+    name: Upgrade Plan via SSH
+    runs-on: ubuntu-latest
+    steps:
+      - name: Upgrade plan via Docker exec
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SSH_PORT || 22 }}
+          script: |
+            cd /opt/ao-copilot
+            docker compose exec -T api python -c "
+            from app.database import SyncSessionLocal
+            from app.models.user import User
+            from app.models.organization import Organization
+            db = SyncSessionLocal()
+            user = db.query(User).filter_by(email='${{ github.event.inputs.email }}'.lower()).first()
+            if user:
+                org = db.query(Organization).filter_by(id=user.org_id).first()
+                old = org.plan
+                org.plan = '${{ github.event.inputs.plan }}'
+                org.quota_docs = 99999
+                db.commit()
+                print(f'OK: {org.name} — {old} -> {org.plan} (quota: 99999)')
+            else:
+                print('ERREUR: utilisateur non trouve')
+            db.close()
+            "
