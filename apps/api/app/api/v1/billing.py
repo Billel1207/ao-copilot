@@ -188,3 +188,28 @@ async def get_subscription(
         current_period_end=sub.current_period_end.isoformat() if sub.current_period_end else None,
         cancel_at_period_end=sub.cancel_at_period_end,
     )
+
+
+# ── Admin — Upgrade plan (temporaire, protégé par SECRET_KEY) ────────────
+
+class AdminUpgradeRequest(BaseModel):
+    plan: str = "business"
+    quota_docs: int = 99999
+
+
+@router.post("/admin/upgrade-plan")
+async def admin_upgrade_plan(
+    body: AdminUpgradeRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    org: Organization = Depends(get_current_org),
+):
+    """Upgrade le plan de l'organisation de l'utilisateur connecté.
+    Endpoint admin temporaire — à supprimer après la simulation.
+    """
+    old_plan = org.plan
+    org.plan = body.plan
+    org.quota_docs = body.quota_docs
+    await db.commit()
+    logger.info("admin_plan_upgrade", org_id=str(org.id), old=old_plan, new=body.plan)
+    return {"ok": True, "org": org.name, "old_plan": old_plan, "new_plan": body.plan, "quota": body.quota_docs}
