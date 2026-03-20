@@ -433,9 +433,9 @@ function ScoringContent({ data: scoring }: { data: ScoringSimulationData }) {
             {scoring.axes_amelioration.map((axe, i) => (
               <li
                 key={i}
-                className="flex items-start gap-2 text-sm text-blue-900 dark:text-blue-200 leading-relaxed"
+                className="flex items-start gap-2 text-sm text-slate-800 dark:text-slate-200 leading-relaxed"
               >
-                <span className="shrink-0 w-5 h-5 rounded-full bg-blue-200 dark:bg-blue-800 text-blue-800 dark:text-blue-200 text-xs font-bold flex items-center justify-center mt-0.5">
+                <span className="shrink-0 w-5 h-5 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center mt-0.5">
                   {i + 1}
                 </span>
                 <span>{axe}</span>
