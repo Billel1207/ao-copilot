@@ -153,10 +153,15 @@ def _check_and_trigger_analysis(db, project_id: str):
         analyze_project.delay(project_id)
 
 
-@celery_app.task(bind=True, name="analyze_project", max_retries=1, time_limit=1800, soft_time_limit=1740)
+@celery_app.task(bind=True, name="analyze_project", max_retries=0, time_limit=900, soft_time_limit=840)
 def analyze_project(self, project_id: str):
     """Pipeline IA complet 15 étapes : résumé, checklist, critères, Go/No-Go,
-    timeline, CCAP, RC, AE, CCTP, DC, conflits, questions, scoring, cashflow."""
+    timeline, CCAP, RC, AE, CCTP, DC, conflits, questions, scoring, cashflow.
+
+    max_retries=0 : pas de retry automatique — les étapes non-critiques
+    échouent silencieusement et le projet passe en 'ready' avec résultats partiels.
+    time_limit=900 (15 min) au lieu de 1800 (30 min) — évite les analyses zombie.
+    """
     from app.models.project import AoProject
     from app.services.analyzer import run_full_analysis
 
@@ -234,10 +239,10 @@ def analyze_project(self, project_id: str):
             r.set(f"project_error:{project_id}", error_msg, ex=86400)
         except Exception:
             pass
-        # Guard : ne relancer que si le quota de retries n'est pas épuisé
-        if self.request.retries < self.max_retries:
-            raise self.retry(exc=exc, countdown=60)
-        raise exc  # Max retries atteint → Celery marque FAILURE
+        # Plus de retry automatique — les étapes non-critiques échouent
+        # silencieusement et le pipeline retourne des résultats partiels.
+        # L'utilisateur peut relancer manuellement si besoin.
+        raise exc
     finally:
         db.close()
 

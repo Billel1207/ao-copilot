@@ -379,10 +379,10 @@ def run_full_analysis(db: Session, project_id: str) -> dict:
             executor.submit(_run_in_thread, fn, name, project_id): name
             for name, fn in batch1_steps.items()
         }
-        for future in as_completed(futures, timeout=300):  # 5 min max par batch
+        for future in as_completed(futures, timeout=180):  # 3 min max par batch
             step_name = futures[future]
             try:
-                _, result = future.result(timeout=180)  # 3 min max par step
+                _, result = future.result(timeout=120)  # 2 min max par step
                 if result is not None:
                     results[step_name] = result
                 else:
@@ -544,10 +544,10 @@ def run_full_analysis(db: Session, project_id: str) -> dict:
             executor.submit(_run_in_thread, fn, name, project_id): name
             for name, fn in batch2_steps.items()
         }
-        for future in as_completed(futures, timeout=420):  # 7 min max pour batch 2 (9 étapes / 5 workers)
+        for future in as_completed(futures, timeout=300):  # 5 min max pour batch 2 (9 étapes / 5 workers)
             step_name = futures[future]
             try:
-                _, result = future.result(timeout=180)  # 3 min max par step
+                _, result = future.result(timeout=120)  # 2 min max par step
                 if result is not None:
                     results[step_name] = result
             except TimeoutError:
