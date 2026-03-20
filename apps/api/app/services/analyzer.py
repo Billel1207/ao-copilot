@@ -14,7 +14,7 @@ Pipeline complet 16 étapes (parallélisé en 3 batches) :
 """
 import uuid
 import structlog
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, as_completed, TimeoutError
 from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 
@@ -150,7 +150,13 @@ def _run_in_thread(step_fn, step_name, project_id):
     Creates a fresh SQLAlchemy session, runs the step function, commits,
     and closes the session. Returns (step_name, result_dict) on success
     or (step_name, None) on failure (already logged inside step_fn).
+
+    Each thread has a 3-minute timeout to prevent infinite blocking
+    on LLM calls or slow DB queries.
     """
+    import signal
+    import threading
+
     thread_db = SyncSessionLocal()
     try:
         result = step_fn(thread_db)
@@ -373,16 +379,20 @@ def run_full_analysis(db: Session, project_id: str) -> dict:
             executor.submit(_run_in_thread, fn, name, project_id): name
             for name, fn in batch1_steps.items()
         }
-        for future in as_completed(futures):
+        for future in as_completed(futures, timeout=300):  # 5 min max par batch
             step_name = futures[future]
             try:
-                _, result = future.result()
+                _, result = future.result(timeout=180)  # 3 min max par step
                 if result is not None:
                     results[step_name] = result
                 else:
                     # Only summary is truly critical (needed for everything else)
                     if step_name in ("summary",):
                         raise RuntimeError(f"Étape critique '{step_name}' a échoué")
+            except TimeoutError:
+                logger.error(f"[{project_id}] Étape {step_name} timeout après 3 min")
+                if step_name in ("summary",):
+                    raise RuntimeError(f"Étape critique '{step_name}' timeout")
             except Exception as exc:
                 if step_name in ("summary",):
                     logger.error(f"[{project_id}] Étape critique {step_name} échouée: {exc}")
@@ -395,7 +405,7 @@ def run_full_analysis(db: Session, project_id: str) -> dict:
     # BATCH 2 — Analyses spécialisées (parallèles, max_workers=5)
     # ccap, rc, ae, cctp, dc_check, conflicts, questions
     # ══════════════════════════════════════════════════════════════
-    logger.info(f"[{project_id}] Batch 2/3 : lancement de 9 analyses en parallèle (7 spécialisées + scoring + sous-traitance)")
+    logger.info(f"[{project_id}] Batch 2/3 : lancement de 9 analyses (max 5 en parallèle, 7 spécialisées + scoring + sous-traitance)")
 
     def _step_ccap(thread_db):
         logger.info(f"[{project_id}] Batch 2 — CCAP")
@@ -529,17 +539,19 @@ def run_full_analysis(db: Session, project_id: str) -> dict:
         "subcontracting": _step_subcontracting,
     }
 
-    with ThreadPoolExecutor(max_workers=9) as executor:
+    with ThreadPoolExecutor(max_workers=5) as executor:
         futures = {
             executor.submit(_run_in_thread, fn, name, project_id): name
             for name, fn in batch2_steps.items()
         }
-        for future in as_completed(futures):
+        for future in as_completed(futures, timeout=420):  # 7 min max pour batch 2 (9 étapes / 5 workers)
             step_name = futures[future]
             try:
-                _, result = future.result()
+                _, result = future.result(timeout=180)  # 3 min max par step
                 if result is not None:
                     results[step_name] = result
+            except TimeoutError:
+                logger.error(f"[{project_id}] Étape {step_name} timeout après 3 min — skippée")
             except Exception as exc:
                 logger.warning(f"[{project_id}] Étape {step_name} échouée (non bloquant): {exc}")
 
