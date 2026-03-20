@@ -88,8 +88,8 @@ def retrieve_relevant_chunks(
         {"pid": project_id},
     ).fetchone()
     if not count_row or count_row[0] == 0:
-        logger.warning(f"RAG: Aucun chunk pour project_id={project_id!r}, contexte vide")
-        return []
+        logger.warning(f"RAG: Aucun embedding_vec pour project_id={project_id!r}, fallback texte brut")
+        return _fallback_text_chunks(db, project_id, top_k)
 
     query_embedding = embed_query(query)
     max_distance = 1.0 - min_similarity  # cosine distance threshold
