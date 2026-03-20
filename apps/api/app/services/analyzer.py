@@ -395,7 +395,7 @@ def run_full_analysis(db: Session, project_id: str) -> dict:
     # BATCH 2 — Analyses spécialisées (parallèles, max_workers=5)
     # ccap, rc, ae, cctp, dc_check, conflicts, questions
     # ══════════════════════════════════════════════════════════════
-    logger.info(f"[{project_id}] Batch 2/3 : lancement de 7 analyses spécialisées en parallèle")
+    logger.info(f"[{project_id}] Batch 2/3 : lancement de 9 analyses en parallèle (7 spécialisées + scoring + sous-traitance)")
 
     def _step_ccap(thread_db):
         logger.info(f"[{project_id}] Batch 2 — CCAP")
@@ -485,7 +485,38 @@ def run_full_analysis(db: Session, project_id: str) -> dict:
         logger.info(f"[{project_id}] Questions : {questions_payload.get('question_count', 0)} générées")
         return questions_payload
 
+    # ── Scoring + Subcontracting closures (dépendent de Batch 1 uniquement) ──
+    def _step_scoring(thread_db):
+        logger.info(f"[{project_id}] Batch 2 — Scoring")
+        criteria_payload = results.get("criteria", {})
+        if not criteria_payload:
+            logger.info(f"[{project_id}] Pas de critères — scoring sauté")
+            return None
+        from app.services.scoring_simulator import simulate_scoring
+        company_profile_dict = _get_company_profile_dict(thread_db, pid)
+        scoring_payload = simulate_scoring(
+            criteria_payload,
+            company_profile=company_profile_dict,
+            project_id=project_id,
+        )
+        _save_result(thread_db, project_id, "scoring", scoring_payload)
+        logger.info(f"[{project_id}] Scoring : note estimée {scoring_payload.get('note_globale_estimee', 'N/A')}/20")
+        return scoring_payload
+
+    def _step_subcontracting(thread_db):
+        logger.info(f"[{project_id}] Batch 2 — Sous-traitance")
+        from app.services.subcontracting_analyzer import analyze_subcontracting
+        subcontracting_payload = analyze_subcontracting(project_id, thread_db)
+        if subcontracting_payload and not subcontracting_payload.get("error"):
+            _save_result(thread_db, project_id, "subcontracting", subcontracting_payload,
+                         confidence=subcontracting_payload.get("confidence_overall"))
+            logger.info(f"[{project_id}] Sous-traitance : score risque={subcontracting_payload.get('score_risque', 'N/A')}")
+            return subcontracting_payload
+        logger.info(f"[{project_id}] Sous-traitance : données insuffisantes")
+        return None
+
     # Map step names to result keys for batch 2
+    # Scoring + Subcontracting fusionnés ici (dépendent de Batch 1, pas de Batch 2)
     batch2_steps = {
         "ccap_risks": _step_ccap,
         "rc_analysis": _step_rc,
@@ -494,9 +525,11 @@ def run_full_analysis(db: Session, project_id: str) -> dict:
         "dc_check": _step_dc_check,
         "conflicts": _step_conflicts,
         "questions": _step_questions,
+        "scoring": _step_scoring,
+        "subcontracting": _step_subcontracting,
     }
 
-    with ThreadPoolExecutor(max_workers=7) as executor:
+    with ThreadPoolExecutor(max_workers=9) as executor:
         futures = {
             executor.submit(_run_in_thread, fn, name, project_id): name
             for name, fn in batch2_steps.items()
@@ -513,13 +546,11 @@ def run_full_analysis(db: Session, project_id: str) -> dict:
     logger.info(f"[{project_id}] Batch 2 terminé — {len([k for k in results if k != 'detected_language'])} analyses cumulées")
 
     # ══════════════════════════════════════════════════════════════
-    # BATCH 3 — Analyses dépendantes (parallélisées par paires)
-    # 3a. deadlines + cashflow (pure computation, rapide)
-    # 3b. scoring + subcontracting (LLM calls, en parallèle)
+    # BATCH 3 — Computations dépendantes (deadlines + cashflow)
+    # Pure computation, pas de LLM — < 1s total
     # ══════════════════════════════════════════════════════════════
-    logger.info(f"[{project_id}] Batch 3/3 : analyses dépendantes (parallélisées)")
+    logger.info(f"[{project_id}] Batch 3 : deadlines + trésorerie (computation)")
 
-    # ── 3a. Fast computations (deadlines + cashflow) — séquentiel car < 1s ──
     timeline_payload = results.get("timeline", {})
     if timeline_payload:
         try:
@@ -552,47 +583,6 @@ def run_full_analysis(db: Session, project_id: str) -> dict:
     except Exception as exc:
         _report_to_sentry(exc, "cashflow_simulation")
         logger.warning(f"[{project_id}] Erreur simulation trésorerie (non bloquant): {exc}")
-
-    # ── 3b. LLM analyses (scoring + subcontracting) — en parallèle ──
-    def _run_scoring():
-        try:
-            criteria_payload = results.get("criteria", {})
-            if criteria_payload:
-                from app.services.scoring_simulator import simulate_scoring
-                company_profile_dict = _get_company_profile_dict(db, pid)
-                scoring_payload = simulate_scoring(
-                    criteria_payload,
-                    company_profile=company_profile_dict,
-                    project_id=project_id,
-                )
-                _save_result(db, project_id, "scoring", scoring_payload)
-                results["scoring"] = scoring_payload
-                logger.info(f"[{project_id}] Scoring : note estimée {scoring_payload.get('note_globale_estimee', 'N/A')}/20")
-        except Exception as exc:
-            _report_to_sentry(exc, "scoring")
-            logger.warning(f"[{project_id}] Erreur simulation scoring (non bloquant): {exc}")
-
-    def _run_subcontracting():
-        try:
-            from app.services.subcontracting_analyzer import analyze_subcontracting
-            subcontracting_payload = analyze_subcontracting(project_id, db)
-            if subcontracting_payload and not subcontracting_payload.get("error"):
-                _save_result(db, project_id, "subcontracting", subcontracting_payload,
-                             confidence=subcontracting_payload.get("confidence_overall"))
-                results["subcontracting"] = subcontracting_payload
-                logger.info(f"[{project_id}] Sous-traitance : score risque={subcontracting_payload.get('score_risque', 'N/A')}")
-            else:
-                logger.info(f"[{project_id}] Sous-traitance : données insuffisantes")
-        except Exception as exc:
-            _report_to_sentry(exc, "subcontracting")
-            logger.warning(f"[{project_id}] Erreur analyse sous-traitance (non bloquant): {exc}")
-
-    logger.info(f"[{project_id}] Batch 3 — scoring + sous-traitance en parallèle")
-    with ThreadPoolExecutor(max_workers=2) as executor:
-        scoring_future = executor.submit(_run_scoring)
-        subcontracting_future = executor.submit(_run_subcontracting)
-        scoring_future.result()
-        subcontracting_future.result()
 
     # ── Post-pipeline: self-verification ────────────────────────────────
     try:
