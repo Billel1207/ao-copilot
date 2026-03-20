@@ -2,6 +2,7 @@
 import io
 import uuid
 
+from sqlalchemy import text
 from app.config import settings
 from app.database import SyncSessionLocal as SyncSession
 from app.worker.celery_app import celery_app
@@ -103,6 +104,25 @@ def process_document(self, doc_id: str):
 
         doc.status = "done"
         db.commit()
+
+        # Populate pgvector native column (embedding_vec) from JSON embedding
+        # This enables fast cosine similarity search via <=> operator
+        try:
+            db.execute(
+                text("""
+                    UPDATE chunks
+                    SET embedding_vec = embedding::text::vector
+                    WHERE document_id = :doc_id
+                      AND embedding IS NOT NULL
+                      AND embedding_vec IS NULL
+                """),
+                {"doc_id": str(doc.id)},
+            )
+            db.commit()
+        except Exception as vec_err:
+            logger.warning("pgvector_copy_failed", error=str(vec_err))
+            db.rollback()
+
         _set_progress(self.request.id, 100, "Document prêt")
 
         # Vérifier si tous les docs du projet sont done → lancer analyse

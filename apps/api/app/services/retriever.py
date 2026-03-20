@@ -84,7 +84,7 @@ def retrieve_relevant_chunks(
 
     # Vérification rapide : pas de chunks → retourner vide sans appel API embedding
     count_row = db.execute(
-        text("SELECT COUNT(*) FROM chunks WHERE project_id = :pid AND embedding IS NOT NULL"),
+        text("SELECT COUNT(*) FROM chunks WHERE project_id = :pid AND embedding_vec IS NOT NULL"),
         {"pid": project_id},
     ).fetchone()
     if not count_row or count_row[0] == 0:
@@ -103,12 +103,12 @@ def retrieve_relevant_chunks(
             c.chunk_index,
             d.original_name AS doc_name,
             d.doc_type,
-            (c.embedding <=> CAST(:query_vec AS vector)) AS distance
+            (c.embedding_vec <=> CAST(:query_vec AS vector)) AS distance
         FROM chunks c
         JOIN ao_documents d ON d.id = c.document_id
         WHERE c.project_id = :project_id
-          AND c.embedding IS NOT NULL
-          AND (c.embedding <=> CAST(:query_vec AS vector)) < :max_distance
+          AND c.embedding_vec IS NOT NULL
+          AND (c.embedding_vec <=> CAST(:query_vec AS vector)) < :max_distance
         ORDER BY distance ASC
         LIMIT :top_k
     """)

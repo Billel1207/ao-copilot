@@ -285,9 +285,13 @@ class LLMService:
     )
     @_llm_breaker
     def _anthropic_json_thinking(self, system: str, user: str, budget: int) -> dict:
-        """Anthropic call with extended thinking enabled."""
-        import re
-        response = self._anthropic.messages.create(
+        """Anthropic call with extended thinking enabled (streaming).
+
+        Uses streaming to avoid the "Streaming is required for operations
+        that may take longer than 10 minutes" error from Anthropic API.
+        """
+        # Use streaming to handle long-running extended thinking operations
+        with self._anthropic.messages.stream(
             model=self.model,
             max_tokens=budget + settings.LLM_MAX_TOKENS,
             temperature=1,  # Required when thinking is enabled
@@ -297,7 +301,8 @@ class LLMService:
             },
             system=_build_system_blocks(system),
             messages=[{"role": "user", "content": user}],
-        )
+        ) as stream:
+            response = stream.get_final_message()
 
         self._track_usage(response, step="thinking")
 
