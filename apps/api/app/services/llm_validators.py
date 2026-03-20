@@ -236,6 +236,27 @@ class LLMEvaluation(BaseModel):
     total_weight_check: float | None = None
     confidence: float | None = None
 
+    @field_validator("total_weight_check", mode="before")
+    @classmethod
+    def coerce_total_weight(cls, v):
+        """Accept dict/list/str from LLM and coerce to float or None."""
+        if v is None:
+            return None
+        if isinstance(v, (int, float)):
+            return float(v)
+        if isinstance(v, dict):
+            # LLM sometimes returns {'criterion': weight} — extract first numeric value
+            for val in v.values():
+                if isinstance(val, (int, float)):
+                    return float(val)
+            return None
+        if isinstance(v, str):
+            try:
+                return float(v.replace(",", ".").replace("%", "").strip())
+            except (ValueError, TypeError):
+                return None
+        return None
+
 class ValidatedCriteria(BaseModel):
     """Modele strict de validation des critères LLM."""
     evaluation: LLMEvaluation

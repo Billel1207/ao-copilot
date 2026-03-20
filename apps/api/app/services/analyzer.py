@@ -380,11 +380,11 @@ def run_full_analysis(db: Session, project_id: str) -> dict:
                 if result is not None:
                     results[step_name] = result
                 else:
-                    # For critical steps (summary, checklist, criteria), raise
-                    if step_name in ("summary", "checklist", "criteria"):
+                    # Only summary is truly critical (needed for everything else)
+                    if step_name in ("summary",):
                         raise RuntimeError(f"Étape critique '{step_name}' a échoué")
             except Exception as exc:
-                if step_name in ("summary", "checklist", "criteria"):
+                if step_name in ("summary",):
                     logger.error(f"[{project_id}] Étape critique {step_name} échouée: {exc}")
                     raise
                 logger.warning(f"[{project_id}] Étape {step_name} échouée (non bloquant): {exc}")
@@ -496,7 +496,7 @@ def run_full_analysis(db: Session, project_id: str) -> dict:
         "questions": _step_questions,
     }
 
-    with ThreadPoolExecutor(max_workers=5) as executor:
+    with ThreadPoolExecutor(max_workers=7) as executor:
         futures = {
             executor.submit(_run_in_thread, fn, name, project_id): name
             for name, fn in batch2_steps.items()
