@@ -7,26 +7,6 @@
   @page {
     margin: 12mm 14mm 20mm 14mm;
     size: A4;
-    @bottom-left {
-      content: "AO Copilot — Confidentiel";
-      font-family: {{ theme.font_family }};
-      font-size: 7.5px; color: {{ theme.text_muted }};
-    }
-    @bottom-center {
-      content: counter(page) " / " counter(pages);
-      font-family: {{ theme.font_family }};
-      font-size: 7.5px; color: #64748B; font-weight: 600;
-    }
-    @bottom-right {
-      content: "Généré le {{ generation_date }}";
-      font-family: {{ theme.font_family }};
-      font-size: 7.5px; color: {{ theme.text_muted }};
-    }
-  }
-  @page :first {
-    @bottom-left { content: ""; }
-    @bottom-center { content: ""; }
-    @bottom-right { content: ""; }
   }
   body {
     font-family: {{ theme.font_family }};

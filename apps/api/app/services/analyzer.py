@@ -513,13 +513,13 @@ def run_full_analysis(db: Session, project_id: str) -> dict:
     logger.info(f"[{project_id}] Batch 2 terminé — {len([k for k in results if k != 'detected_language'])} analyses cumulées")
 
     # ══════════════════════════════════════════════════════════════
-    # BATCH 3 — Analyses dépendantes (séquentielles)
-    # deadlines (← timeline), scoring (← criteria),
-    # cashflow (← ae + timeline), subcontracting
+    # BATCH 3 — Analyses dépendantes (parallélisées par paires)
+    # 3a. deadlines + cashflow (pure computation, rapide)
+    # 3b. scoring + subcontracting (LLM calls, en parallèle)
     # ══════════════════════════════════════════════════════════════
-    logger.info(f"[{project_id}] Batch 3/3 : 4 analyses dépendantes (séquentielles)")
+    logger.info(f"[{project_id}] Batch 3/3 : analyses dépendantes (parallélisées)")
 
-    # ── 3a. Deadlines structurées (dépend de timeline) ──────────
+    # ── 3a. Fast computations (deadlines + cashflow) — séquentiel car < 1s ──
     timeline_payload = results.get("timeline", {})
     if timeline_payload:
         try:
@@ -528,27 +528,6 @@ def run_full_analysis(db: Session, project_id: str) -> dict:
             _report_to_sentry(exc, "deadlines")
             logger.warning(f"[{project_id}] Erreur extraction deadlines (non bloquant): {exc}")
 
-    # ── 3b. Scoring simulation (dépend de criteria) ─────────────
-    logger.info(f"[{project_id}] Batch 3 — scoring")
-    try:
-        criteria_payload = results.get("criteria", {})
-        if criteria_payload:
-            from app.services.scoring_simulator import simulate_scoring
-            company_profile_dict = _get_company_profile_dict(db, pid)
-            scoring_payload = simulate_scoring(
-                criteria_payload,
-                company_profile=company_profile_dict,
-                project_id=project_id,
-            )
-            _save_result(db, project_id, "scoring", scoring_payload)
-            results["scoring"] = scoring_payload
-            logger.info(f"[{project_id}] Scoring : note estimée {scoring_payload.get('note_globale_estimee', 'N/A')}/20")
-    except Exception as exc:
-        _report_to_sentry(exc, "scoring")
-        logger.warning(f"[{project_id}] Erreur simulation scoring (non bloquant): {exc}")
-
-    # ── 3c. Cashflow simulation (dépend de ae + timeline) ───────
-    logger.info(f"[{project_id}] Batch 3 — trésorerie")
     try:
         ae_data = results.get("ae_analysis", {})
         timeline_data = results.get("timeline", {})
@@ -574,21 +553,46 @@ def run_full_analysis(db: Session, project_id: str) -> dict:
         _report_to_sentry(exc, "cashflow_simulation")
         logger.warning(f"[{project_id}] Erreur simulation trésorerie (non bloquant): {exc}")
 
-    # ── 3d. Analyse sous-traitance ──────────────────────────────
-    logger.info(f"[{project_id}] Batch 3 — sous-traitance")
-    try:
-        from app.services.subcontracting_analyzer import analyze_subcontracting
-        subcontracting_payload = analyze_subcontracting(project_id, db)
-        if subcontracting_payload and not subcontracting_payload.get("error"):
-            _save_result(db, project_id, "subcontracting", subcontracting_payload,
-                         confidence=subcontracting_payload.get("confidence_overall"))
-            results["subcontracting"] = subcontracting_payload
-            logger.info(f"[{project_id}] Sous-traitance : score risque={subcontracting_payload.get('score_risque', 'N/A')}")
-        else:
-            logger.info(f"[{project_id}] Sous-traitance : données insuffisantes")
-    except Exception as exc:
-        _report_to_sentry(exc, "subcontracting")
-        logger.warning(f"[{project_id}] Erreur analyse sous-traitance (non bloquant): {exc}")
+    # ── 3b. LLM analyses (scoring + subcontracting) — en parallèle ──
+    def _run_scoring():
+        try:
+            criteria_payload = results.get("criteria", {})
+            if criteria_payload:
+                from app.services.scoring_simulator import simulate_scoring
+                company_profile_dict = _get_company_profile_dict(db, pid)
+                scoring_payload = simulate_scoring(
+                    criteria_payload,
+                    company_profile=company_profile_dict,
+                    project_id=project_id,
+                )
+                _save_result(db, project_id, "scoring", scoring_payload)
+                results["scoring"] = scoring_payload
+                logger.info(f"[{project_id}] Scoring : note estimée {scoring_payload.get('note_globale_estimee', 'N/A')}/20")
+        except Exception as exc:
+            _report_to_sentry(exc, "scoring")
+            logger.warning(f"[{project_id}] Erreur simulation scoring (non bloquant): {exc}")
+
+    def _run_subcontracting():
+        try:
+            from app.services.subcontracting_analyzer import analyze_subcontracting
+            subcontracting_payload = analyze_subcontracting(project_id, db)
+            if subcontracting_payload and not subcontracting_payload.get("error"):
+                _save_result(db, project_id, "subcontracting", subcontracting_payload,
+                             confidence=subcontracting_payload.get("confidence_overall"))
+                results["subcontracting"] = subcontracting_payload
+                logger.info(f"[{project_id}] Sous-traitance : score risque={subcontracting_payload.get('score_risque', 'N/A')}")
+            else:
+                logger.info(f"[{project_id}] Sous-traitance : données insuffisantes")
+        except Exception as exc:
+            _report_to_sentry(exc, "subcontracting")
+            logger.warning(f"[{project_id}] Erreur analyse sous-traitance (non bloquant): {exc}")
+
+    logger.info(f"[{project_id}] Batch 3 — scoring + sous-traitance en parallèle")
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        scoring_future = executor.submit(_run_scoring)
+        subcontracting_future = executor.submit(_run_subcontracting)
+        scoring_future.result()
+        subcontracting_future.result()
 
     # ── Post-pipeline: self-verification ────────────────────────────────
     try:
