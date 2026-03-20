@@ -38,6 +38,25 @@ def _build_system_blocks(system: str, *, cache: bool = True) -> list[dict] | str
         }
     ]
 
+
+def _build_user_blocks(user: str, *, cache: bool = True) -> list[dict] | str:
+    """Build user message with prompt caching on large content.
+
+    Caches user content (RAG chunks, document text) when it exceeds 1024 chars.
+    This gives ~2x faster TTFT and 90% cheaper input tokens on cache hits.
+    Particularly effective when multiple analyses share similar document chunks
+    within the 5-minute cache window.
+    """
+    if not cache or len(user) < 1024:
+        return user
+    return [
+        {
+            "type": "text",
+            "text": user,
+            "cache_control": {"type": "ephemeral"},
+        }
+    ]
+
 # Exceptions Anthropic qui méritent un retry (transitoires)
 _RETRYABLE_EXCEPTIONS = (
     anthropic_sdk.RateLimitError,
@@ -126,7 +145,7 @@ class LLMService:
             max_tokens=settings.LLM_MAX_TOKENS,
             temperature=settings.LLM_TEMPERATURE,
             system=_build_system_blocks(system),
-            messages=[{"role": "user", "content": user}],
+            messages=[{"role": "user", "content": _build_user_blocks(user)}],
         )
         self._track_usage(response, step="json")
         return self._parse_json_response(response.content[0].text, response.stop_reason)
@@ -221,7 +240,7 @@ class LLMService:
             max_tokens=max_tokens,
             temperature=0.2,
             system=_build_system_blocks(system),
-            messages=[{"role": "user", "content": user}],
+            messages=[{"role": "user", "content": _build_user_blocks(user)}],
         )
         self._track_usage(response, step="chat_text")
         return response.content[0].text
@@ -238,7 +257,7 @@ class LLMService:
                 model=self.model,
                 max_tokens=max_tokens,
                 system=_build_system_blocks(system_prompt),
-                messages=[{"role": "user", "content": user_prompt}],
+                messages=[{"role": "user", "content": _build_user_blocks(user_prompt)}],
             ) as stream:
                 for text in stream.text_stream:
                     yield text
@@ -300,7 +319,7 @@ class LLMService:
                 "budget_tokens": budget,
             },
             system=_build_system_blocks(system),
-            messages=[{"role": "user", "content": user}],
+            messages=[{"role": "user", "content": _build_user_blocks(user)}],
         ) as stream:
             response = stream.get_final_message()
 
