@@ -40,7 +40,7 @@ export const useAuthStore = create<AuthState>()(
         try {
           const { data } = await authApi.login({ email, password });
           Cookies.set("access_token", data.access_token, {
-            expires: 1 / 96, // 15 min
+            expires: 1 / 24, // 60 min
             sameSite: "lax",
             secure: process.env.NODE_ENV === "production",
           });
@@ -62,7 +62,7 @@ export const useAuthStore = create<AuthState>()(
         try {
           const { data: res } = await authApi.register(data);
           Cookies.set("access_token", res.access_token, {
-            expires: 1 / 96,
+            expires: 1 / 24, // 60 min
             sameSite: "lax",
             secure: process.env.NODE_ENV === "production",
           });

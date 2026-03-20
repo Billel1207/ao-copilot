@@ -71,7 +71,7 @@ api.interceptors.response.use(
           { withCredentials: true }
         );
         Cookies.set("access_token", data.access_token, {
-          expires: 1 / 96, // 15 min
+          expires: 1 / 24, // 60 min
           sameSite: "lax",
           secure: process.env.NODE_ENV === "production",
         });
@@ -218,7 +218,7 @@ async function silentRefresh(): Promise<string> {
   if (!res.ok) throw new Error("Refresh failed");
   const data = await res.json();
   Cookies.set("access_token", data.access_token, {
-    expires: 1 / 96, // 15 min
+    expires: 1 / 24, // 60 min
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
   });
