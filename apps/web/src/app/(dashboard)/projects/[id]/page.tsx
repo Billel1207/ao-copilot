@@ -453,6 +453,7 @@ export default function ProjectPage() {
   const { data: project, isLoading: projectLoading } = useProject(projectId);
   const { data: documents } = useDocuments(projectId);
   const { data: summary } = useSummary(projectId, project?.status === "ready");
+  const queryClient = useQueryClient();
   const triggerAnalysis = useTriggerAnalysis(projectId);
   const deleteDocument = useDeleteDocument(projectId);
 
