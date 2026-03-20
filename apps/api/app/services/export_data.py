@@ -27,7 +27,9 @@ class DictObj:
 
     def __init__(self, d: dict | None):
         self._keys: set = set()
-        for k, v in (d or {}).items():
+        if not isinstance(d, dict):
+            return  # Graceful: non-dict input → empty object
+        for k, v in d.items():
             self._keys.add(k)
             if isinstance(v, list):
                 setattr(self, k, [DictObj(i) if isinstance(i, dict) else i for i in v])

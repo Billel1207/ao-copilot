@@ -139,8 +139,8 @@ def generate_export_pdf(db: Session, project_id: str) -> bytes:
             confidence=data.confidence,
             days_remaining=data.days_remaining,
             scoring_simulation=DictObj(data.scoring) if data.scoring else None,
-            ccag_derogations=[DictObj(d) for d in data.ccag_derogations] if data.ccag_derogations else None,
-            ccap_clauses_risquees=[DictObj(c) for c in data.ccap_clauses_risquees] if data.ccap_clauses_risquees else None,
+            ccag_derogations=[DictObj(d) if isinstance(d, dict) else DictObj({}) for d in data.ccag_derogations] if isinstance(data.ccag_derogations, list) and data.ccag_derogations else None,
+            ccap_clauses_risquees=[DictObj(c) if isinstance(c, dict) else DictObj({}) for c in data.ccap_clauses_risquees] if isinstance(data.ccap_clauses_risquees, list) and data.ccap_clauses_risquees else None,
             rc_analysis=DictObj(data.rc_analysis) if data.rc_analysis else None,
             questions_list=[DictObj(q) if isinstance(q, dict) else q for q in data.questions] if data.questions else None,
             documents_inventory=[DictObj(d) for d in documents_inventory] if documents_inventory else None,
@@ -150,7 +150,7 @@ def generate_export_pdf(db: Session, project_id: str) -> bytes:
             ae_analysis=DictObj(data.ae_analysis) if data.ae_analysis else None,
             dc_check=DictObj(data.dc_check) if data.dc_check else None,
             conflicts=DictObj(data.conflicts) if data.conflicts else None,
-            dpgf_pricing=[DictObj(line) for line in data.dpgf_pricing] if data.dpgf_pricing else None,
+            dpgf_pricing=[DictObj(line) if isinstance(line, dict) else DictObj({}) for line in data.dpgf_pricing] if isinstance(data.dpgf_pricing, list) and data.dpgf_pricing else None,
             glossaire_btp=data.glossaire_btp,
             generated_at=datetime.now().strftime("%d/%m/%Y %H:%M"),
             generation_date=datetime.now().strftime("%d/%m/%Y"),
@@ -167,7 +167,7 @@ def generate_export_pdf(db: Session, project_id: str) -> bytes:
         output = BytesIO()
         result = pisa.CreatePDF(html_content, dest=output, encoding="utf-8")
         if result.err:
-            raise RuntimeError(f"xhtml2pdf errors: {result.err}")
+            logger.warning("xhtml2pdf_warnings", count=result.err, project_id=project_id)
         return output.getvalue()
     except Exception as exc:
         logger.error("pdf_generation_error", project_id=project_id, error=str(exc))
