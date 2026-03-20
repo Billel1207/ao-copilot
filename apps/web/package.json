@@ -45,17 +45,17 @@
     "tailwindcss": "^3.4.16",
     "typescript": "^5.7.2",
     "zod": "^3.23.8",
-    "zustand": "^5.0.2"
+    "zustand": "^5.0.2",
+    "@types/js-cookie": "^3.0.6",
+    "@types/node": "^22.10.2",
+    "@types/react": "^18.3.17",
+    "@types/react-dom": "^18.3.5"
   },
   "devDependencies": {
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.0.0",
     "@testing-library/user-event": "^14.5.2",
-    "@types/js-cookie": "^3.0.6",
-    "@types/node": "^22.10.2",
-    "@types/react": "^18.3.17",
-    "@types/react-dom": "^18.3.5",
     "@vitejs/plugin-react": "^4.3.1",
     "@vitest/coverage-v8": "^1.6.0",
     "eslint": "^8.57.0",
