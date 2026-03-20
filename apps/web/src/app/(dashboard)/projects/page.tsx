@@ -4,11 +4,14 @@ import Link from "next/link";
 import {
   Plus, Search, FolderOpen, Clock, CheckCircle2,
   Loader2, AlertCircle, ChevronRight, FileText, Calendar,
-  ArrowUpDown
+  ArrowUpDown, Trash2
 } from "lucide-react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useProjects } from "@/hooks/useProjects";
+import { projectsApi } from "@/lib/api";
 import { formatDate, cn } from "@/lib/utils";
 import { ProjectListSkeleton } from "@/components/common/Skeleton";
+import { toast } from "sonner";
 
 // ── Types & config ────────────────────────────────────────────────────────
 
@@ -40,7 +43,7 @@ const STATUS_FILTERS = [
 
 // ── Project Card ──────────────────────────────────────────────────────────
 
-function ProjectCard({ project }: { project: Project }) {
+function ProjectCard({ project, onDelete }: { project: Project; onDelete: (id: string) => void }) {
   const cfg = STATUS_CONFIG[project.status] ?? STATUS_CONFIG.draft;
   const deadline = project.submission_deadline ? new Date(project.submission_deadline) : null;
   const daysLeft = deadline ? Math.ceil((deadline.getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : null;
@@ -89,7 +92,20 @@ function ProjectCard({ project }: { project: Project }) {
             </div>
           </div>
 
-          <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-primary-400 flex-shrink-0 mt-0.5 transition-colors" />
+          <div className="flex items-center gap-2 flex-shrink-0 mt-0.5">
+            <button
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onDelete(project.id);
+              }}
+              className="p-1.5 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors opacity-0 group-hover:opacity-100"
+              title="Supprimer ce projet"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+            <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-primary-400 transition-colors" />
+          </div>
         </div>
       </div>
     </Link>
@@ -112,6 +128,18 @@ export default function ProjectsPage() {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [sortBy, setSortBy] = useState<SortKey>("");
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+
+  const deleteProject = useMutation({
+    mutationFn: (id: string) => projectsApi.delete(id),
+    onSuccess: () => {
+      toast.success("Projet supprimé");
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
+      setConfirmDeleteId(null);
+    },
+    onError: () => toast.error("Impossible de supprimer le projet"),
+  });
 
   // Debounce 300ms — envoie la recherche au serveur seulement après pause
   useEffect(() => {
@@ -227,7 +255,46 @@ export default function ProjectsPage() {
         </div>
       ) : (
         <div className="space-y-2">
-          {filtered.map(p => <ProjectCard key={p.id} project={p} />)}
+          {filtered.map(p => (
+            <ProjectCard key={p.id} project={p} onDelete={(id) => setConfirmDeleteId(id)} />
+          ))}
+        </div>
+      )}
+
+      {/* ── Modale de confirmation suppression ── */}
+      {confirmDeleteId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 animate-fade-in">
+          <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full mx-4 p-6 animate-slide-up">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
+                <Trash2 className="w-5 h-5 text-red-600" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-slate-900">Supprimer ce projet ?</h3>
+                <p className="text-sm text-slate-500">
+                  {projects.find(p => p.id === confirmDeleteId)?.title}
+                </p>
+              </div>
+            </div>
+            <p className="text-sm text-slate-500 mb-6">
+              Cette action est irréversible. Tous les documents et analyses associés seront définitivement supprimés.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setConfirmDeleteId(null)}
+                className="px-4 py-2 text-sm font-medium text-slate-600 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={() => deleteProject.mutate(confirmDeleteId)}
+                disabled={deleteProject.isPending}
+                className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
+              >
+                {deleteProject.isPending ? "Suppression..." : "Supprimer"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
