@@ -115,6 +115,42 @@ async def trigger_analysis(
     return response
 
 
+@router.post("/{project_id}/analyze/cancel")
+async def cancel_analysis(
+    project_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    org: Organization = Depends(get_current_org),
+):
+    """Annule une analyse en cours — remet le projet en statut 'extracted'.
+
+    Permet à l'utilisateur d'ajouter des documents manquants avant de relancer.
+    Tente aussi de révoquer la tâche Celery si elle est encore en attente.
+    """
+    project = await _get_project_or_404(project_id, org.id, db)
+
+    if project.status != "analyzing":
+        return {"message": "Aucune analyse en cours", "status": project.status}
+
+    # Tenter de révoquer la tâche Celery
+    try:
+        redis = get_redis()
+        task_id = redis.get(f"project_task:{project_id}")
+        if task_id:
+            from app.worker.celery_app import celery_app
+            celery_app.control.revoke(task_id, terminate=True)
+            redis.delete(f"project_task:{project_id}")
+            logger.info(f"[{project_id}] Tâche Celery {task_id} révoquée")
+    except Exception as e:
+        logger.warning(f"[{project_id}] Impossible de révoquer la tâche Celery: {e}")
+
+    # Remettre le statut à "extracted"
+    project.status = "extracted"
+    await db.flush()
+
+    return {"message": "Analyse annulée", "status": "extracted", "project_id": str(project_id)}
+
+
 @router.get("/{project_id}/analyze/status", response_model=AnalysisStatusOut)
 async def get_analysis_status(
     project_id: uuid.UUID,

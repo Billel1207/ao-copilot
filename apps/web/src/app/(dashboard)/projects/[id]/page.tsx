@@ -8,14 +8,14 @@ import {
   AlertCircle, Zap, RefreshCw, MessageSquare, Calendar,
   TrendingUp, Eye, X, ShieldAlert, Trophy, ThumbsDown, Ban, Pencil,
   ScrollText, FileCheck, GitCompareArrows, HelpCircle, BarChart3, DollarSign,
-  Wrench, Wallet, Users, Trash2,
+  Wrench, Wallet, Users, Trash2, StopCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useProject } from "@/hooks/useProjects";
 import { useDocuments, useDeleteDocument } from "@/hooks/useDocuments";
 import { useSummary, useTriggerAnalysis } from "@/hooks/useAnalysis";
-import { documentsApi, projectsApi } from "@/lib/api";
+import { analysisApi, documentsApi, projectsApi } from "@/lib/api";
 import { SummaryTab }   from "@/components/summary/SummaryTab";
 import { ChecklistTab } from "@/components/checklist/ChecklistTab";
 import { CriteriaTab }  from "@/components/criteria/CriteriaTab";
@@ -486,6 +486,15 @@ export default function ProjectPage() {
     </div>
   );
 
+  const cancelAnalysis = useMutation({
+    mutationFn: () => analysisApi.cancel(projectId),
+    onSuccess: () => {
+      toast.success("Analyse annulée — vous pouvez modifier vos documents");
+      queryClient.invalidateQueries({ queryKey: ["project", projectId] });
+    },
+    onError: () => toast.error("Impossible d'annuler l'analyse"),
+  });
+
   const canAnalyze = (documents?.length || 0) > 0 && !["analyzing", "processing"].includes(project.status);
   const isReady = project.status === "ready";
 
@@ -555,10 +564,21 @@ export default function ProjectPage() {
             <ProgressAnalysis status={project.status} />
 
             {project.status === "analyzing" && (
-              <span className="flex items-center gap-1.5 text-xs text-amber-700 bg-amber-50 px-3 py-1.5 rounded-full border border-amber-200">
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                Analyse en cours…
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="flex items-center gap-1.5 text-xs text-amber-700 bg-amber-50 px-3 py-1.5 rounded-full border border-amber-200">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  Analyse en cours…
+                </span>
+                <button
+                  onClick={() => cancelAnalysis.mutate()}
+                  disabled={cancelAnalysis.isPending}
+                  className="flex items-center gap-1 text-xs text-red-600 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-full border border-red-200 transition-colors disabled:opacity-50"
+                  title="Annuler l'analyse pour modifier les documents"
+                >
+                  <StopCircle className="w-3.5 h-3.5" />
+                  Annuler
+                </button>
+              </div>
             )}
 
             {canAnalyze && (
@@ -745,7 +765,7 @@ export default function ProjectPage() {
                       <button
                         onClick={() => handleDeleteDoc(doc.id, doc.original_name)}
                         disabled={deleteDocument.isPending}
-                        className="p-1.5 rounded-lg text-slate-400 hover:text-danger-600 hover:bg-danger-50 transition-colors disabled:opacity-50"
+                        className="p-1.5 rounded-lg text-red-400 hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
                         title="Supprimer ce document"
                       >
                         <Trash2 className="w-4 h-4" />

@@ -148,6 +148,7 @@ export const documentsApi = {
 export const analysisApi = {
   trigger: (projectId: string) => api.post(`/projects/${projectId}/analyze`, {}, { timeout: 120_000 }),
   status: (projectId: string) => api.get(`/projects/${projectId}/analyze/status`),
+  cancel: (projectId: string) => api.post(`/projects/${projectId}/analyze/cancel`),
   summary: (projectId: string) => api.get(`/projects/${projectId}/summary`),
   checklist: (projectId: string, params?: { criticality?: string; status?: string; category?: string }) =>
     api.get(`/projects/${projectId}/checklist`, { params }),
