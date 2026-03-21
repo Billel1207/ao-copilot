@@ -11,6 +11,7 @@ import pytest
 from io import BytesIO
 from unittest.mock import MagicMock, patch, PropertyMock
 from dataclasses import dataclass, field
+from datetime import datetime, timedelta
 
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
@@ -22,6 +23,8 @@ class MockProject:
     status: str = "ready"
     org_id: str = "00000000-0000-0000-0000-000000000001"
     buyer: str = "Ville de Lyon"
+    submission_deadline: datetime = field(default_factory=lambda: datetime(2026, 7, 15, 12, 0))
+    estimated_value: int = 1_500_000
 
 
 @dataclass
@@ -72,9 +75,18 @@ def _make_export_data(**overrides):
                 "location": "Lyon (69)",
                 "market_type": "travaux",
             },
-            "key_points": ["Délai 12 mois", "Lot unique"],
-            "risks": ["Pénalités élevées", "Accès chantier restreint"],
-            "actions_next_48h": ["Visiter le site", "Demander variante"],
+            "key_points": [
+                {"point": "Délai 12 mois", "importance": "high"},
+                {"point": "Lot unique", "importance": "medium"},
+            ],
+            "risks": [
+                {"risk": "Pénalités élevées", "severity": "high", "why": "1/1000 par jour"},
+                {"risk": "Accès chantier restreint", "severity": "medium", "why": "Zone urbaine"},
+            ],
+            "actions_next_48h": [
+                {"action": "Visiter le site", "priority": "P0", "owner_role": "Chef de projet"},
+                {"action": "Demander variante", "priority": "P1", "owner_role": "BE"},
+            ],
         },
         criteria={"evaluation": {"scoring_criteria": [
             {"name": "Prix", "weight": 40, "estimated_score": 75},
@@ -118,8 +130,9 @@ def _make_export_data(**overrides):
 class TestGenerateMemoTechnique:
     """Tests pour generate_memo_technique()."""
 
+    @patch("app.services.memo_exporter._insert_company_logo", return_value=False)
     @patch("app.services.memo_exporter.fetch_export_data")
-    def test_generates_valid_docx_bytes(self, mock_fetch):
+    def test_generates_valid_docx_bytes(self, mock_fetch, mock_logo):
         """Le résultat est un fichier DOCX valide (commence par PK — ZIP)."""
         from app.services.memo_exporter import generate_memo_technique
 
@@ -143,8 +156,9 @@ class TestGenerateMemoTechnique:
         # DOCX = ZIP file → starts with PK
         assert result[:2] == b"PK"
 
+    @patch("app.services.memo_exporter._insert_company_logo", return_value=False)
     @patch("app.services.memo_exporter.fetch_export_data")
-    def test_works_without_llm(self, mock_fetch):
+    def test_works_without_llm(self, mock_fetch, mock_logo):
         """La mémo se génère même si le service LLM est indisponible."""
         from app.services.memo_exporter import generate_memo_technique
 
@@ -163,8 +177,9 @@ class TestGenerateMemoTechnique:
         assert isinstance(result, bytes)
         assert result[:2] == b"PK"
 
+    @patch("app.services.memo_exporter._insert_company_logo", return_value=False)
     @patch("app.services.memo_exporter.fetch_export_data")
-    def test_works_without_company_profile(self, mock_fetch):
+    def test_works_without_company_profile(self, mock_fetch, mock_logo):
         """La mémo se génère même sans profil entreprise."""
         from app.services.memo_exporter import generate_memo_technique
 
@@ -180,8 +195,9 @@ class TestGenerateMemoTechnique:
         assert isinstance(result, bytes)
         assert result[:2] == b"PK"
 
+    @patch("app.services.memo_exporter._insert_company_logo", return_value=False)
     @patch("app.services.memo_exporter.fetch_export_data")
-    def test_works_with_minimal_data(self, mock_fetch):
+    def test_works_with_minimal_data(self, mock_fetch, mock_logo):
         """La mémo se génère avec un minimum de données."""
         from app.services.memo_exporter import generate_memo_technique
 
@@ -204,8 +220,9 @@ class TestGenerateMemoTechnique:
         assert isinstance(result, bytes)
         assert len(result) > 0
 
+    @patch("app.services.memo_exporter._insert_company_logo", return_value=False)
     @patch("app.services.memo_exporter.fetch_export_data")
-    def test_docx_contains_project_title(self, mock_fetch):
+    def test_docx_contains_project_title(self, mock_fetch, mock_logo):
         """Le document contient le titre du projet dans le texte."""
         from app.services.memo_exporter import generate_memo_technique
         from docx import Document as DocxDocument
@@ -223,8 +240,9 @@ class TestGenerateMemoTechnique:
         all_text = " ".join([p.text for p in doc.paragraphs])
         assert "Rénovation Collège Victor Hugo" in all_text
 
+    @patch("app.services.memo_exporter._insert_company_logo", return_value=False)
     @patch("app.services.memo_exporter.fetch_export_data")
-    def test_docx_contains_company_name(self, mock_fetch):
+    def test_docx_contains_company_name(self, mock_fetch, mock_logo):
         """Le document contient le nom de l'entreprise."""
         from app.services.memo_exporter import generate_memo_technique
         from docx import Document as DocxDocument
@@ -246,8 +264,9 @@ class TestGenerateMemoTechnique:
 class TestMemoRobustness:
     """Tests de robustesse memo."""
 
+    @patch("app.services.memo_exporter._insert_company_logo", return_value=False)
     @patch("app.services.memo_exporter.fetch_export_data")
-    def test_empty_scoring_criteria(self, mock_fetch):
+    def test_empty_scoring_criteria(self, mock_fetch, mock_logo):
         """Pas de crash avec des critères de scoring vides."""
         from app.services.memo_exporter import generate_memo_technique
 
@@ -262,8 +281,9 @@ class TestMemoRobustness:
         result = generate_memo_technique(mock_db, "test-project-id")
         assert isinstance(result, bytes)
 
+    @patch("app.services.memo_exporter._insert_company_logo", return_value=False)
     @patch("app.services.memo_exporter.fetch_export_data")
-    def test_none_risks_list(self, mock_fetch):
+    def test_none_risks_list(self, mock_fetch, mock_logo):
         """Pas de crash avec une liste de risques None."""
         from app.services.memo_exporter import generate_memo_technique
 

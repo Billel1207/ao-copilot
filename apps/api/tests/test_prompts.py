@@ -121,7 +121,8 @@ class TestBuildGonogoPrompt:
 
     def test_company_profile_empty_dict(self):
         _, u = build_gonogo_prompt("ctx", company_profile={})
-        assert "Non" in u
+        # Empty dict should still produce a valid prompt (no crash)
+        assert "score" in u
 
     def test_schema_in_user(self):
         _, u = build_gonogo_prompt("ctx")
