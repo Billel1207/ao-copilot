@@ -18,7 +18,7 @@ interface AuthState {
   isLoading: boolean;
   isAuthenticated: boolean;
   error: string | null;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string, rememberMe?: boolean) => Promise<void>;
   register: (data: { email: string; password: string; full_name: string; org_name: string }) => Promise<void>;
   logout: () => Promise<void>;
   fetchMe: () => Promise<void>;
@@ -35,12 +35,12 @@ export const useAuthStore = create<AuthState>()(
 
       clearError: () => set({ error: null }),
 
-      login: async (email, password) => {
+      login: async (email, password, rememberMe = false) => {
         set({ isLoading: true, error: null });
         try {
           const { data } = await authApi.login({ email, password });
           Cookies.set("access_token", data.access_token, {
-            expires: 1 / 24, // 60 min
+            expires: rememberMe ? 7 : 1 / 24, // 7 jours si "Rester connecté", sinon 60 min
             sameSite: "lax",
             secure: process.env.NODE_ENV === "production",
           });

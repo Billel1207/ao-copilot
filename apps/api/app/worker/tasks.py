@@ -153,7 +153,7 @@ def _check_and_trigger_analysis(db, project_id: str):
         analyze_project.delay(project_id)
 
 
-@celery_app.task(bind=True, name="analyze_project", max_retries=0, time_limit=900, soft_time_limit=840)
+@celery_app.task(bind=True, name="analyze_project", max_retries=0, time_limit=1200, soft_time_limit=1140)
 def analyze_project(self, project_id: str):
     """Pipeline IA complet 15 étapes : résumé, checklist, critères, Go/No-Go,
     timeline, CCAP, RC, AE, CCTP, DC, conflits, questions, scoring, cashflow.

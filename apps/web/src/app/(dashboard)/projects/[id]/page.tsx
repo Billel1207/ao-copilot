@@ -457,6 +457,16 @@ export default function ProjectPage() {
   const triggerAnalysis = useTriggerAnalysis(projectId);
   const deleteDocument = useDeleteDocument(projectId);
 
+  // ⚠ All hooks MUST be above early returns (React Rules of Hooks)
+  const cancelAnalysis = useMutation({
+    mutationFn: () => analysisApi.cancel(projectId),
+    onSuccess: () => {
+      toast.success("Analyse annulée — vous pouvez modifier vos documents");
+      queryClient.invalidateQueries({ queryKey: ["project", projectId] });
+    },
+    onError: () => toast.error("Impossible d'annuler l'analyse"),
+  });
+
   const handleDeleteDoc = (docId: string, docName: string) => {
     if (!confirm(`Supprimer « ${docName} » ? Cette action est irréversible.`)) return;
     deleteDocument.mutate(docId, {
@@ -486,15 +496,6 @@ export default function ProjectPage() {
       <Link href="/dashboard" className="btn-secondary text-sm">Retour au tableau de bord</Link>
     </div>
   );
-
-  const cancelAnalysis = useMutation({
-    mutationFn: () => analysisApi.cancel(projectId),
-    onSuccess: () => {
-      toast.success("Analyse annulée — vous pouvez modifier vos documents");
-      queryClient.invalidateQueries({ queryKey: ["project", projectId] });
-    },
-    onError: () => toast.error("Impossible d'annuler l'analyse"),
-  });
 
   const canAnalyze = (documents?.length || 0) > 0 && !["analyzing", "processing"].includes(project.status);
   const isReady = project.status === "ready";

@@ -37,6 +37,7 @@ const FEATURES = [
 export default function LoginPage() {
   const router = useRouter();
   const { login, isLoading } = useAuthStore();
+  const [rememberMe, setRememberMe] = useState(false);
   const {
     register,
     handleSubmit,
@@ -45,7 +46,7 @@ export default function LoginPage() {
 
   const onSubmit = async (data: FormData) => {
     try {
-      await login(data.email, data.password);
+      await login(data.email, data.password, rememberMe);
       router.push("/dashboard");
     } catch {
       toast.error("Email ou mot de passe incorrect");
@@ -163,6 +164,20 @@ export default function LoginPage() {
                   <span>⚠</span> {errors.password.message}
                 </p>
               )}
+            </div>
+
+            {/* Rester connecté */}
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="rememberMe"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                className="w-4 h-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500 cursor-pointer"
+              />
+              <label htmlFor="rememberMe" className="text-sm text-slate-600 cursor-pointer select-none">
+                Rester connecté
+              </label>
             </div>
 
             <button

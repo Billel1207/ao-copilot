@@ -379,25 +379,41 @@ def run_full_analysis(db: Session, project_id: str) -> dict:
             executor.submit(_run_in_thread, fn, name, project_id): name
             for name, fn in batch1_steps.items()
         }
-        for future in as_completed(futures, timeout=180):  # 3 min max par batch
-            step_name = futures[future]
-            try:
-                _, result = future.result(timeout=120)  # 2 min max par step
-                if result is not None:
-                    results[step_name] = result
-                else:
-                    # Only summary is truly critical (needed for everything else)
+        try:
+            for future in as_completed(futures, timeout=300):  # 5 min max par batch
+                step_name = futures[future]
+                try:
+                    _, result = future.result(timeout=180)  # 3 min max par step
+                    if result is not None:
+                        results[step_name] = result
+                    else:
+                        if step_name in ("summary",):
+                            raise RuntimeError(f"Étape critique '{step_name}' a échoué")
+                except TimeoutError:
+                    logger.error(f"[{project_id}] Étape {step_name} timeout après 3 min")
                     if step_name in ("summary",):
-                        raise RuntimeError(f"Étape critique '{step_name}' a échoué")
-            except TimeoutError:
-                logger.error(f"[{project_id}] Étape {step_name} timeout après 3 min")
-                if step_name in ("summary",):
-                    raise RuntimeError(f"Étape critique '{step_name}' timeout")
-            except Exception as exc:
-                if step_name in ("summary",):
-                    logger.error(f"[{project_id}] Étape critique {step_name} échouée: {exc}")
-                    raise
-                logger.warning(f"[{project_id}] Étape {step_name} échouée (non bloquant): {exc}")
+                        raise RuntimeError(f"Étape critique '{step_name}' timeout")
+                except Exception as exc:
+                    if step_name in ("summary",):
+                        logger.error(f"[{project_id}] Étape critique {step_name} échouée: {exc}")
+                        raise
+                    logger.warning(f"[{project_id}] Étape {step_name} échouée (non bloquant): {exc}")
+        except TimeoutError:
+            # as_completed() global timeout — log unfinished futures but continue
+            finished = {futures[f] for f in futures if f.done()}
+            unfinished = set(futures.values()) - finished
+            logger.warning(f"[{project_id}] Batch 1 timeout global — terminées: {finished}, non terminées: {unfinished}")
+            # Collect results from finished futures
+            for f, name in futures.items():
+                if f.done() and name not in results:
+                    try:
+                        _, result = f.result(timeout=0)
+                        if result is not None:
+                            results[name] = result
+                    except Exception:
+                        pass
+            if "summary" not in results:
+                raise RuntimeError("Étape critique 'summary' non terminée dans le timeout")
 
     logger.info(f"[{project_id}] Batch 1 terminé — {len([k for k in results if k != 'detected_language'])} analyses")
 
@@ -544,16 +560,30 @@ def run_full_analysis(db: Session, project_id: str) -> dict:
             executor.submit(_run_in_thread, fn, name, project_id): name
             for name, fn in batch2_steps.items()
         }
-        for future in as_completed(futures, timeout=300):  # 5 min max pour batch 2 (9 étapes / 5 workers)
-            step_name = futures[future]
-            try:
-                _, result = future.result(timeout=120)  # 2 min max par step
-                if result is not None:
-                    results[step_name] = result
-            except TimeoutError:
-                logger.error(f"[{project_id}] Étape {step_name} timeout après 3 min — skippée")
-            except Exception as exc:
-                logger.warning(f"[{project_id}] Étape {step_name} échouée (non bloquant): {exc}")
+        try:
+            for future in as_completed(futures, timeout=480):  # 8 min max pour batch 2 (9 étapes / 5 workers)
+                step_name = futures[future]
+                try:
+                    _, result = future.result(timeout=180)  # 3 min max par step
+                    if result is not None:
+                        results[step_name] = result
+                except TimeoutError:
+                    logger.error(f"[{project_id}] Étape {step_name} timeout après 3 min — skippée")
+                except Exception as exc:
+                    logger.warning(f"[{project_id}] Étape {step_name} échouée (non bloquant): {exc}")
+        except TimeoutError:
+            # as_completed() global timeout — collect whatever finished
+            finished = {futures[f] for f in futures if f.done()}
+            unfinished = set(futures.values()) - finished
+            logger.warning(f"[{project_id}] Batch 2 timeout global — terminées: {finished}, non terminées: {unfinished}")
+            for f, name in futures.items():
+                if f.done() and name not in results:
+                    try:
+                        _, result = f.result(timeout=0)
+                        if result is not None:
+                            results[name] = result
+                    except Exception:
+                        pass
 
     logger.info(f"[{project_id}] Batch 2 terminé — {len([k for k in results if k != 'detected_language'])} analyses cumulées")
 
