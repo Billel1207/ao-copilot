@@ -101,6 +101,7 @@ export function ExportTab({
   const [loadingMemo, setLoadingMemo] = useState(false);
   const [downloadUrlPdf, setDownloadUrlPdf] = useState<string | null>(null);
   const [downloadUrlWord, setDownloadUrlWord] = useState<string | null>(null);
+  const [downloadUrlMemo, setDownloadUrlMemo] = useState<string | null>(null);
   const abortedRef = useRef(false);
   const isReady = projectStatus === "ready";
   const hasProAccess = userPlan === "pro" || userPlan === "europe" || userPlan === "business";
@@ -195,40 +196,16 @@ export function ExportTab({
   };
 
   /**
-   * Téléchargement direct Mémoire Technique : la route retourne un StreamingResponse
-   * (blob .docx), on crée un object URL temporaire pour déclencher le téléchargement.
+   * Mémoire Technique : dispatch via Celery (comme PDF/DOCX) car la génération
+   * inclut 3 appels LLM + charts et peut prendre 30-60 secondes.
    */
-  const downloadMemoTechnique = async () => {
-    if (!isReady) {
-      toast.error("L'analyse doit être terminée avant d'exporter");
-      return;
-    }
-    setLoadingMemo(true);
-    try {
-      const response = await exportApi.startMemo(projectId);
-      const blob = new Blob([response.data as BlobPart], {
-        type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-      });
-      const objectUrl = URL.createObjectURL(blob);
-      const anchor = document.createElement("a");
-      anchor.href = objectUrl;
-      anchor.download = `memo_technique.docx`;
-      document.body.appendChild(anchor);
-      anchor.click();
-      anchor.remove();
-      URL.revokeObjectURL(objectUrl);
-      toast.success("Mémoire technique téléchargée !");
-    } catch (err: unknown) {
-      const axiosError = err as { response?: { status?: number } };
-      if (axiosError?.response?.status === 403) {
-        toast.error("Plan Pro requis pour la mémoire technique.");
-      } else {
-        toast.error("Erreur lors de la génération de la mémoire technique.");
-      }
-    } finally {
-      setLoadingMemo(false);
-    }
-  };
+  const downloadMemoTechnique = () =>
+    pollExport(
+      () => exportApi.startMemo(projectId),
+      setLoadingMemo,
+      setDownloadUrlMemo,
+      "Mémoire technique"
+    );
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -340,8 +317,13 @@ export function ExportTab({
             locked={!hasProAccess}
             lockedMsg="La mémoire technique IA est disponible à partir du plan Pro (179€/mois)."
             action={
-              loadingMemo ? (
-                <GeneratingProgress label="Génération de la mémoire..." />
+              downloadUrlMemo ? (
+                <a href={downloadUrlMemo} download
+                  className="btn-primary inline-flex items-center gap-2">
+                  <Download className="w-4 h-4" /> Télécharger la mémoire
+                </a>
+              ) : loadingMemo ? (
+                <GeneratingProgress label="Génération de la mémoire (IA + charts)..." />
               ) : (
                 <button
                   onClick={downloadMemoTechnique}

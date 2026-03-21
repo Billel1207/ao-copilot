@@ -196,42 +196,11 @@ async def export_memo_technique(
             detail="Analyse non terminée — attendez que le statut soit 'ready'",
         )
 
-    # generate_memo_technique utilise une Session synchrone via run_sync
-    from app.services.memo_exporter import generate_memo_technique
-    import re as _re
+    # Dispatch vers Celery (LLM calls + charts + document = trop long pour un request sync)
+    from app.worker.tasks import export_project_memo
+    task = export_project_memo.delay(str(project_id))
 
-    try:
-        docx_bytes: bytes = await db.run_sync(
-            lambda sync_db: generate_memo_technique(sync_db, str(project_id))
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
-    except RuntimeError as exc:
-        raise HTTPException(status_code=500, detail=str(exc))
-    except Exception as exc:
-        import structlog
-        structlog.get_logger(__name__).error(
-            "memo_generation_failed",
-            project_id=str(project_id),
-            error=str(exc),
-            error_type=type(exc).__name__,
-        )
-        raise HTTPException(
-            status_code=500,
-            detail=f"Erreur lors de la génération de la mémoire technique: {type(exc).__name__}: {exc}",
-        )
-
-    safe_name = _re.sub(r"[^\w\-]", "_", project.reference or project.title)[:60]
-    filename = f"memo_technique_{safe_name}.docx"
-
-    return StreamingResponse(
-        io.BytesIO(docx_bytes),
-        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        headers={
-            "Content-Disposition": f'attachment; filename="{filename}"',
-            "Content-Length": str(len(docx_bytes)),
-        },
-    )
+    return {"job_id": task.id, "status": "pending"}
 
 
 @router.post("/{project_id}/export/pack")

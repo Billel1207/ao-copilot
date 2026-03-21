@@ -463,6 +463,35 @@ def export_project_pack(project_id: str) -> str:
         db.close()
 
 
+@celery_app.task(name="export_project_memo", time_limit=300, soft_time_limit=280)
+def export_project_memo(project_id: str) -> str:
+    """Génère une mémoire technique Word (.docx) et retourne la clé S3."""
+    from app.services.memo_exporter import generate_memo_technique
+    from app.services.storage import storage_service
+    import uuid as uuid_lib
+
+    db = SyncSession()
+    try:
+        docx_bytes = generate_memo_technique(db, project_id)
+        s3_key = f"exports/{project_id}/{uuid_lib.uuid4()}_memo.docx"
+        storage_service.upload_bytes(
+            s3_key,
+            docx_bytes,
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        )
+        return s3_key
+    except Exception as exc:
+        logger.error(
+            "export_project_memo_failed",
+            project_id=project_id,
+            error=str(exc),
+            error_type=type(exc).__name__,
+        )
+        raise RuntimeError(f"Erreur génération mémoire technique: {type(exc).__name__}: {exc}") from exc
+    finally:
+        db.close()
+
+
 @celery_app.task(name="export_project_docx", time_limit=300, soft_time_limit=280)
 def export_project_docx(project_id: str) -> str:
     """Génère un rapport Word (.docx) et retourne la clé S3. Plan Pro requis (vérifié en route)."""

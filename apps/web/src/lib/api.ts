@@ -197,7 +197,7 @@ export const exportApi = {
   startDpgfExcel: (projectId: string) =>
     api.post(`/projects/${projectId}/export/dpgf-excel`, {}, { responseType: "blob" }),
   startMemo: (projectId: string) =>
-    api.post(`/projects/${projectId}/export/memo`, {}, { responseType: "blob" }),
+    api.post(`/projects/${projectId}/export/memo`),
   startPack: (projectId: string) =>
     api.post(`/projects/${projectId}/export/pack`),
   getStatus: (projectId: string, jobId: string) =>
