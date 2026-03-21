@@ -350,7 +350,11 @@ def generate_memo_technique(db: Session, project_id: str) -> bytes:
         ("Acheteur public", project.buyer or "—"),
         ("Référence", project.reference or "—"),
         ("Candidat", org_name),
-        ("Lot(s)", ", ".join(l.get("title", "") for l in rc.get("lots", [])) or "Lot unique"),
+        ("Lot(s)", ", ".join(
+            (l.get("title", "") if isinstance(l, dict) else str(l))
+            for l in (rc.get("lots") or [])
+            if l
+        ) or "Lot unique"),
         ("Date de remise", deadline_str),
         ("Document établi le", datetime.now().strftime("%d/%m/%Y")),
     ]:
@@ -479,8 +483,8 @@ def generate_memo_technique(db: Session, project_id: str) -> bytes:
     id_table = _styled_table(["Rubrique", "Proposition IA", "À compléter / vérifier"])
     id_fields = [
         ("Raison sociale", org_name, "Vérifier"),
-        ("Chiffre d'affaires", f"{company.revenue_eur:,} €".replace(",", " ") if company and company.revenue_eur else "—", "CA dernier exercice clos"),
-        ("Effectif", f"{company.employee_count} salariés" if company and company.employee_count else "—", "Effectif total CDI"),
+        ("Chiffre d'affaires", f"{int(company.revenue_eur):,} €".replace(",", " ") if company and company.revenue_eur else "—", "CA dernier exercice clos"),
+        ("Effectif", f"{company.employee_count} salariés" if company and getattr(company, "employee_count", None) else "—", "Effectif total CDI"),
         ("Forme juridique", "—", "SAS, SARL, SA, etc."),
         ("SIRET", "—", "N° SIRET à 14 chiffres"),
         ("Code APE / NAF", "—", "Code activité"),

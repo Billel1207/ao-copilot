@@ -208,6 +208,18 @@ async def export_memo_technique(
         raise HTTPException(status_code=404, detail=str(exc))
     except RuntimeError as exc:
         raise HTTPException(status_code=500, detail=str(exc))
+    except Exception as exc:
+        import structlog
+        structlog.get_logger(__name__).error(
+            "memo_generation_failed",
+            project_id=str(project_id),
+            error=str(exc),
+            error_type=type(exc).__name__,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erreur lors de la génération de la mémoire technique: {type(exc).__name__}: {exc}",
+        )
 
     safe_name = _re.sub(r"[^\w\-]", "_", project.reference or project.title)[:60]
     filename = f"memo_technique_{safe_name}.docx"

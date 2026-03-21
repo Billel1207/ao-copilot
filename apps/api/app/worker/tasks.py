@@ -2,10 +2,13 @@
 import io
 import uuid
 
+import structlog
 from sqlalchemy import text
 from app.config import settings
 from app.database import SyncSessionLocal as SyncSession
 from app.worker.celery_app import celery_app
+
+logger = structlog.get_logger(__name__)
 
 
 def _set_progress(task_id: str, pct: int, step: str):
@@ -260,6 +263,14 @@ def export_project_pdf(project_id: str) -> str:
         s3_key = f"exports/{project_id}/{uuid_lib.uuid4()}.pdf"
         storage_service.upload_bytes(s3_key, pdf_bytes, "application/pdf")
         return s3_key
+    except Exception as exc:
+        logger.error(
+            "export_project_pdf_failed",
+            project_id=project_id,
+            error=str(exc),
+            error_type=type(exc).__name__,
+        )
+        raise RuntimeError(f"Erreur génération PDF: {type(exc).__name__}: {exc}") from exc
     finally:
         db.close()
 
