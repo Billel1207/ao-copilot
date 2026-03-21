@@ -120,6 +120,10 @@ class CSRFMiddleware(BaseHTTPMiddleware):
         if request.method not in _STATE_CHANGING_METHODS:
             return await call_next(request)
 
+        # Skip in test/development (TestClient doesn't send Origin headers)
+        if settings.APP_ENV in ("development", "test"):
+            return await call_next(request)
+
         # Skip exempt endpoints
         if request.url.path in _CSRF_EXEMPT_PATHS:
             return await call_next(request)
