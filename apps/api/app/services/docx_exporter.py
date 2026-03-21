@@ -168,20 +168,24 @@ def generate_export_docx(db: Session, project_id: str) -> bytes:
     # ── Helper: severity badge text ──────────────────────────────────────
     def _severity_color(sev):
         s = (sev or "").lower()
-        if s in ("high", "fort", "haut", "éliminatoire", "eliminatoire"):
+        if s in ("high", "fort", "haut", "éliminatoire", "eliminatoire", "critique", "defavorable"):
             return RED
         elif s in ("medium", "moyen", "moyenne"):
             return ORANGE
-        elif s in ("low", "bas", "faible"):
+        elif s in ("low", "bas", "faible", "favorable"):
             return GREEN_DARK
+        elif s in ("neutre",):
+            return GRAY
         return GRAY
 
     def _severity_bg(sev):
         s = (sev or "").lower()
-        if s in ("high", "fort", "haut", "éliminatoire", "eliminatoire"):
+        if s in ("high", "fort", "haut", "éliminatoire", "eliminatoire", "critique", "defavorable"):
             return "FEF2F2"
         elif s in ("medium", "moyen", "moyenne"):
             return "FFFBEB"
+        elif s in ("favorable",):
+            return "ECFDF5"
         return None
 
     def _status_color(status):
@@ -611,14 +615,57 @@ def generate_export_docx(db: Session, project_id: str) -> bytes:
         run_sub_rc.font.color.rgb = GRAY
         run_sub_rc.font.size = Pt(9)
         rc_table = _styled_table(["Rubrique", "Détail"])
+        # ── Formatage du groupement (dict → texte lisible) ──
+        groupement_raw = rc.get("groupement")
+        groupement_text = None
+        if isinstance(groupement_raw, dict):
+            parts = []
+            if groupement_raw.get("groupement_autorise"):
+                parts.append("Autorisé")
+            else:
+                parts.append("Non autorisé")
+            forme = groupement_raw.get("forme_imposee")
+            if forme:
+                parts.append(f"forme imposée : {forme}")
+            if groupement_raw.get("mandataire_solidaire"):
+                parts.append("mandataire solidaire")
+            details = groupement_raw.get("details")
+            if details and len(str(details)) < 300:
+                parts.append(str(details))
+            groupement_text = ". ".join(parts)
+        elif groupement_raw:
+            groupement_text = str(groupement_raw)
+
+        # ── Sous-traitance (support clés RC analyzer) ──
+        sous_trait_raw = rc.get("sous_traitance") or {}
+        if isinstance(sous_trait_raw, dict):
+            st_autorisee = sous_trait_raw.get("sous_traitance_autorisee", False)
+            st_details = sous_trait_raw.get("details")
+            sous_trait_text = "Autorisée" if st_autorisee else "Non autorisée"
+            restrictions = sous_trait_raw.get("restrictions", [])
+            if restrictions:
+                sous_trait_text += f" ({', '.join(str(r) for r in restrictions[:3])})"
+            elif st_details:
+                sous_trait_text += f" — {str(st_details)[:150]}"
+        else:
+            st_autorisee = rc.get("subcontracting_allowed") or rc.get("sous_traitance_autorisee")
+            sous_trait_text = "Autorisée" if st_autorisee else "Non autorisée"
+
+        # ── Visite obligatoire (support clés RC analyzer + summary) ──
+        visite_obligatoire = (
+            rc.get("visite_site_obligatoire")
+            or rc.get("visite_obligatoire")
+            or po.get("site_visit_required")
+        )
+
         rc_fields = [
             ("Procédure", rc.get("procedure_type")),
-            ("Allotissement", rc.get("allotissement")),
-            ("Groupement", rc.get("groupement")),
-            ("Variantes", rc.get("variantes")),
-            ("Sous-traitance", "Autorisée" if rc.get("subcontracting_allowed") else "Non autorisée"),
-            ("CCAG de référence", rc.get("ccag_reference")),
-            ("Visite obligatoire", "Oui" if rc.get("visite_obligatoire") else "Non"),
+            ("Allotissement", rc.get("allotissement") or po.get("allotissement")),
+            ("Groupement", groupement_text),
+            ("Variantes", "Autorisées" if rc.get("variantes_autorisees") else rc.get("variantes")),
+            ("Sous-traitance", sous_trait_text),
+            ("CCAG de référence", rc.get("ccag_reference") or po.get("ccag_reference")),
+            ("Visite obligatoire", "Oui" if visite_obligatoire else "Non"),
             ("DUME requis", "Oui" if rc.get("dume_required") else "Non"),
         ]
         for label, value in rc_fields:
@@ -794,16 +841,34 @@ def generate_export_docx(db: Session, project_id: str) -> bytes:
             row = d_table.add_row().cells
             _set_cell_text(row[0], d.get("article_ccag") or d.get("article") or "—",
                           bold=True, size=Pt(9))
-            _set_cell_text(row[1], d.get("derogation", "—"), size=Pt(9))
+            # Support clés RC/CCAP analyzer: description, valeur_ccap, valeur_ccag
+            derog_text = (d.get("derogation")
+                         or d.get("description")
+                         or d.get("valeur_ccap")
+                         or "—")
+            if derog_text != "—" and d.get("valeur_ccag"):
+                derog_text = f"CCAG : {d['valeur_ccag']} → CCAP : {derog_text}"
+            _set_cell_text(row[1], derog_text, size=Pt(9))
+            # Support clés: severity, impact (DEFAVORABLE/FAVORABLE/NEUTRE)
             sev = d.get("severity") or d.get("impact") or "—"
-            sev_label = {"high": "FORT", "medium": "MOYEN", "low": "BAS",
-                        "fort": "FORT", "moyen": "MOYEN"}.get(sev.lower() if isinstance(sev, str) else sev, sev.upper() if isinstance(sev, str) else str(sev))
+            sev_map = {"high": "FORT", "medium": "MOYEN", "low": "BAS",
+                       "fort": "FORT", "moyen": "MOYEN", "bas": "BAS",
+                       "defavorable": "DEFAVORABLE", "favorable": "FAVORABLE",
+                       "neutre": "NEUTRE"}
+            sev_label = sev_map.get(sev.lower() if isinstance(sev, str) else "", sev.upper() if isinstance(sev, str) else str(sev))
             _set_cell_text(row[2], sev_label, bold=True,
                           color=_severity_color(sev), size=Pt(9))
             bg = _severity_bg(sev)
             if bg:
                 _shade_cell(row[2], bg)
-            _set_cell_text(row[3], d.get("evaluation") or d.get("risk_comment") or "—", size=Pt(9))
+            eval_text = (d.get("evaluation")
+                        or d.get("risk_comment")
+                        or d.get("description")
+                        or "—")
+            # Avoid duplicating text already in derog column
+            if eval_text == derog_text or (d.get("valeur_ccap") and eval_text == d.get("valeur_ccap")):
+                eval_text = d.get("description") or "—"
+            _set_cell_text(row[3], eval_text, size=Pt(9))
 
         doc.add_page_break()
 
@@ -816,12 +881,22 @@ def generate_export_docx(db: Session, project_id: str) -> bytes:
         cr_table = _styled_table(["Clause", "Risque", "Sévérité", "Recommandation"])
         for cl in clauses_risquees[:15]:
             row = cr_table.add_row().cells
-            _set_cell_text(row[0], cl.get("clause") or cl.get("article") or "—", bold=True, size=Pt(9))
-            _set_cell_text(row[1], cl.get("risk") or cl.get("risk_description") or "—", size=Pt(9))
-            sev = cl.get("severity") or "—"
-            _set_cell_text(row[2], sev.upper() if isinstance(sev, str) else str(sev),
+            # Support clés CCAP analyzer: article_reference, clause_text, risk_level, risk_type, conseil
+            _set_cell_text(row[0],
+                          cl.get("clause") or cl.get("article_reference") or cl.get("article") or "—",
+                          bold=True, size=Pt(9))
+            _set_cell_text(row[1],
+                          cl.get("risk") or cl.get("risk_description") or cl.get("clause_text") or cl.get("risk_type") or "—",
+                          size=Pt(9))
+            sev = cl.get("severity") or cl.get("risk_level") or "—"
+            sev_map = {"critique": "CRITIQUE", "haut": "HAUT", "moyen": "MOYEN", "bas": "BAS",
+                       "high": "FORT", "medium": "MOYEN", "low": "BAS"}
+            sev_label = sev_map.get(sev.lower() if isinstance(sev, str) else "", sev.upper() if isinstance(sev, str) else str(sev))
+            _set_cell_text(row[2], sev_label,
                           bold=True, color=_severity_color(sev), size=Pt(9))
-            _set_cell_text(row[3], cl.get("recommendation") or cl.get("mitigation") or "—", size=Pt(9))
+            _set_cell_text(row[3],
+                          cl.get("recommendation") or cl.get("conseil") or cl.get("mitigation") or "—",
+                          size=Pt(9))
 
         doc.add_page_break()
 
@@ -1345,15 +1420,27 @@ def generate_export_docx(db: Session, project_id: str) -> bytes:
     # ══════════════════════════════════════════════════════════════════════
     if scoring:
         doc.add_heading("16. Simulation note acheteur", 1)
-        total = scoring.get("total_score", 0)
+        total = scoring.get("total_score") or scoring.get("note_globale_estimee") or 0
         max_s = scoring.get("max_score", 20)
 
-        score_p = doc.add_paragraph()
-        score_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        run_sc = score_p.add_run(f"{total:.1f} / {max_s}")
-        run_sc.bold = True
-        run_sc.font.size = Pt(24)
-        run_sc.font.color.rgb = DARK_BLUE
+        # Si le score est 0 et qu'il n'y a pas de critères détaillés,
+        # c'est probablement un défaut d'analyse — afficher un avertissement
+        crit_scores = scoring.get("criteria_scores", [])
+        if total == 0 and not crit_scores:
+            _add_encadre(
+                "⚠ La simulation de notation n'a pas pu être calculée.\n"
+                "Complétez votre profil entreprise (certifications, CA, références) "
+                "pour obtenir une estimation réaliste de votre note.",
+                bg_hex="FFFBEB", border_hex="F59E0B",
+                text_color=ORANGE
+            )
+        else:
+            score_p = doc.add_paragraph()
+            score_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            run_sc = score_p.add_run(f"{total:.1f} / {max_s}")
+            run_sc.bold = True
+            run_sc.font.size = Pt(24)
+            run_sc.font.color.rgb = DARK_BLUE
 
         if scoring.get("rank_estimate"):
             rank_p = doc.add_paragraph()
@@ -1362,7 +1449,6 @@ def generate_export_docx(db: Session, project_id: str) -> bytes:
             run_rk.font.size = Pt(11)
             run_rk.font.color.rgb = GRAY
 
-        crit_scores = scoring.get("criteria_scores", [])
         if crit_scores:
             doc.add_heading("Détail par critère", 2)
             cs_table = _styled_table(["Critère", "Note", "Max", "Commentaire"])

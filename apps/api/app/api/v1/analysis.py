@@ -1376,6 +1376,7 @@ async def get_subcontracting(
     """Analyse de la stratégie de sous-traitance optimale."""
     await _get_project_or_404(project_id, org.id, db)
 
+    # 1. Chercher d'abord en cache Redis
     cache_key = f"subcontracting:{project_id}"
     try:
         cached = get_redis().get(cache_key)
@@ -1384,18 +1385,45 @@ async def get_subcontracting(
     except Exception:
         pass
 
-    from app.services.subcontracting_analyzer import analyze_subcontracting
+    # 2. Chercher un résultat existant en DB (sauvé par le pipeline d'analyse)
     from app.worker.tasks import SyncSession
-
     sync_db = SyncSession()
     try:
-        result = await analyze_subcontracting(str(project_id), sync_db)
+        from app.models.analysis import ExtractionResult as ER
+        existing = sync_db.query(ER).filter_by(
+            project_id=project_id, result_type="subcontracting"
+        ).order_by(ER.version.desc()).first()
+        if existing and existing.payload:
+            result = existing.payload
+            try:
+                get_redis().set(cache_key, json.dumps(result, default=str), ex=3600)
+            except Exception:
+                pass
+            return result
+
+        # 3. Aucun résultat existant — lancer l'analyse à la volée
+        from app.services.subcontracting_analyzer import analyze_subcontracting
+        result = analyze_subcontracting(str(project_id), sync_db)
+
+        try:
+            get_redis().set(cache_key, json.dumps(result, default=str), ex=3600)
+        except Exception:
+            pass
+
+        return result
+    except Exception as exc:
+        import structlog
+        structlog.get_logger(__name__).warning(
+            "subcontracting_analysis_failed", error=str(exc), project_id=str(project_id)
+        )
+        return {
+            "sous_traitance_autorisee": None,
+            "lots_analysis": [],
+            "conflits": [],
+            "recommandations": [],
+            "score_risque": 0,
+            "resume": "Analyse en cours ou données insuffisantes. Relancez l'analyse du projet.",
+            "confidence_overall": 0.0,
+        }
     finally:
         sync_db.close()
-
-    try:
-        get_redis().set(cache_key, json.dumps(result, default=str), ex=3600)
-    except Exception:
-        pass
-
-    return result

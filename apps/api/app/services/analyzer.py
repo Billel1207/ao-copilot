@@ -604,14 +604,44 @@ def run_full_analysis(db: Session, project_id: str) -> dict:
     try:
         ae_data = results.get("ae_analysis", {})
         timeline_data = results.get("timeline", {})
+        summary_data = results.get("summary", {})
+        po_data = summary_data.get("project_overview", {}) if summary_data else {}
+        ccap_data = results.get("ccap_risks", {}) or results.get("ccap", {})
+
+        # Montant HT : essayer AE → puis summary/project_overview → puis CCAP
         montant_ht = _parse_montant(ae_data.get("montant_total_ht"))
+        if not montant_ht or montant_ht <= 0:
+            montant_ht = _parse_montant(po_data.get("estimated_budget"))
         duree_mois = timeline_data.get("execution_duration_months")
+        if not duree_mois or duree_mois <= 0:
+            # Essayer de parser la durée depuis le summary
+            duree_str = po_data.get("duree_marche", "")
+            if duree_str:
+                import re
+                m = re.search(r'(\d+)\s*mois', str(duree_str))
+                if m:
+                    duree_mois = int(m.group(1))
+
+        # Avance : essayer AE → CCAP → summary key_points → default 5%
+        avance_pct = ae_data.get("avance_pct") or ae_data.get("avance_forfaitaire_pct")
+        if not avance_pct:
+            # Chercher dans les key_points du summary si "avance" et un % sont mentionnés
+            for kp in (summary_data.get("key_points") or []):
+                pt = (kp.get("point") or "").lower()
+                if "avance" in pt and "10%" in pt:
+                    avance_pct = 10.0
+                    break
+                elif "avance" in pt and "5%" in pt:
+                    avance_pct = 5.0
+                    break
+        avance_pct = float(avance_pct) if avance_pct else 5.0
+
         if montant_ht and montant_ht > 0 and duree_mois and duree_mois > 0:
             from app.services.cashflow_simulator import simulate_cashflow
             cashflow_payload = simulate_cashflow(
                 montant_total_ht=montant_ht,
                 duree_mois=int(duree_mois),
-                avance_pct=ae_data.get("avance_pct", 5.0) or 5.0,
+                avance_pct=avance_pct,
                 retenue_pct=ae_data.get("retenue_garantie_pct", 5.0) or 5.0,
                 delai_paiement_jours=ae_data.get("delai_paiement_jours", 30) or 30,
             )
@@ -810,14 +840,25 @@ def _get_company_profile_dict(db: Session, project_id: uuid.UUID) -> dict | None
 
 
 def _parse_montant(value) -> float | None:
-    """Parse un montant HT (string ou nombre) en float."""
+    """Parse un montant HT (string ou nombre) en float.
+
+    Gère les formats courants BTP :
+    - "1 331 418,00 €" → 1331418.00
+    - "1 800 000 à 2 500 000 EUR HT" → 1800000.0 (premier montant)
+    - "6 435 000" → 6435000.0
+    """
     if value is None:
         return None
     if isinstance(value, (int, float)):
         return float(value)
-    # Nettoyer : "1 331 418,00 €" → 1331418.00
     import re
-    cleaned = re.sub(r'[^\d,.]', '', str(value))
+    s = str(value).strip()
+    # Si c'est une fourchette "X à Y" ou "X - Y", prendre le premier montant
+    range_match = re.match(r'^([\d\s,.]+)\s*(?:à|–|-|/)\s*([\d\s,.]+)', s)
+    if range_match:
+        s = range_match.group(1).strip()
+    # Nettoyer : "1 331 418,00 €" → 1331418.00
+    cleaned = re.sub(r'[^\d,.]', '', s)
     cleaned = cleaned.replace(',', '.')
     try:
         return float(cleaned)

@@ -98,14 +98,14 @@ def generate_memo_technique(db: Session, project_id: str) -> bytes:
             top_risks=risks[:3],
             company_profile=_company_dict,
         )
-        _memo_intro_text = llm_service.chat_text(sys_p, usr_p, max_tokens=400)
+        _memo_intro_text = llm_service.chat_text(sys_p, usr_p, max_tokens=800)
 
         sys_p, usr_p = build_memo_positioning_prompt(
             company_profile=_company_dict,
             gonogo_dimensions=_gonogo_dims if isinstance(_gonogo_dims, dict) else {},
             eligibility_gaps=gonogo.get("profile_gaps") or [],
         )
-        _memo_positioning_text = llm_service.chat_text(sys_p, usr_p, max_tokens=400)
+        _memo_positioning_text = llm_service.chat_text(sys_p, usr_p, max_tokens=800)
 
         _actions = summary.get("actions_next_48h") or []
         sys_p, usr_p = build_memo_action_plan_prompt(
@@ -113,7 +113,7 @@ def generate_memo_technique(db: Session, project_id: str) -> bytes:
             risks=risks,
             deadline_submission=_deadline_str,
         )
-        _memo_action_plan_text = llm_service.chat_text(sys_p, usr_p, max_tokens=500)
+        _memo_action_plan_text = llm_service.chat_text(sys_p, usr_p, max_tokens=1000)
     except Exception as _llm_err:
         logger.warning("memo_llm_generation_skipped", error=str(_llm_err))
 
@@ -344,11 +344,18 @@ def generate_memo_technique(db: Session, project_id: str) -> bytes:
 
     # Info table
     cover_info = _styled_table(["Information", "Détail"])
-    deadline_str = project.submission_deadline.strftime("%d/%m/%Y") if project.submission_deadline else "—"
+    deadline_str = (
+        project.submission_deadline.strftime("%d/%m/%Y")
+        if project.submission_deadline
+        else po.get("deadline_submission", "—") or "—"
+    )
+    # Fallback sur project_overview pour les champs manquants du projet
+    _buyer = project.buyer or po.get("buyer") or "—"
+    _reference = project.reference or po.get("reference") or "—"
     for label, value in [
         ("Marché", project.title),
-        ("Acheteur public", project.buyer or "—"),
-        ("Référence", project.reference or "—"),
+        ("Acheteur public", _buyer),
+        ("Référence", _reference),
         ("Candidat", org_name),
         ("Lot(s)", ", ".join(
             (l.get("title", "") if isinstance(l, dict) else str(l))
