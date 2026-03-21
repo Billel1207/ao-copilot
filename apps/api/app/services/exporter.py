@@ -118,7 +118,9 @@ def generate_export_pdf(db: Session, project_id: str) -> bytes:
     documents_inventory = _build_documents_inventory(data.documents)
 
     # ── Jinja2 environment ──
-    env = Environment(loader=BaseLoader(), autoescape=True)
+    # autoescape=False : ce template est interne (pas de contenu utilisateur non-sanitisé)
+    # et xhtml2pdf a besoin du CSS brut (les quotes dans font-family sont corrompues par autoescape)
+    env = Environment(loader=BaseLoader(), autoescape=False)
     env.filters['datefr'] = _format_date_fr
     env.filters['trunc'] = _safe_truncate
     template = env.from_string(EXPORT_TEMPLATE)
