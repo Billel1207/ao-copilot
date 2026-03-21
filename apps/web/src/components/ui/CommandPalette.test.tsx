@@ -13,6 +13,9 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: mockPush }),
 }));
 
+// Mock scrollIntoView (not available in jsdom)
+Element.prototype.scrollIntoView = vi.fn();
+
 // ── Setup ─────────────────────────────────────────────────────────────────
 
 beforeEach(() => {

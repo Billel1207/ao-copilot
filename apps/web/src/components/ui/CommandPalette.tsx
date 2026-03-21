@@ -71,14 +71,13 @@ export function CommandPalette() {
     }
   }, [open]);
 
-  // ── Fuzzy filter ──
+  // ── Substring filter ──
   const filtered = useMemo(() => {
     if (!query.trim()) return COMMANDS;
     const q = query.toLowerCase();
     return COMMANDS.filter((cmd) => {
-      const haystack = [cmd.label, ...(cmd.keywords ?? [])].join(" ").toLowerCase();
-      return q.split("").every((char) => haystack.includes(char)) &&
-        haystack.includes(q.charAt(0));
+      const haystack = [cmd.label, cmd.id, ...(cmd.keywords ?? [])].join(" ").toLowerCase();
+      return haystack.includes(q);
     });
   }, [query]);
 
