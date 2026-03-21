@@ -9,6 +9,40 @@ from app.services.export_data import fetch_export_data
 logger = structlog.get_logger(__name__)
 
 
+def _insert_company_logo(doc, org_id) -> bool:
+    """Insert company logo from S3 into the document header. Returns True if inserted."""
+    try:
+        import uuid
+        from app.models.company_profile import CompanyProfile
+        from app.services.storage import storage_service
+        from app.core.database import SyncSessionLocal
+        from docx.shared import Mm
+
+        db_local = SyncSessionLocal()
+        try:
+            profile = db_local.query(CompanyProfile).filter_by(
+                org_id=uuid.UUID(str(org_id))
+            ).first()
+            if not profile or not profile.logo_s3_key:
+                return False
+
+            logo_bytes = storage_service.download_bytes(profile.logo_s3_key)
+            if not logo_bytes or len(logo_bytes) > 2 * 1024 * 1024:
+                return False
+
+            logo_stream = BytesIO(logo_bytes)
+            p = doc.add_paragraph()
+            p.alignment = 1  # CENTER
+            run = p.add_run()
+            run.add_picture(logo_stream, width=Mm(40))
+            return True
+        finally:
+            db_local.close()
+    except Exception as exc:
+        logger.debug("memo_logo_not_available", error=str(exc))
+        return False
+
+
 def generate_memo_technique(db: Session, project_id: str) -> bytes:
     """Génère une mémoire technique Word (.docx) complète — 10 sections standard BTP.
     Design identique au rapport PDF/DOCX. Système hybride :
@@ -135,6 +169,9 @@ def generate_memo_technique(db: Session, project_id: str) -> bytes:
         logger.warning("memo_chart_generation_skipped", error=str(_chart_err))
 
     doc = Document()
+
+    # ── Logo entreprise (si disponible) ────────────────────────────────
+    _insert_company_logo(doc, project.org_id)
 
     # ── Couleurs (identiques au rapport DOCX) ────────────────────────────
     DARK_BLUE = RGBColor(0x0F, 0x1B, 0x4C)
@@ -1166,4 +1203,18 @@ def generate_memo_technique(db: Session, project_id: str) -> bytes:
 
     buf = BytesIO()
     doc.save(buf)
+
+    # ── Validation longueur : alerte si mémo dépasse ~20 pages ─────────
+    # Estimation : ~3000 caractères par page Word standard (Calibri 11pt)
+    total_chars = sum(len(p.text) for p in doc.paragraphs)
+    estimated_pages = max(1, total_chars // 3000)
+    if estimated_pages > 20:
+        logger.warning(
+            "memo_technique_too_long",
+            estimated_pages=estimated_pages,
+            total_chars=total_chars,
+            project_id=project_id,
+            hint="Le mémo dépasse 20 pages estimées. Envisagez de réduire max_tokens LLM.",
+        )
+
     return buf.getvalue()

@@ -1,5 +1,5 @@
 import uuid
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -11,12 +11,15 @@ from app.models.document import AoDocument
 from app.models.user import User
 from app.models.organization import Organization
 from app.api.v1.deps import get_current_user, get_current_org
+from app.core.limiter import limiter
 
 router = APIRouter()
 
 
 @router.post("/{project_id}/export/pdf")
+@limiter.limit("20/hour")
 async def export_pdf(
+    request: Request,
     project_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -39,7 +42,9 @@ async def export_pdf(
 
 
 @router.post("/{project_id}/export/word")
+@limiter.limit("20/hour")
 async def export_word(
+    request: Request,
     project_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -70,7 +75,9 @@ async def export_word(
 
 
 @router.post("/{project_id}/export/dpgf-excel")
+@limiter.limit("20/hour")
 async def export_dpgf_excel(
+    request: Request,
     project_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -163,8 +170,63 @@ async def export_dpgf_excel(
     )
 
 
+@router.post("/{project_id}/export/analysis-excel")
+@limiter.limit("20/hour")
+async def export_analysis_excel(
+    request: Request,
+    project_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    org: Organization = Depends(get_current_org),
+):
+    """Export Excel enrichi — scoring, cashflow, checklist, Go/No-Go, DPGF pricing.
+
+    Classeur multi-onglets avec graphiques openpyxl intégrés.
+    Plan Pro ou supérieur requis.
+    """
+    if org.plan not in ("pro", "europe", "business", "trial"):
+        raise HTTPException(
+            status_code=403,
+            detail="L'export Excel enrichi est disponible à partir du plan Pro.",
+        )
+
+    result = await db.execute(
+        select(AoProject).where(AoProject.id == project_id, AoProject.org_id == org.id)
+    )
+    project = result.scalar_one_or_none()
+    if not project:
+        raise HTTPException(status_code=404, detail="Projet introuvable")
+    if project.status != "ready":
+        raise HTTPException(status_code=400, detail="Analyse non terminée")
+
+    # Synchronous generation (openpyxl is fast, no LLM calls)
+    from app.services.excel_exporter import generate_analysis_excel
+    from app.core.database import SyncSessionLocal
+
+    sync_db = SyncSessionLocal()
+    try:
+        xlsx_bytes = generate_analysis_excel(sync_db, str(project_id))
+    finally:
+        sync_db.close()
+
+    import re
+    safe_title = re.sub(r"[^\w\-]", "_", project.title)[:50]
+    filename = f"Analyse_{safe_title}.xlsx"
+
+    return StreamingResponse(
+        io.BytesIO(xlsx_bytes),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Content-Length": str(len(xlsx_bytes)),
+        },
+    )
+
+
 @router.post("/{project_id}/export/memo")
+@limiter.limit("10/hour")
 async def export_memo_technique(
+    request: Request,
     project_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -204,7 +266,9 @@ async def export_memo_technique(
 
 
 @router.post("/{project_id}/export/pack")
+@limiter.limit("5/hour")
 async def export_pack(
+    request: Request,
     project_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),

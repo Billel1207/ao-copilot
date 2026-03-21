@@ -2,6 +2,12 @@
 import { useGoNoGo } from "@/hooks/useAnalysis";
 import { cn } from "@/lib/utils";
 import { TrendingUp, TrendingDown, Minus, ShieldCheck, ShieldAlert, ShieldX, Loader2 } from "lucide-react";
+import dynamic from "next/dynamic";
+
+const GoNoGoRadar = dynamic(
+  () => import("@/components/charts/GoNoGoRadar").then(m => ({ default: m.GoNoGoRadar })),
+  { ssr: false, loading: () => <div className="h-[280px] animate-pulse bg-slate-50 rounded-xl" /> }
+);
 
 interface Props {
   projectId: string;
@@ -168,7 +174,7 @@ export function GoNoGoCard({ projectId }: Props) {
     );
   }
 
-  const { score, recommendation, strengths = [], risks = [], summary, breakdown } = data;
+  const { score, recommendation, strengths = [], risks = [], summary, breakdown, dimension_scores } = data;
   const cfg = getScoreConfig(score, recommendation);
 
   return (
@@ -210,6 +216,16 @@ export function GoNoGoCard({ projectId }: Props) {
             )}
           </div>
         </div>
+
+        {/* Radar chart (9 dimensions Go/No-Go) */}
+        {dimension_scores && typeof dimension_scores === "object" && Object.keys(dimension_scores).length > 0 && (
+          <div className="mt-5 pt-5 border-t border-slate-100">
+            <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide mb-2">
+              Radar 9 dimensions
+            </p>
+            <GoNoGoRadar dimensions={dimension_scores} score={score} />
+          </div>
+        )}
 
         {/* Strengths & risks */}
         {(strengths.length > 0 || risks.length > 0) && (

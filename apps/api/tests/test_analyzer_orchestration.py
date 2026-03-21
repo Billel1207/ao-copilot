@@ -733,7 +733,7 @@ class _SyncFuture:
             self._result = None
             self._exception = e
 
-    def result(self):
+    def result(self, timeout=None):
         if self._exception:
             raise self._exception
         return self._result
@@ -756,9 +756,10 @@ class _SyncExecutor:
         return f
 
 
-def _sync_as_completed(futures):
+def _sync_as_completed(futures, timeout=None):
     """Drop-in for concurrent.futures.as_completed that works with _SyncFuture."""
     # futures is a dict {future: name} — just yield all keys immediately
+    # timeout is accepted but ignored in sync test context
     if isinstance(futures, dict):
         yield from futures.keys()
     else:

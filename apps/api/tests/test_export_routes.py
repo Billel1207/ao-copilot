@@ -189,19 +189,24 @@ async def test_export_memo_not_ready(client, db_session):
 
 
 async def test_export_memo_success(client, db_session):
-    """Memo export success returns docx bytes."""
+    """Memo export success dispatches Celery job and returns job_id."""
     _, _, project, _, headers = await _create_test_context(db_session, plan="pro")
 
-    fake_docx = b"PK\x03\x04 fake docx content"
+    mock_task = MagicMock()
+    mock_task.id = "test-task-id-123"
 
-    with patch("app.services.memo_exporter.generate_memo_technique", return_value=fake_docx):
+    with patch("app.worker.tasks.export_project_memo") as mock_export:
+        mock_export.delay.return_value = mock_task
         resp = await client.post(
             f"/api/v1/projects/{project.id}/export/memo",
             headers=headers,
         )
 
     assert resp.status_code == 200
-    assert "application/vnd.openxmlformats" in resp.headers.get("content-type", "")
+    data = resp.json()
+    assert data["job_id"] == "test-task-id-123"
+    assert data["status"] == "pending"
+    mock_export.delay.assert_called_once_with(str(project.id))
 
 
 # ── Pack Export ──────────────────────────────────────────────────────────────

@@ -36,14 +36,15 @@ def test_production_wildcard_raises():
         _ = s.allowed_origins_list
 
 
-def test_production_http_origin_raises():
-    """En production, un origin HTTP (non-HTTPS) lève RuntimeError."""
+def test_production_http_origin_filtered():
+    """En production, un origin HTTP est filtré (fallback HTTPS)."""
     s = _make_settings(
         APP_ENV="production",
         ALLOWED_ORIGINS="http://example.com",
     )
-    with pytest.raises(RuntimeError, match="non-HTTPS origin"):
-        _ = s.allowed_origins_list
+    result = s.allowed_origins_list
+    # Non-HTTPS origins are filtered out; fallback to ao-copilot.fr
+    assert result == ["https://ao-copilot.fr"]
 
 
 def test_production_https_origin_ok():
@@ -68,14 +69,15 @@ def test_production_multiple_https_ok():
     assert "https://app.ao-copilot.fr" in result
 
 
-def test_production_mixed_http_https_raises():
-    """En production, un mix HTTP + HTTPS lève RuntimeError sur le HTTP."""
+def test_production_mixed_http_https_filters():
+    """En production, un mix HTTP + HTTPS filtre les HTTP, garde les HTTPS."""
     s = _make_settings(
         APP_ENV="production",
         ALLOWED_ORIGINS="https://ao-copilot.fr,http://admin.ao-copilot.fr",
     )
-    with pytest.raises(RuntimeError, match="non-HTTPS"):
-        _ = s.allowed_origins_list
+    result = s.allowed_origins_list
+    # Only HTTPS origins are kept
+    assert result == ["https://ao-copilot.fr"]
 
 
 def test_dev_http_localhost_ok():

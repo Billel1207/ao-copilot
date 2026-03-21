@@ -411,3 +411,302 @@ class TestStreamChatText:
         tokens = list(svc.stream_chat_text("sys", "usr"))
         assert len(tokens) == 1
         assert "Erreur" in tokens[0]
+
+
+# ---------------------------------------------------------------------------
+# _build_user_blocks
+# ---------------------------------------------------------------------------
+
+class TestBuildUserBlocks:
+    def test_short_text_returns_string(self):
+        from app.services.llm import _build_user_blocks
+        result = _build_user_blocks("short text", cache=True)
+        assert isinstance(result, str)
+        assert result == "short text"
+
+    def test_long_text_returns_cached_blocks(self):
+        from app.services.llm import _build_user_blocks
+        long_text = "x" * 2000
+        result = _build_user_blocks(long_text, cache=True)
+        assert isinstance(result, list)
+        assert result[0]["cache_control"] == {"type": "ephemeral"}
+        assert result[0]["text"] == long_text
+
+    def test_cache_false_returns_string_always(self):
+        from app.services.llm import _build_user_blocks
+        long_text = "x" * 2000
+        result = _build_user_blocks(long_text, cache=False)
+        assert isinstance(result, str)
+
+    def test_exactly_1024_chars_returns_cached_blocks(self):
+        from app.services.llm import _build_user_blocks
+        text = "a" * 1024
+        result = _build_user_blocks(text, cache=True)
+        # len(1024) is NOT < 1024, so it gets cached as a list
+        assert isinstance(result, list)
+
+    def test_1023_chars_returns_string(self):
+        from app.services.llm import _build_user_blocks
+        text = "a" * 1023
+        result = _build_user_blocks(text, cache=True)
+        assert isinstance(result, str)
+
+
+# ---------------------------------------------------------------------------
+# _get_openai
+# ---------------------------------------------------------------------------
+
+class TestGetOpenai:
+    def test_returns_none_when_no_api_key(self):
+        import app.services.llm as llm_mod
+        llm_mod._openai_client = None  # reset
+        with patch.object(llm_mod.settings, "OPENAI_API_KEY", ""):
+            result = llm_mod._get_openai()
+            assert result is None
+
+    def test_returns_client_when_key_set(self):
+        import app.services.llm as llm_mod
+        llm_mod._openai_client = None  # reset
+        mock_openai_mod = MagicMock()
+        mock_client = MagicMock()
+        mock_openai_mod.OpenAI.return_value = mock_client
+        with patch.object(llm_mod.settings, "OPENAI_API_KEY", "sk-test123"), \
+             patch.dict("sys.modules", {"openai": mock_openai_mod}):
+            result = llm_mod._get_openai()
+            assert result is mock_client
+        llm_mod._openai_client = None  # cleanup
+
+    def test_returns_none_on_import_error(self):
+        import app.services.llm as llm_mod
+        llm_mod._openai_client = None
+        with patch.object(llm_mod.settings, "OPENAI_API_KEY", "sk-test"), \
+             patch.dict("sys.modules", {"openai": None}):
+            # None in sys.modules causes ImportError
+            result = llm_mod._get_openai()
+            assert result is None
+        llm_mod._openai_client = None
+
+
+# ---------------------------------------------------------------------------
+# OpenAI fallbacks
+# ---------------------------------------------------------------------------
+
+class TestOpenAIFallbacks:
+    @patch("app.services.llm.anthropic_sdk")
+    @patch("app.services.llm._get_openai")
+    def test_openai_json_fallback_returns_none_when_no_client(self, mock_get_openai, mock_anthropic):
+        from app.services.llm import LLMService
+        mock_get_openai.return_value = None
+        svc = LLMService()
+        result = svc._openai_json_fallback("sys", "usr")
+        assert result is None
+
+    @patch("app.services.llm.anthropic_sdk")
+    @patch("app.services.llm._get_openai")
+    def test_openai_json_fallback_success(self, mock_get_openai, mock_anthropic):
+        from app.services.llm import LLMService
+        mock_client = MagicMock()
+        mock_get_openai.return_value = mock_client
+
+        mock_response = MagicMock()
+        mock_response.choices = [MagicMock()]
+        mock_response.choices[0].message.content = '{"result": "ok"}'
+        mock_response.usage.prompt_tokens = 50
+        mock_response.usage.completion_tokens = 20
+        mock_response.usage.total_tokens = 70
+        mock_client.chat.completions.create.return_value = mock_response
+
+        svc = LLMService()
+        result = svc._openai_json_fallback("sys", "usr")
+        assert result == {"result": "ok"}
+        assert len(svc._usage_accumulator) == 1
+        assert svc._usage_accumulator[0]["step"] == "openai_fallback"
+
+    @patch("app.services.llm.anthropic_sdk")
+    @patch("app.services.llm._get_openai")
+    def test_openai_json_fallback_exception_returns_none(self, mock_get_openai, mock_anthropic):
+        from app.services.llm import LLMService
+        mock_client = MagicMock()
+        mock_get_openai.return_value = mock_client
+        mock_client.chat.completions.create.side_effect = Exception("API error")
+
+        svc = LLMService()
+        result = svc._openai_json_fallback("sys", "usr")
+        assert result is None
+
+    @patch("app.services.llm.anthropic_sdk")
+    @patch("app.services.llm._get_openai")
+    def test_openai_text_fallback_returns_none_when_no_client(self, mock_get_openai, mock_anthropic):
+        from app.services.llm import LLMService
+        mock_get_openai.return_value = None
+        svc = LLMService()
+        result = svc._openai_text_fallback("sys", "usr")
+        assert result is None
+
+    @patch("app.services.llm.anthropic_sdk")
+    @patch("app.services.llm._get_openai")
+    def test_openai_text_fallback_success(self, mock_get_openai, mock_anthropic):
+        from app.services.llm import LLMService
+        mock_client = MagicMock()
+        mock_get_openai.return_value = mock_client
+
+        mock_response = MagicMock()
+        mock_response.choices = [MagicMock()]
+        mock_response.choices[0].message.content = "Hello from GPT"
+        mock_response.usage.prompt_tokens = 30
+        mock_response.usage.completion_tokens = 10
+        mock_client.chat.completions.create.return_value = mock_response
+
+        svc = LLMService()
+        result = svc._openai_text_fallback("sys", "usr", max_tokens=512)
+        assert result == "Hello from GPT"
+
+    @patch("app.services.llm.anthropic_sdk")
+    @patch("app.services.llm._get_openai")
+    def test_openai_text_fallback_exception_returns_none(self, mock_get_openai, mock_anthropic):
+        from app.services.llm import LLMService
+        mock_client = MagicMock()
+        mock_get_openai.return_value = mock_client
+        mock_client.chat.completions.create.side_effect = RuntimeError("down")
+
+        svc = LLMService()
+        result = svc._openai_text_fallback("sys", "usr")
+        assert result is None
+
+
+# ---------------------------------------------------------------------------
+# chat_text with fallback
+# ---------------------------------------------------------------------------
+
+class TestChatTextFallback:
+    @patch("app.services.llm.anthropic_sdk")
+    def test_chat_text_fallback_to_openai(self, mock_anthropic):
+        from app.services.llm import LLMService
+        import pybreaker
+        svc = LLMService()
+
+        svc._anthropic_chat_text = MagicMock(side_effect=pybreaker.CircuitBreakerError(MagicMock()))
+        svc._openai_text_fallback = MagicMock(return_value="OpenAI result")
+
+        result = svc.chat_text("sys", "usr")
+        assert result == "OpenAI result"
+
+    @patch("app.services.llm.anthropic_sdk")
+    def test_chat_text_fallback_none_reraises(self, mock_anthropic):
+        from app.services.llm import LLMService
+        import pybreaker
+        svc = LLMService()
+
+        svc._anthropic_chat_text = MagicMock(side_effect=pybreaker.CircuitBreakerError(MagicMock()))
+        svc._openai_text_fallback = MagicMock(return_value=None)
+
+        with pytest.raises(pybreaker.CircuitBreakerError):
+            svc.chat_text("sys", "usr")
+
+
+# ---------------------------------------------------------------------------
+# complete_json with fallback
+# ---------------------------------------------------------------------------
+
+class TestCompleteJsonFallback:
+    @patch("app.services.llm.anthropic_sdk")
+    def test_complete_json_fallback_to_openai(self, mock_anthropic):
+        from app.services.llm import LLMService
+        import pybreaker
+        svc = LLMService()
+
+        svc._anthropic_json = MagicMock(side_effect=pybreaker.CircuitBreakerError(MagicMock()))
+        svc._openai_json_fallback = MagicMock(return_value={"key": "fallback"})
+
+        result = svc.complete_json("sys", "usr")
+        assert result == {"key": "fallback"}
+
+    @patch("app.services.llm.anthropic_sdk")
+    def test_complete_json_fallback_none_reraises(self, mock_anthropic):
+        from app.services.llm import LLMService
+        import pybreaker
+        svc = LLMService()
+
+        svc._anthropic_json = MagicMock(side_effect=pybreaker.CircuitBreakerError(MagicMock()))
+        svc._openai_json_fallback = MagicMock(return_value=None)
+
+        with pytest.raises(pybreaker.CircuitBreakerError):
+            svc.complete_json("sys", "usr")
+
+
+# ---------------------------------------------------------------------------
+# get_batch_results
+# ---------------------------------------------------------------------------
+
+class TestGetBatchResults:
+    @patch("app.services.llm.anthropic_sdk")
+    def test_get_batch_results_success_and_error(self, mock_anthropic):
+        from app.services.llm import LLMService
+        svc = LLMService()
+
+        # Successful entry
+        success_entry = MagicMock()
+        success_entry.custom_id = "req1"
+        success_entry.result.type = "succeeded"
+        success_entry.result.message.content = [MagicMock(text='{"answer": 42}')]
+        success_entry.result.message.stop_reason = "end_turn"
+
+        # Error entry
+        error_entry = MagicMock()
+        error_entry.custom_id = "req2"
+        error_entry.result.type = "errored"
+
+        svc._anthropic.messages.batches.results.return_value = [success_entry, error_entry]
+
+        results = svc.get_batch_results("batch_789")
+        assert len(results) == 2
+        assert results[0]["custom_id"] == "req1"
+        assert results[0]["status"] == "success"
+        assert results[0]["result"]["answer"] == 42
+        assert results[1]["custom_id"] == "req2"
+        assert results[1]["status"] == "error"
+        assert results[1]["result"] is None
+
+    @patch("app.services.llm.anthropic_sdk")
+    def test_get_batch_results_json_parse_failure(self, mock_anthropic):
+        from app.services.llm import LLMService
+        svc = LLMService()
+
+        entry = MagicMock()
+        entry.custom_id = "req_bad"
+        entry.result.type = "succeeded"
+        entry.result.message.content = [MagicMock(text="not json at all!!!")]
+        entry.result.message.stop_reason = "end_turn"
+
+        svc._anthropic.messages.batches.results.return_value = [entry]
+
+        results = svc.get_batch_results("batch_x")
+        assert results[0]["status"] == "success"
+        assert "error" in results[0]["result"]
+
+
+# ---------------------------------------------------------------------------
+# get_batch_status with ended_at=None
+# ---------------------------------------------------------------------------
+
+class TestGetBatchStatusPending:
+    @patch("app.services.llm.anthropic_sdk")
+    def test_batch_status_in_progress(self, mock_anthropic):
+        from app.services.llm import LLMService
+        svc = LLMService()
+
+        mock_batch = MagicMock()
+        mock_batch.id = "batch_pending"
+        mock_batch.processing_status = "in_progress"
+        mock_batch.request_counts.processing = 3
+        mock_batch.request_counts.succeeded = 2
+        mock_batch.request_counts.errored = 0
+        mock_batch.created_at = "2025-06-01T00:00:00"
+        mock_batch.ended_at = None
+
+        svc._anthropic.messages.batches.retrieve.return_value = mock_batch
+
+        result = svc.get_batch_status("batch_pending")
+        assert result["status"] == "in_progress"
+        assert result["ended_at"] is None
+        assert result["request_counts"]["total"] == 5

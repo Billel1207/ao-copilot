@@ -50,6 +50,14 @@ class CompanyProfile(Base):
         Integer, nullable=True
     )  # Nombre de projets actifs actuellement
 
+    # ── White-labeling (plan Business) ─────────────────────────────
+    logo_s3_key: Mapped[str | None] = mapped_column(
+        String(512), nullable=True
+    )  # Clé S3 du logo entreprise (PNG/SVG, max 2 Mo)
+    custom_theme: Mapped[dict | None] = mapped_column(
+        JSON, nullable=True
+    )  # Surcharge couleurs exports: {"primary": "#...", "header_bg": "#..."}
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=text("NOW()")
     )

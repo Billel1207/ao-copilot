@@ -2,6 +2,7 @@
 
 Événements supportés :
 - analysis.completed  : analyse terminée pour un projet
+- export.completed    : export (PDF/DOCX/Excel/Memo/Pack) terminé
 - project.created     : nouveau projet créé
 - project.deadline_due: date limite dans <7 jours
 - quota.warning       : >80% du quota mensuel utilisé

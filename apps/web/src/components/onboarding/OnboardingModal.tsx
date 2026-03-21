@@ -9,6 +9,7 @@ import {
   FileText, Sparkles, Users2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useFocusTrap } from "@/hooks/useFocusTrap";
 
 const STORAGE_KEY = "ao_onboarding_done";
 
@@ -344,15 +345,18 @@ export function OnboardingModal() {
     setOpen(false);
   };
 
+  // WCAG 2.4.3 — Focus trap for modal
+  const trapRef = useFocusTrap<HTMLDivElement>(open, handleClose);
+
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Configuration initiale">
       {/* Backdrop */}
-      <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" />
+      <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" aria-hidden="true" />
 
       {/* Modal */}
-      <div className="relative w-full max-w-md bg-white rounded-2xl shadow-elevation animate-slide-up">
+      <div ref={trapRef} className="relative w-full max-w-md bg-white rounded-2xl shadow-elevation animate-slide-up">
 
         {/* Header bar */}
         <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-slate-100">

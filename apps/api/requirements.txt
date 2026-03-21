@@ -74,6 +74,17 @@ python-docx==1.1.0
 # Charts & Visualisations
 matplotlib>=3.8.0
 docxtpl>=0.16.0
+plotly>=5.18.0
+kaleido>=0.2.1
+
+# PDF rendering (optional — feature flag USE_WEASYPRINT)
+weasyprint>=62.0
+
+# Mistral (EU embeddings — RGPD natif, optionnel)
+# mistralai>=1.0.0
+
+# Load testing (optionnel)
+# locust>=2.20.0
 
 # Tests
 pytest==8.3.4

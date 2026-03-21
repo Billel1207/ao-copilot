@@ -1,4 +1,4 @@
-"""Abstraction LLM — Anthropic Claude (principal) avec fallback OpenAI optionnel.
+"""Abstraction LLM — Anthropic Claude (principal) avec fallback OpenAI GPT-4o.
 
 Features:
 - Prompt caching (cache_control ephemeral) — 90% cheaper on cache hits
@@ -6,6 +6,7 @@ Features:
 - Circuit breaker (pybreaker) — fail-fast during API outages
 - Tenacity retry with exponential backoff for transient errors
 - Usage tracking (input/output/cached tokens) for cost monitoring
+- Fallback automatique vers OpenAI GPT-4o si Anthropic indisponible
 """
 import json
 import structlog
@@ -19,6 +20,23 @@ from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_excep
 from app.config import settings
 
 logger = structlog.get_logger(__name__)
+
+# ── OpenAI fallback (lazy init) ──────────────────────────────────────────
+_openai_client = None
+
+
+def _get_openai():
+    """Lazy init OpenAI client for fallback."""
+    global _openai_client
+    if _openai_client is None:
+        if not settings.OPENAI_API_KEY:
+            return None
+        try:
+            import openai
+            _openai_client = openai.OpenAI(api_key=settings.OPENAI_API_KEY)
+        except Exception:
+            return None
+    return _openai_client
 
 
 def _build_system_blocks(system: str, *, cache: bool = True) -> list[dict] | str:
@@ -93,12 +111,21 @@ class LLMService:
     ) -> dict[str, Any]:
         """Appel LLM avec sortie JSON garantie + validation Pydantic optionnelle.
 
+        Utilise Claude (Anthropic) en priorité. Si le circuit breaker est ouvert
+        ou si toutes les tentatives échouent, bascule sur OpenAI GPT-4o en fallback.
+
         Args:
             required_keys: Vérifie que ces clés existent dans la réponse.
             validator: Modèle Pydantic v2 pour validation stricte post-parsing.
                        Corrige automatiquement les valeurs hors-spec (enums, ranges, dates).
         """
-        result = self._anthropic_json(system_prompt, user_prompt)
+        try:
+            result = self._anthropic_json(system_prompt, user_prompt)
+        except (pybreaker.CircuitBreakerError, *_RETRYABLE_EXCEPTIONS) as exc:
+            logger.warning("anthropic_unavailable_trying_fallback", error=str(exc))
+            result = self._openai_json_fallback(system_prompt, user_prompt)
+            if result is None:
+                raise  # Re-raise si OpenAI fallback non disponible
 
         # Validation de structure post-parsing (clés requises)
         if required_keys:
@@ -224,6 +251,72 @@ class LLMService:
 
         return raw
 
+    # ── OpenAI GPT-4o Fallback ─────────────────────────────────────────
+    def _openai_json_fallback(self, system: str, user: str) -> dict | None:
+        """Fallback vers OpenAI GPT-4o quand Anthropic est indisponible.
+
+        Retourne None si OpenAI n'est pas configuré (OPENAI_API_KEY vide).
+        """
+        client = _get_openai()
+        if client is None:
+            logger.warning("openai_fallback_unavailable", reason="OPENAI_API_KEY not set")
+            return None
+
+        try:
+            response = client.chat.completions.create(
+                model=settings.LLM_FALLBACK_MODEL,
+                temperature=settings.LLM_TEMPERATURE,
+                max_tokens=settings.LLM_MAX_TOKENS,
+                response_format={"type": "json_object"},
+                messages=[
+                    {"role": "system", "content": system + "\n\nRéponds UNIQUEMENT en JSON valide."},
+                    {"role": "user", "content": user},
+                ],
+            )
+            raw = response.choices[0].message.content
+            self._usage_accumulator.append({
+                "step": "openai_fallback",
+                "input_tokens": response.usage.prompt_tokens,
+                "output_tokens": response.usage.completion_tokens,
+                "cache_read_tokens": 0,
+                "cache_creation_tokens": 0,
+            })
+            logger.info("openai_fallback_success", model=settings.LLM_FALLBACK_MODEL,
+                        tokens=response.usage.total_tokens)
+            return self._parse_json_response(raw, "end_turn")
+        except Exception as exc:
+            logger.error("openai_fallback_failed", error=str(exc))
+            return None
+
+    def _openai_text_fallback(self, system: str, user: str, max_tokens: int = 1024) -> str | None:
+        """Fallback texte libre vers OpenAI GPT-4o."""
+        client = _get_openai()
+        if client is None:
+            return None
+
+        try:
+            response = client.chat.completions.create(
+                model=settings.LLM_FALLBACK_MODEL,
+                temperature=0.2,
+                max_tokens=max_tokens,
+                messages=[
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": user},
+                ],
+            )
+            self._usage_accumulator.append({
+                "step": "openai_text_fallback",
+                "input_tokens": response.usage.prompt_tokens,
+                "output_tokens": response.usage.completion_tokens,
+                "cache_read_tokens": 0,
+                "cache_creation_tokens": 0,
+            })
+            logger.info("openai_text_fallback_success", model="gpt-4o")
+            return response.choices[0].message.content
+        except Exception as exc:
+            logger.error("openai_text_fallback_failed", error=str(exc))
+            return None
+
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=1, max=30),
@@ -233,8 +326,8 @@ class LLMService:
         ),
     )
     @_llm_breaker
-    def chat_text(self, system: str, user: str, max_tokens: int = 1024) -> str:
-        """Appel Claude en mode texte libre (pas JSON)."""
+    def _anthropic_chat_text(self, system: str, user: str, max_tokens: int = 1024) -> str:
+        """Appel Claude en mode texte libre (pas JSON) — interne."""
         response = self._anthropic.messages.create(
             model=self.model,
             max_tokens=max_tokens,
@@ -244,6 +337,17 @@ class LLMService:
         )
         self._track_usage(response, step="chat_text")
         return response.content[0].text
+
+    def chat_text(self, system: str, user: str, max_tokens: int = 1024) -> str:
+        """Appel LLM en mode texte libre avec fallback OpenAI."""
+        try:
+            return self._anthropic_chat_text(system, user, max_tokens)
+        except (pybreaker.CircuitBreakerError, *_RETRYABLE_EXCEPTIONS) as exc:
+            logger.warning("anthropic_chat_text_fallback", error=str(exc))
+            result = self._openai_text_fallback(system, user, max_tokens)
+            if result is not None:
+                return result
+            raise
 
     def stream_chat_text(
         self,

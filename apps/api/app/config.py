@@ -44,17 +44,30 @@ class Settings(BaseSettings):
     ANTHROPIC_API_KEY: str = ""
     LLM_MODEL: str = "claude-sonnet-4-6"
     LLM_TEMPERATURE: float = 0.1
-    LLM_MAX_TOKENS: int = 4096
+    LLM_MAX_TOKENS: int = 16384
 
-    # Embeddings (OpenAI — meilleur rapport qualité/prix pour les vecteurs)
+    # Fallback LLM (OpenAI GPT-4o — activé si OPENAI_API_KEY est renseigné)
+    LLM_FALLBACK_MODEL: str = "gpt-4o"
+
+    # Embeddings — OpenAI (défaut) ou Mistral (EU/RGPD)
     OPENAI_API_KEY: str = ""
+    EMBEDDING_PROVIDER: str = "openai"  # "openai" (défaut) ou "mistral" (EU RGPD)
     EMBEDDING_MODEL: str = "text-embedding-3-small"
     EMBEDDING_DIMS: int = 1536
 
-    # JWT
+    # Mistral (hébergé en France — RGPD natif)
+    MISTRAL_API_KEY: str = ""
+    MISTRAL_EMBEDDING_MODEL: str = "mistral-embed"
+
+    # JWT — RS256 (asymmetric) en production, HS256 en dev/test
     JWT_ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
+    JWT_PRIVATE_KEY: str = ""   # PEM RSA private key (required for RS256)
+    JWT_PUBLIC_KEY: str = ""    # PEM RSA public key (required for RS256)
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+
+    # PDF Renderer (feature flag)
+    USE_WEASYPRINT: bool = False  # True pour activer WeasyPrint (CSS3 complet, nécessite deps système)
 
     # Sentry
     SENTRY_DSN: str = ""
@@ -62,8 +75,8 @@ class Settings(BaseSettings):
     # Stripe Billing
     STRIPE_SECRET_KEY: str = ""
     STRIPE_WEBHOOK_SECRET: str = ""
-    STRIPE_PRICE_STARTER: str = "price_1T9JtH01CSvduw4lzqagkbQQ"  # 79€/mois
-    STRIPE_PRICE_PRO: str = "price_1T9Jv901CSvduw4lh0rVDHiQ"  # 199€/mois
+    STRIPE_PRICE_STARTER: str = "price_1T9JtH01CSvduw4lzqagkbQQ"  # 69€/mois
+    STRIPE_PRICE_PRO: str = "price_1T9Jv901CSvduw4lh0rVDHiQ"  # 179€/mois
     STRIPE_PRICE_EUROPE: str = "price_1T91vb01CSvduw4lFd3RvNL6"  # 299€/mois
     STRIPE_PRICE_BUSINESS: str = "price_1T9Fum01CSvduw4lo5gFEIbE"  # 499€/mois
     STRIPE_PRICE_DOC_UNIT: str = "price_1T9FwV01CSvduw4l4597ixbb"  # 3€/doc

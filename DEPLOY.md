@@ -14,7 +14,7 @@
 1. Va sur **hostinger.fr → VPS Hosting**
 2. Choisis le plan **KVM 2** (8 Go RAM) minimum — l'IA consomme de la mémoire
 3. Sélectionne **Ubuntu 22.04** comme OS
-4. Note l'**adresse IP** du VPS (ex: `123.45.67.89`)
+4. Note l'**adresse IP** du VPS (ex: `VOTRE_IP_VPS`)
 
 ---
 
@@ -24,8 +24,8 @@ Dans le panneau DNS Hostinger (ou ton registrar) :
 
 | Type | Nom | Valeur | TTL |
 |------|-----|--------|-----|
-| A | `@` | `123.45.67.89` (IP du VPS) | 300 |
-| A | `www` | `123.45.67.89` | 300 |
+| A | `@` | `VOTRE_IP_VPS` (IP du VPS) | 300 |
+| A | `www` | `VOTRE_IP_VPS` | 300 |
 
 > Attends 5-30 min que le DNS se propage avant de continuer.
 
@@ -35,10 +35,10 @@ Dans le panneau DNS Hostinger (ou ton registrar) :
 
 ```bash
 # Connexion en root
-ssh root@123.45.67.89
+ssh root@VOTRE_IP_VPS
 
 # Télécharger et exécuter le script de configuration
-curl -O https://raw.githubusercontent.com/TON-REPO/ao-copilot/main/scripts/setup-vps.sh
+curl -O https://raw.githubusercontent.com/adama-sas/ao-copilot/main/scripts/setup-vps.sh
 bash setup-vps.sh
 ```
 
@@ -57,7 +57,7 @@ Ce script installe automatiquement :
 su - deploy
 
 # Cloner le repo
-git clone https://github.com/TON-COMPTE/ao-copilot.git /opt/ao-copilot
+git clone https://github.com/adama-sas/ao-copilot.git /opt/ao-copilot
 cd /opt/ao-copilot
 ```
 
@@ -173,7 +173,68 @@ docker compose -f docker-compose.production.yml --env-file .env.production \
 
 Dans le Dashboard Stripe → Développeurs → Webhooks :
 - URL : `https://ao-copilot.fr/api/v1/billing/webhook`
-- Événements : `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.payment_failed`
+- Événements :
+  - `checkout.session.completed`
+  - `checkout.session.expired`
+  - `customer.subscription.updated`
+  - `customer.subscription.deleted`
+  - `invoice.payment_succeeded`
+  - `invoice.payment_failed`
+
+---
+
+## Étape 10 — Sauvegarde automatique de la base de données
+
+Script de backup quotidien vers S3:
+
+```bash
+# Créer le script de backup
+cat > /opt/ao-copilot/scripts/backup_db.sh << 'SCRIPT'
+#!/bin/bash
+set -euo pipefail
+TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+BACKUP_FILE="/tmp/aocopilot_backup_${TIMESTAMP}.sql.gz"
+
+# Dump + compression
+docker compose -f /opt/ao-copilot/docker-compose.production.yml exec -T postgres \
+  pg_dump -U aocopilot aocopilot | gzip > "${BACKUP_FILE}"
+
+# Upload vers S3 Scaleway
+aws s3 cp "${BACKUP_FILE}" \
+  "s3://aocopilot-backups/db/${TIMESTAMP}.sql.gz" \
+  --endpoint-url https://s3.fr-par.scw.cloud
+
+# Cleanup local
+rm -f "${BACKUP_FILE}"
+
+# Supprimer les backups > 30 jours
+aws s3 ls s3://aocopilot-backups/db/ --endpoint-url https://s3.fr-par.scw.cloud \
+  | awk '{print $4}' | while read file; do
+    date_str=$(echo "$file" | grep -oP '\d{8}')
+    if [ $(( ($(date +%s) - $(date -d "$date_str" +%s)) / 86400 )) -gt 30 ]; then
+      aws s3 rm "s3://aocopilot-backups/db/$file" --endpoint-url https://s3.fr-par.scw.cloud
+    fi
+  done
+
+echo "Backup OK: ${TIMESTAMP}"
+SCRIPT
+chmod +x /opt/ao-copilot/scripts/backup_db.sh
+
+# Ajouter au crontab (tous les jours à 3h du matin)
+(crontab -l 2>/dev/null; echo "0 3 * * * /opt/ao-copilot/scripts/backup_db.sh >> /var/log/ao-copilot-backup.log 2>&1") | crontab -
+```
+
+### Restauration
+
+```bash
+# Télécharger le backup
+aws s3 cp s3://aocopilot-backups/db/YYYYMMDD_HHMMSS.sql.gz /tmp/restore.sql.gz \
+  --endpoint-url https://s3.fr-par.scw.cloud
+
+# Restaurer
+gunzip -c /tmp/restore.sql.gz | docker compose -f docker-compose.production.yml exec -T postgres \
+  psql -U aocopilot aocopilot
+```
 
 ---
 
@@ -239,6 +300,27 @@ Celery Worker → Redis (queue)
 
 ---
 
+## Commandes de monitoring
+
+```bash
+# Health check
+curl https://ao-copilot.fr/api/v1/health
+
+# Celery workers status
+docker compose exec api celery -A app.worker.celery inspect active
+
+# Queue depth
+docker compose exec redis redis-cli LLEN celery
+
+# DB connections
+docker compose exec postgres psql -U aocopilot -c "SELECT count(*) FROM pg_stat_activity;"
+
+# Disk usage
+df -h /opt/ao-copilot
+```
+
+---
+
 ## Checklist finale avant mise en production
 
 - [ ] Domaine pointé sur le VPS et DNS propagé
@@ -249,3 +331,9 @@ Celery Worker → Redis (queue)
 - [ ] Email Resend configuré (domaine vérifié)
 - [ ] Premier compte admin créé manuellement
 - [ ] Test d'un vrai paiement Stripe (puis remboursé)
+- [ ] Sauvegarde DB quotidienne configurée (crontab)
+- [ ] Certificat SSL configuré (scripts/setup-ssl.sh)
+- [ ] Sentry DSN configuré pour monitoring erreurs
+- [ ] Health check endpoint vérifié (GET /api/v1/health → 200)
+- [ ] Workers Celery opérationnels (vérifier les logs)
+- [ ] Clés JWT RS256 générées (openssl genrsa)

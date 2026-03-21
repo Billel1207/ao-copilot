@@ -5,8 +5,26 @@
 <style>
   /* ══════════════ TYPOGRAPHIE & BASE ══════════════ */
   @page {
-    margin: 12mm 14mm 20mm 14mm;
+    margin: 12mm 14mm 22mm 14mm;
     size: A4;
+    @bottom-center {
+      content: "Page " counter(page) " / " counter(pages);
+      font-size: 7pt;
+      color: #94A3B8;
+      font-family: Helvetica, Arial, sans-serif;
+    }
+    @bottom-left {
+      content: "AO Copilot — Confidentiel";
+      font-size: 7pt;
+      color: #94A3B8;
+      font-family: Helvetica, Arial, sans-serif;
+    }
+    @bottom-right {
+      content: "Généré le {{ generated_at }}";
+      font-size: 7pt;
+      color: #94A3B8;
+      font-family: Helvetica, Arial, sans-serif;
+    }
   }
   body {
     font-family: {{ theme.font_family }};
@@ -148,6 +166,12 @@
     padding: 12px 16px; font-size: 9px; color: #78350f;
     margin-top: 24px;
   }
+  .ai-transparency-box {
+    background: #eff6ff; border: 1px solid #bfdbfe; border-left: 4px solid {{ theme.primary }};
+    padding: 10px 14px; font-size: 8px; color: #1e3a8a; margin-top: 14px;
+  }
+  .ai-transparency-box strong { font-size: 9px; display: block; margin-bottom: 4px; letter-spacing: 0.5px; }
+  .ai-transparency-box .ai-meta { color: #475569; line-height: 1.6; }
   .footer {
     text-align: center; color: {{ theme.text_muted }}; font-size: 8px;
     margin-top: 16px; padding-top: 8px;
@@ -196,6 +220,12 @@
 
 <!-- ═══════════ PAGE DE COUVERTURE ═══════════ -->
 <div class="page cover-page">
+  {% if company_logo_b64 %}
+  <div style="margin-bottom: 20px;">
+    <img src="{{ company_logo_b64 }}" alt="Logo entreprise"
+         style="max-width: 180px; max-height: 80px; object-fit: contain;" />
+  </div>
+  {% endif %}
   <div class="cover-brand">AO COPILOT</div>
   <div class="cover-line"></div>
   <div style="font-size: 12px; color: #64748b; letter-spacing: 3px; text-transform: uppercase; margin-bottom: 30px;">Rapport d'analyse DCE</div>
@@ -1697,6 +1727,20 @@
     <strong>Donnees utilisees :</strong> Seuls les documents uploades dans le projet ont ete analyses.
     L'IA ne dispose d'aucune information externe (pas d'acces internet, pas de base de donnees externe).
     La qualite de l'analyse depend directement de la qualite des documents fournis (lisibilite OCR, exhaustivite du DCE).
+  </div>
+
+  {# ── AI Act Article 50 — Transparency metadata ── #}
+  <div class="ai-transparency-box">
+    <strong>🤖 CONTENU GÉNÉRÉ PAR INTELLIGENCE ARTIFICIELLE</strong>
+    <div class="ai-meta">
+      Modèle IA : {{ ai_model|default("Claude Sonnet (Anthropic)") }}<br/>
+      Date de génération : {{ generated_at }}<br/>
+      Confiance moyenne : {{ ai_confidence|default("N/A") }}<br/>
+      Ce rapport a été généré automatiquement par AO Copilot à l'aide d'un modèle d'IA.
+      Conformément au Règlement européen 2024/1689 (AI Act, Article 50),
+      nous vous informons que ce contenu est produit par un système d'intelligence artificielle.
+      Il ne se substitue pas à un avis professionnel juridique ou technique.
+    </div>
   </div>
 
   <div class="footer" style="margin-top: 40px;">

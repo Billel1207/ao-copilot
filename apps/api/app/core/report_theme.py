@@ -2,8 +2,14 @@
 
 Toutes les couleurs, polices et espacements des rapports sont définis ici.
 Modifier ce fichier suffit pour changer l'apparence de tous les exports.
+
+White-labeling (plan Business) : `get_theme(org_id=...)` fusionne
+les surcharges du `custom_theme` JSON de CompanyProfile avec DEFAULT_THEME.
 """
-from dataclasses import dataclass, field
+from __future__ import annotations
+
+from dataclasses import dataclass, field, fields
+from typing import Optional
 
 
 @dataclass
@@ -54,7 +60,63 @@ class ReportTheme:
 # Instance par défaut utilisée par tous les exports
 DEFAULT_THEME = ReportTheme()
 
+# Champs autorisés pour la surcharge custom_theme (sécurité : pas de font_family)
+_ALLOWED_THEME_KEYS = {f.name for f in fields(ReportTheme) if "color" in f.name or f.name.endswith("_bg") or f.name.endswith("_text") or f.name == "primary" or f.name == "primary_dark" or f.name == "header_bg"}
 
-def get_theme() -> ReportTheme:
-    """Retourne le thème actif (extensible : thème client personnalisé futur)."""
-    return DEFAULT_THEME
+# Cache per-org pour éviter des queries répétées dans un même export
+_theme_cache: dict[str, ReportTheme] = {}
+
+
+def get_theme(org_id: Optional[str] = None) -> ReportTheme:
+    """Retourne le thème actif, avec surcharges per-org pour le plan Business.
+
+    Args:
+        org_id: UUID de l'organisation (optionnel). Si fourni, cherche
+                un custom_theme dans CompanyProfile.
+
+    Returns:
+        ReportTheme (DEFAULT_THEME si pas de surcharge ou org_id absent)
+    """
+    if not org_id:
+        return DEFAULT_THEME
+
+    # Cache hit
+    if org_id in _theme_cache:
+        return _theme_cache[org_id]
+
+    try:
+        from app.core.database import SyncSessionLocal
+        from app.models.company_profile import CompanyProfile
+
+        db = SyncSessionLocal()
+        try:
+            import uuid
+            profile = db.query(CompanyProfile).filter_by(
+                org_id=uuid.UUID(org_id)
+            ).first()
+
+            if not profile or not profile.custom_theme or not isinstance(profile.custom_theme, dict):
+                _theme_cache[org_id] = DEFAULT_THEME
+                return DEFAULT_THEME
+
+            # Merge only allowed keys (prevent injection of font_family or other fields)
+            overrides = {
+                k: v for k, v in profile.custom_theme.items()
+                if k in _ALLOWED_THEME_KEYS and isinstance(v, str) and v.startswith("#") and len(v) <= 9
+            }
+
+            if not overrides:
+                _theme_cache[org_id] = DEFAULT_THEME
+                return DEFAULT_THEME
+
+            # Create theme with overrides
+            import dataclasses
+            theme = dataclasses.replace(DEFAULT_THEME, **overrides)
+            _theme_cache[org_id] = theme
+            return theme
+        finally:
+            db.close()
+
+    except Exception:
+        # Any error → fallback to default (non-critical feature)
+        return DEFAULT_THEME

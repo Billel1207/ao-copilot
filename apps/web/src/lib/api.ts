@@ -103,6 +103,14 @@ export const authApi = {
     api.post<{ access_token: string; expires_in: number }>("/auth/login", data),
   logout: () => api.post("/auth/logout"),
   me: () => api.get("/auth/me"),
+  forgotPassword: (email: string) =>
+    api.post("/auth/forgot-password", { email }),
+  resetPassword: (token: string, new_password: string) =>
+    api.post("/auth/reset-password", { token, new_password }),
+  verifyEmail: (token: string) =>
+    api.post("/auth/verify-email", { token }),
+  resendVerification: () =>
+    api.post("/auth/resend-verification"),
 };
 
 // ── Projects ─────────────────────────────────────────────────
@@ -188,6 +196,14 @@ export const analysisApi = {
 export const companyApi = {
   getProfile: () => api.get("/company/profile"),
   updateProfile: (data: object) => api.put("/company/profile", data),
+  uploadLogo: (file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    return api.post("/company/logo", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+  },
+  deleteLogo: () => api.delete("/company/logo"),
 };
 
 // ── Export ────────────────────────────────────────────────────
@@ -196,6 +212,8 @@ export const exportApi = {
   startWord: (projectId: string) => api.post(`/projects/${projectId}/export/word`),
   startDpgfExcel: (projectId: string) =>
     api.post(`/projects/${projectId}/export/dpgf-excel`, {}, { responseType: "blob" }),
+  startAnalysisExcel: (projectId: string) =>
+    api.post(`/projects/${projectId}/export/analysis-excel`, {}, { responseType: "blob" }),
   startMemo: (projectId: string) =>
     api.post(`/projects/${projectId}/export/memo`),
   startPack: (projectId: string) =>

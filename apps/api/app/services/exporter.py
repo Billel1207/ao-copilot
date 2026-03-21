@@ -5,7 +5,9 @@ Les données sont centralisées dans export_data.py (fetch_export_data).
 Les fonctions generate_export_docx et generate_memo_technique ont été
 déplacées vers docx_exporter.py et memo_exporter.py respectivement.
 """
+import base64
 import os
+import uuid as _uuid
 import structlog
 from datetime import datetime
 from io import BytesIO
@@ -60,6 +62,43 @@ def _build_documents_inventory(documents) -> list[dict]:
             "ocr_quality": doc.ocr_quality_score,
         })
     return inventory
+
+
+def _fetch_company_logo_b64(org_id) -> str | None:
+    """Fetch company logo from S3 and return as base64 data URI, or None."""
+    try:
+        from app.models.company_profile import CompanyProfile
+        from app.services.storage import storage_service
+        from app.core.database import SyncSessionLocal
+
+        db = SyncSessionLocal()
+        try:
+            profile = db.query(CompanyProfile).filter_by(
+                org_id=_uuid.UUID(str(org_id))
+            ).first()
+            if not profile or not profile.logo_s3_key:
+                return None
+
+            logo_bytes = storage_service.download_bytes(profile.logo_s3_key)
+            if not logo_bytes or len(logo_bytes) > 2 * 1024 * 1024:  # Max 2 Mo
+                return None
+
+            # Detect MIME type from first bytes
+            if logo_bytes[:4] == b"\x89PNG":
+                mime = "image/png"
+            elif logo_bytes[:2] == b"\xff\xd8":
+                mime = "image/jpeg"
+            elif b"<svg" in logo_bytes[:200]:
+                mime = "image/svg+xml"
+            else:
+                mime = "image/png"  # fallback
+
+            return f"data:{mime};base64,{base64.b64encode(logo_bytes).decode()}"
+        finally:
+            db.close()
+    except Exception as exc:
+        logger.debug("company_logo_not_available", error=str(exc))
+        return None
 
 
 def _generate_charts(data) -> dict[str, str | None]:
@@ -128,6 +167,11 @@ def generate_export_pdf(db: Session, project_id: str) -> bytes:
     # ── Graphiques ──
     charts = _generate_charts(data)
 
+    # ── Logo & thème per-org ──
+    org_id = str(data.project.org_id) if data.project.org_id else None
+    company_logo_b64 = _fetch_company_logo_b64(org_id) if org_id else None
+    theme = get_theme(org_id)
+
     # ── Rendu template ──
     try:
         html_content = template.render(
@@ -156,7 +200,11 @@ def generate_export_pdf(db: Session, project_id: str) -> bytes:
             glossaire_btp=data.glossaire_btp,
             generated_at=datetime.now().strftime("%d/%m/%Y %H:%M"),
             generation_date=datetime.now().strftime("%d/%m/%Y"),
-            theme=get_theme(),
+            theme=theme,
+            company_logo_b64=company_logo_b64,
+            # AI Act Article 50 — AI transparency metadata
+            ai_model="Claude Sonnet (Anthropic)",
+            ai_confidence=f"{data.confidence}%" if data.confidence else "N/A",
             **charts,
         )
     except Exception as exc:

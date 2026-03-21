@@ -264,6 +264,68 @@ def send_quota_warning(
     )
 
 
+def send_password_reset_email(to_email: str, reset_url: str) -> bool:
+    """Email de réinitialisation de mot de passe."""
+    content = f"""
+    <h2 style="margin:0 0 8px;font-size:22px;color:#0F172A;">Réinitialisation de mot de passe 🔑</h2>
+    <p style="color:#64748B;font-size:15px;margin:0 0 24px;line-height:1.6;">
+      Bonjour,<br>
+      Vous avez demandé la réinitialisation de votre mot de passe sur AO Copilot.
+      Cliquez sur le bouton ci-dessous pour choisir un nouveau mot de passe.
+    </p>
+
+    <a href="{reset_url}"
+       style="display:inline-block;background:linear-gradient(135deg,#1E40AF,#1D4ED8);color:white;
+              font-weight:600;font-size:15px;padding:14px 28px;border-radius:12px;text-decoration:none;
+              box-shadow:0 4px 12px rgba(30,64,175,0.3);">
+      Réinitialiser mon mot de passe →
+    </a>
+
+    <div style="background:#FEF3C7;border:1px solid #FDE68A;border-radius:10px;padding:14px 16px;margin-top:24px;">
+      <p style="margin:0;color:#92400E;font-size:13px;font-weight:600;">
+        ⏱ Ce lien est valable 15 minutes. Si vous n&apos;avez pas demandé cette réinitialisation,
+        ignorez simplement cet email.
+      </p>
+    </div>
+    """
+
+    return _send_email(
+        to=to_email,
+        subject="Réinitialisation de mot de passe — AO Copilot",
+        html=_base_template(content),
+    )
+
+
+def send_verification_email(email: str, verify_url: str) -> bool:
+    """Email de vérification d'adresse email après inscription."""
+    content = f"""
+    <h2 style="margin:0 0 8px;font-size:22px;color:#0F172A;">V&eacute;rifiez votre adresse email</h2>
+    <p style="color:#64748B;font-size:15px;margin:0 0 24px;line-height:1.6;">
+      Bienvenue sur AO Copilot !<br>
+      Cliquez sur le bouton ci-dessous pour confirmer votre adresse email
+      et activer toutes les fonctionnalit&eacute;s de votre compte.
+    </p>
+
+    <a href="{verify_url}"
+       style="display:inline-block;background:linear-gradient(135deg,#1E40AF,#1D4ED8);color:white;
+              font-weight:600;font-size:15px;padding:14px 28px;border-radius:12px;text-decoration:none;
+              box-shadow:0 4px 12px rgba(30,64,175,0.3);">
+      Confirmer mon email
+    </a>
+
+    <p style="color:#94A3B8;font-size:12px;margin-top:20px;">
+      Ce lien est valable 24 heures. Si vous n&apos;avez pas cr&eacute;&eacute; de compte sur AO Copilot,
+      ignorez simplement cet email.
+    </p>
+    """
+
+    return _send_email(
+        to=email,
+        subject="Confirmez votre adresse email \u2014 AO Copilot",
+        html=_base_template(content),
+    )
+
+
 def send_team_invite(
     to_email: str,
     inviter_name: str,

@@ -1,7 +1,8 @@
-"""Routes API pour le profil entreprise — GET/PUT /company/profile."""
+"""Routes API pour le profil entreprise — GET/PUT /company/profile + logo upload."""
 import logging
+import uuid as uuid_lib
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -11,9 +12,13 @@ from app.models.company_profile import CompanyProfile
 from app.models.user import User
 from app.models.organization import Organization
 from app.api.v1.deps import get_current_user, get_current_org
+from app.core.limiter import limiter
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+ALLOWED_LOGO_TYPES = {"image/png", "image/jpeg", "image/svg+xml", "image/webp"}
+MAX_LOGO_SIZE = 2 * 1024 * 1024  # 2 Mo
 
 
 # ── Pydantic schemas ─────────────────────────────────────────────────────────
@@ -190,3 +195,94 @@ async def upsert_company_profile(
         created_at=profile.created_at.isoformat(),
         updated_at=profile.updated_at.isoformat(),
     )
+
+
+# ── Logo upload ──────────────────────────────────────────────────────────
+
+
+@router.post("/logo")
+@limiter.limit("10/hour")
+async def upload_company_logo(
+    request: Request,
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    org: Organization = Depends(get_current_org),
+):
+    """Upload le logo entreprise (PNG/JPEG/SVG/WebP, max 2 Mo).
+
+    Le logo apparaîtra sur les exports PDF/DOCX/Mémo.
+    """
+    if file.content_type not in ALLOWED_LOGO_TYPES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Type de fichier non supporté ({file.content_type}). "
+                   f"Formats acceptés : PNG, JPEG, SVG, WebP.",
+        )
+
+    content = await file.read()
+    if len(content) > MAX_LOGO_SIZE:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Fichier trop volumineux ({len(content) // 1024} Ko). Maximum : 2 Mo.",
+        )
+
+    from app.services.storage import storage_service
+
+    ext_map = {"image/png": "png", "image/jpeg": "jpg", "image/svg+xml": "svg", "image/webp": "webp"}
+    ext = ext_map.get(file.content_type, "png")
+    s3_key = f"logos/{org.id}/logo_{uuid_lib.uuid4().hex[:8]}.{ext}"
+
+    storage_service.upload_bytes(s3_key, content, file.content_type)
+
+    result = await db.execute(
+        select(CompanyProfile).where(CompanyProfile.org_id == org.id)
+    )
+    profile = result.scalar_one_or_none()
+
+    if profile:
+        if profile.logo_s3_key:
+            try:
+                storage_service.delete_object(profile.logo_s3_key)
+            except Exception:
+                pass
+        profile.logo_s3_key = s3_key
+        profile.updated_at = datetime.now(timezone.utc)
+    else:
+        profile = CompanyProfile(org_id=org.id, logo_s3_key=s3_key)
+        db.add(profile)
+
+    await db.flush()
+    logger.info("company_logo_uploaded", org_id=str(org.id), s3_key=s3_key)
+
+    return {"status": "ok", "logo_s3_key": s3_key, "size_kb": len(content) // 1024}
+
+
+@router.delete("/logo")
+async def delete_company_logo(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    org: Organization = Depends(get_current_org),
+):
+    """Supprime le logo entreprise."""
+    result = await db.execute(
+        select(CompanyProfile).where(CompanyProfile.org_id == org.id)
+    )
+    profile = result.scalar_one_or_none()
+
+    if not profile or not profile.logo_s3_key:
+        raise HTTPException(status_code=404, detail="Aucun logo configuré")
+
+    from app.services.storage import storage_service
+
+    try:
+        storage_service.delete_object(profile.logo_s3_key)
+    except Exception:
+        pass
+
+    profile.logo_s3_key = None
+    profile.updated_at = datetime.now(timezone.utc)
+    await db.flush()
+
+    logger.info("company_logo_deleted", org_id=str(org.id))
+    return {"status": "ok"}

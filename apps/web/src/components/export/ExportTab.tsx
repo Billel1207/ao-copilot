@@ -1,9 +1,10 @@
 "use client";
 import { useState, useRef, useEffect } from "react";
-import { Download, Loader2, FileText, Lock, FileOutput, CheckCircle2, Zap, TableProperties, FileEdit } from "lucide-react";
+import { Download, Loader2, FileText, Lock, FileOutput, CheckCircle2, Zap, TableProperties, FileEdit, Eye } from "lucide-react";
 import { toast } from "sonner";
 import { exportApi } from "@/lib/api";
 import Link from "next/link";
+import { PdfPreviewModal } from "./PdfPreviewModal";
 
 const MAX_POLL_ATTEMPTS = 30;
 
@@ -102,6 +103,7 @@ export function ExportTab({
   const [downloadUrlPdf, setDownloadUrlPdf] = useState<string | null>(null);
   const [downloadUrlWord, setDownloadUrlWord] = useState<string | null>(null);
   const [downloadUrlMemo, setDownloadUrlMemo] = useState<string | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const abortedRef = useRef(false);
   const isReady = projectStatus === "ready";
   const hasProAccess = userPlan === "pro" || userPlan === "europe" || userPlan === "business";
@@ -238,10 +240,18 @@ export function ExportTab({
           ]}
           action={
             downloadUrlPdf ? (
-              <a href={downloadUrlPdf} download
-                className="btn-primary inline-flex items-center gap-2">
-                <Download className="w-4 h-4" /> Télécharger PDF
-              </a>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setPreviewUrl(downloadUrlPdf)}
+                  className="btn-secondary inline-flex items-center gap-2 text-sm"
+                >
+                  <Eye className="w-4 h-4" /> Aperçu
+                </button>
+                <a href={downloadUrlPdf} download
+                  className="btn-primary inline-flex items-center gap-2">
+                  <Download className="w-4 h-4" /> Télécharger
+                </a>
+              </div>
             ) : loadingPdf ? (
               <GeneratingProgress label="Génération PDF en cours..." />
             ) : (
@@ -367,6 +377,15 @@ export function ExportTab({
           />
         )}
       </div>
+
+      {/* PDF Preview Modal */}
+      {previewUrl && (
+        <PdfPreviewModal
+          url={previewUrl}
+          filename="rapport_ao_copilot.pdf"
+          onClose={() => setPreviewUrl(null)}
+        />
+      )}
     </div>
   );
 }

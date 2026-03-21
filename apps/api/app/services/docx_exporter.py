@@ -12,6 +12,41 @@ from app.services.export_data import fetch_export_data
 logger = structlog.get_logger(__name__)
 
 
+def _insert_company_logo(doc, org_id) -> bool:
+    """Insert company logo from S3 into the document header. Returns True if inserted."""
+    try:
+        import uuid
+        from app.models.company_profile import CompanyProfile
+        from app.services.storage import storage_service
+        from app.core.database import SyncSessionLocal
+        from docx.shared import Mm
+
+        db = SyncSessionLocal()
+        try:
+            profile = db.query(CompanyProfile).filter_by(
+                org_id=uuid.UUID(str(org_id))
+            ).first()
+            if not profile or not profile.logo_s3_key:
+                return False
+
+            logo_bytes = storage_service.download_bytes(profile.logo_s3_key)
+            if not logo_bytes or len(logo_bytes) > 2 * 1024 * 1024:
+                return False
+
+            logo_stream = BytesIO(logo_bytes)
+            # Add logo as first paragraph before title
+            p = doc.add_paragraph()
+            p.alignment = 1  # CENTER
+            run = p.add_run()
+            run.add_picture(logo_stream, width=Mm(40))
+            return True
+        finally:
+            db.close()
+    except Exception as exc:
+        logger.debug("docx_logo_not_available", error=str(exc))
+        return False
+
+
 def generate_export_docx(db: Session, project_id: str) -> bytes:
     """Génère un rapport Word (.docx) complet — design identique au PDF.
     Headers bleu foncé, encadrés colorés, badges, Go/No-Go box, disclaimer IA.
@@ -55,6 +90,9 @@ def generate_export_docx(db: Session, project_id: str) -> bytes:
     po = summary.get("project_overview", {})
 
     doc = Document()
+
+    # ── Logo entreprise (si disponible) ────────────────────────────────
+    _insert_company_logo(doc, project.org_id)
 
     # ── Couleurs PDF ─────────────────────────────────────────────────────
     DARK_BLUE = RGBColor(0x0F, 0x1B, 0x4C)

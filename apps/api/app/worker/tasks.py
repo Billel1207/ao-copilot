@@ -11,6 +11,68 @@ from app.worker.celery_app import celery_app
 logger = structlog.get_logger(__name__)
 
 
+def _dispatch_export_webhook(project_id: str, export_type: str, s3_key: str):
+    """Dispatch export.completed webhook (best-effort, non-blocking)."""
+    try:
+        from app.models.project import AoProject
+        from app.services.webhook_dispatch import deliver_single_webhook_sync
+        from app.models.webhook import WebhookEndpoint
+
+        db = SyncSession()
+        try:
+            project = db.query(AoProject).filter_by(id=uuid.UUID(project_id)).first()
+            if not project:
+                return
+
+            org_id = str(project.org_id)
+
+            # Récupérer les endpoints actifs abonnés à export.completed
+            endpoints = (
+                db.query(WebhookEndpoint)
+                .filter(
+                    WebhookEndpoint.org_id == uuid.UUID(org_id),
+                    WebhookEndpoint.is_active == True,
+                    WebhookEndpoint.failure_count < 10,
+                )
+                .all()
+            )
+
+            import json
+            from datetime import datetime, timezone
+
+            payload = {
+                "event": "export.completed",
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "data": {
+                    "project_id": project_id,
+                    "project_title": project.title,
+                    "export_type": export_type,
+                    "s3_key": s3_key,
+                },
+            }
+            payload_json = json.dumps(payload, ensure_ascii=False, default=str)
+
+            for ep in endpoints:
+                subscribed = [e.strip() for e in (ep.events or "").split(",")]
+                if "export.completed" not in subscribed:
+                    continue
+                try:
+                    deliver_single_webhook_sync(
+                        endpoint_id=str(ep.id),
+                        url=ep.url,
+                        secret=ep.secret,
+                        event_type="export.completed",
+                        payload_json=payload_json,
+                        attempt_number=1,
+                    )
+                except Exception as wh_err:
+                    logger.debug("export_webhook_delivery_failed", error=str(wh_err))
+        finally:
+            db.close()
+    except Exception as exc:
+        logger.debug("export_webhook_dispatch_skipped", error=str(exc))
+
+
 def _set_progress(task_id: str, pct: int, step: str):
     """Stocke la progression dans Redis."""
     import redis as redis_lib
@@ -253,22 +315,36 @@ def analyze_project(self, project_id: str):
 @celery_app.task(name="export_project_pdf", time_limit=300, soft_time_limit=280)
 def export_project_pdf(project_id: str) -> str:
     """Génère un PDF d'export et retourne la clé S3."""
+    import time as _time
     from app.services.exporter import generate_export_pdf
     from app.services.storage import storage_service
     import uuid as uuid_lib
 
+    t0 = _time.monotonic()
     db = SyncSession()
     try:
         pdf_bytes = generate_export_pdf(db, project_id)
         s3_key = f"exports/{project_id}/{uuid_lib.uuid4()}.pdf"
         storage_service.upload_bytes(s3_key, pdf_bytes, "application/pdf")
+        duration_ms = int((_time.monotonic() - t0) * 1000)
+        logger.info(
+            "export_completed",
+            export_type="pdf",
+            project_id=project_id,
+            size_kb=len(pdf_bytes) // 1024,
+            duration_ms=duration_ms,
+        )
+        _dispatch_export_webhook(project_id, "pdf", s3_key)
         return s3_key
     except Exception as exc:
+        duration_ms = int((_time.monotonic() - t0) * 1000)
         logger.error(
-            "export_project_pdf_failed",
+            "export_failed",
+            export_type="pdf",
             project_id=project_id,
             error=str(exc),
             error_type=type(exc).__name__,
+            duration_ms=duration_ms,
         )
         raise RuntimeError(f"Erreur génération PDF: {type(exc).__name__}: {exc}") from exc
     finally:
@@ -458,6 +534,7 @@ def export_project_pack(project_id: str) -> str:
         zip_buffer.seek(0)
         s3_key = f"exports/{project_id}/{uuid_lib.uuid4()}.zip"
         storage_service.upload_bytes(s3_key, zip_buffer.read(), "application/zip")
+        _dispatch_export_webhook(project_id, "pack", s3_key)
         return s3_key
     finally:
         db.close()
@@ -466,10 +543,12 @@ def export_project_pack(project_id: str) -> str:
 @celery_app.task(name="export_project_memo", time_limit=300, soft_time_limit=280)
 def export_project_memo(project_id: str) -> str:
     """Génère une mémoire technique Word (.docx) et retourne la clé S3."""
+    import time as _time
     from app.services.memo_exporter import generate_memo_technique
     from app.services.storage import storage_service
     import uuid as uuid_lib
 
+    t0 = _time.monotonic()
     db = SyncSession()
     try:
         docx_bytes = generate_memo_technique(db, project_id)
@@ -479,13 +558,25 @@ def export_project_memo(project_id: str) -> str:
             docx_bytes,
             "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         )
+        duration_ms = int((_time.monotonic() - t0) * 1000)
+        logger.info(
+            "export_completed",
+            export_type="memo",
+            project_id=project_id,
+            size_kb=len(docx_bytes) // 1024,
+            duration_ms=duration_ms,
+        )
+        _dispatch_export_webhook(project_id, "memo", s3_key)
         return s3_key
     except Exception as exc:
+        duration_ms = int((_time.monotonic() - t0) * 1000)
         logger.error(
-            "export_project_memo_failed",
+            "export_failed",
+            export_type="memo",
             project_id=project_id,
             error=str(exc),
             error_type=type(exc).__name__,
+            duration_ms=duration_ms,
         )
         raise RuntimeError(f"Erreur génération mémoire technique: {type(exc).__name__}: {exc}") from exc
     finally:
@@ -495,10 +586,12 @@ def export_project_memo(project_id: str) -> str:
 @celery_app.task(name="export_project_docx", time_limit=300, soft_time_limit=280)
 def export_project_docx(project_id: str) -> str:
     """Génère un rapport Word (.docx) et retourne la clé S3. Plan Pro requis (vérifié en route)."""
+    import time as _time
     from app.services.docx_exporter import generate_export_docx
     from app.services.storage import storage_service
     import uuid as uuid_lib
 
+    t0 = _time.monotonic()
     db = SyncSession()
     try:
         docx_bytes = generate_export_docx(db, project_id)
@@ -508,6 +601,15 @@ def export_project_docx(project_id: str) -> str:
             docx_bytes,
             "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         )
+        duration_ms = int((_time.monotonic() - t0) * 1000)
+        logger.info(
+            "export_completed",
+            export_type="docx",
+            project_id=project_id,
+            size_kb=len(docx_bytes) // 1024,
+            duration_ms=duration_ms,
+        )
+        _dispatch_export_webhook(project_id, "docx", s3_key)
         return s3_key
     finally:
         db.close()

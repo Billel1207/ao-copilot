@@ -290,8 +290,8 @@ class TestWebhookEndpoint:
         # Vérifier que le plan a été rétrogradé
         await db.refresh(org)
         assert org.plan == "free"
-        # PLANS["free"].docs_per_month is 5
-        assert org.quota_docs == 5
+        # PLANS["free"].docs_per_month is 2
+        assert org.quota_docs == 2
 class TestQuotaEnforcement:
     """Tests de l'enforcement du quota via BillingService."""
 

@@ -214,8 +214,8 @@ class TestSubscriptionCanceled:
         # Org retombe au plan free
         await db.refresh(org)
         assert org.plan == "free"
-        # PLANS["free"].docs_per_month is 5
-        assert org.quota_docs == 5
+        # PLANS["free"].docs_per_month is 2
+        assert org.quota_docs == 2
 
 
     async def test_cancellation_marks_subscription_as_canceled(self, client_db):

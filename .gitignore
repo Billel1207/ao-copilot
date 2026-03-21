@@ -69,6 +69,10 @@ create_test_pdfs*.py
 /create_dce_*.py
 apps/api/.local-storage/
 
+# ─── Build artifacts ─────────────────────────────────────────────
+apps/web/*.tar.gz
+*.tar.gz
+
 # ─── MCP & Playwright ───────────────────────────────────────────
 .mcp.json
 .playwright-mcp/

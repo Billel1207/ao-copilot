@@ -54,13 +54,13 @@ class PlanConfig:
 PLANS: dict[PlanId, PlanConfig] = {
     "free": PlanConfig(
         name="Gratuit",
-        docs_per_month=5,
+        docs_per_month=2,
         max_users=1,
         monthly_eur=0.0,
         stripe_price_id="",
         retention_days=14,
         word_export=False,
-        features=["5 documents/mois", "1 utilisateur", "Analyse IA basique", "14 jours de rétention"],
+        features=["2 documents/mois", "1 utilisateur", "Analyse IA basique", "14 jours de rétention"],
     ),
     "trial": PlanConfig(
         name="Essai 14 jours",
